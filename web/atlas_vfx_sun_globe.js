@@ -279,7 +279,8 @@ function button(label, title) {
   el.textContent = label;
   el.title = title;
   Object.assign(el.style, {
-    border: "1px solid #375568", borderRadius: "7px", padding: "7px 6px", flex: "1 1 auto", whiteSpace: "nowrap",
+    border: "1px solid #375568", borderRadius: "7px", padding: "7px 6px", minWidth: "0", whiteSpace: "nowrap",
+    overflow: "hidden", textOverflow: "ellipsis",
     color: "#d9f7ff", background: "#122430", font: "700 9px system-ui", letterSpacing: ".06em", cursor: "pointer",
   });
   return el;
@@ -346,7 +347,7 @@ function radialTexture(THREE, ring) {
   return tex;
 }
 
-const PANEL_H = 446;
+const PANEL_H = 476;
 
 // ------------------------------------------------------------------------------------------- the panel
 function buildGlobe(node, THREE) {
@@ -368,7 +369,7 @@ function buildGlobe(node, THREE) {
     fontFamily: "Inter, system-ui, sans-serif", userSelect: "none", position: "relative",
   });
   const heading = overlay({ left: "15px", top: "13px" });
-  heading.innerHTML = '<div style="font-size:10px;letter-spacing:.24em;color:#6cd8e5">ATLAS PHYSICAL SKY</div>' +
+  heading.innerHTML = '<div style="font-size:10px;letter-spacing:.16em;color:#6cd8e5">ATLAS PHYSICAL SKY</div>' +
     '<div style="font-size:19px;font-weight:800;letter-spacing:.05em;margin-top:2px">SUN GLOBE</div>';
   const badge = overlay({ right: "13px", top: "14px", borderRadius: "99px", padding: "5px 8px",
     font: "800 9px system-ui", letterSpacing: ".11em" });
@@ -377,28 +378,33 @@ function buildGlobe(node, THREE) {
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, { position: "absolute", left: "0", top: "52px", width: "100%", height: "260px",
     cursor: "grab", touchAction: "none", zIndex: 1 });
-  const legend = overlay({ left: "14px", top: "58px", color: "#5f8f99", font: "600 8.5px ui-monospace, monospace",
+  // camera line on its own row, the axis legend under it (they overlapped on a narrow node)
+  const camLabel = overlay({ left: "14px", right: "14px", top: "58px", color: "#7fc9d4",
+    font: "600 8.5px ui-monospace, monospace", letterSpacing: ".04em", whiteSpace: "nowrap", overflow: "hidden",
+    textOverflow: "ellipsis" });
+  const legend = overlay({ left: "14px", top: "71px", color: "#5f8f99", font: "600 8.5px ui-monospace, monospace",
     letterSpacing: ".06em" });
-  legend.textContent = "N -Z  E +X  Y UP";
-  const camLabel = overlay({ right: "14px", top: "58px", color: "#7fc9d4", font: "600 8.5px ui-monospace, monospace",
-    letterSpacing: ".04em", textAlign: "right" });
-  const flag = overlay({ left: "50%", top: "76px", transform: "translateX(-50%)", borderRadius: "99px",
+  legend.textContent = "N -Z · E +X · Y UP";
+  const flag = overlay({ left: "50%", top: "86px", transform: "translateX(-50%)", borderRadius: "99px",
     padding: "4px 9px", font: "800 9px system-ui", letterSpacing: ".11em", color: "#ffd0c0", background: "#5a1d12",
     border: "1px solid #c0523a", display: "none", whiteSpace: "nowrap" });
   flag.textContent = "BELOW HORIZON · SKY NOT RENDERED";
-  const relation = overlay({ left: "14px", right: "14px", top: "290px", color: "#9fe0e8",
-    font: "700 9.5px system-ui", letterSpacing: ".08em", whiteSpace: "nowrap", overflow: "hidden" });
-  const readout = overlay({ left: "14px", right: "14px", top: "318px", display: "flex",
-    justifyContent: "space-between", color: "#86dbe4", font: "600 11px ui-monospace, monospace",
-    letterSpacing: ".05em", whiteSpace: "nowrap" });
+  // up to two lines: a long relation ("... 72° RIGHT OF THE LENS · IN FRAME") wrapped off the edge before
+  const relation = overlay({ left: "14px", right: "14px", top: "286px", color: "#9fe0e8",
+    font: "700 9.5px/12px system-ui", letterSpacing: ".08em", maxHeight: "24px", overflow: "hidden" });
+  // az, el and the clock wrap as whole items with a gap between them (they ran together on a narrow node)
+  const readout = overlay({ left: "14px", right: "14px", top: "314px", display: "flex", flexWrap: "wrap",
+    justifyContent: "space-between", columnGap: "10px", rowGap: "2px", color: "#86dbe4",
+    font: "600 10px/13px ui-monospace, monospace", letterSpacing: ".04em", whiteSpace: "nowrap" });
   const scrub = document.createElement("canvas");
   scrub.title = "Time of day: drag to relight the plate to another hour (writes time_offset_h; shift = 1 minute " +
     "steps). In manual the scrubber switches back to the metadata sun.";
-  Object.assign(scrub.style, { position: "absolute", left: "12px", right: "12px", top: "340px",
+  Object.assign(scrub.style, { position: "absolute", left: "12px", right: "12px", top: "346px",
     width: "calc(100% - 24px)", height: "50px", cursor: "ew-resize", touchAction: "none", zIndex: 1 });
   const controls = document.createElement("div");
+  // 2 x 2: four buttons in one row clipped "VIEW NORTH" off a narrow node
   Object.assign(controls.style, { position: "absolute", left: "12px", right: "12px", bottom: "10px",
-    display: "flex", gap: "6px", zIndex: 2 });
+    display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px", zIndex: 2 });
   const resetBtn = button("RESET TO METADATA", "Back to the sun the GPS and capture time give: metadata mode, " +
     "time offset 0, offsets 0");
   const goldenBtn = button("GOLDEN HOUR", "Move the clock to the golden hour on the capture day (the NOAA sun at " +
