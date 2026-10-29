@@ -20,6 +20,16 @@
     "url": "https://raw.githubusercontent.com/mmp/pbrt-v4/9772673e43e74b931675081b2826f4acc91ba348/src/ext/skymodel/ArHosekSkyModelData_Spectral.h",
     "sha256": "46459aefe7cfa14759495200b107a0db7ac0f8d5cec8792582123286ddf0cc09",
     "bytes": 513703
+   },
+   "ArHosekSkyModelData_CIEXYZ.h": {
+    "url": "https://raw.githubusercontent.com/mmp/pbrt-v4/9772673e43e74b931675081b2826f4acc91ba348/src/ext/skymodel/ArHosekSkyModelData_CIEXYZ.h",
+    "sha256": "cd879dc216340d9416b16930cb92f4bd3e3bbcb7c6f0a3ce692bf006f4110320",
+    "bytes": 66862
+   },
+   "ArHosekSkyModelData_RGB.h": {
+    "url": "https://raw.githubusercontent.com/mmp/pbrt-v4/9772673e43e74b931675081b2826f4acc91ba348/src/ext/skymodel/ArHosekSkyModelData_RGB.h",
+    "sha256": "ed5b2c94674ca2249aca289178de72821768e6b9f152a16835b944f80fe6a196",
+    "bytes": 66849
    }
   }
  },

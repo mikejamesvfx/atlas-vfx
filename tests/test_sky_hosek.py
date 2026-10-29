@@ -84,8 +84,8 @@ def test_golden():
     check(worst < 1e-9, "sky radiance = the reference C", f"{len(g['sky'])} cases, worst rel {worst:.2e}")
     worst = 0.0
     for t, a, el, ga, wl, want in g["sun"]:
-        bands = sh.solar_spectral(t, np.array([el]), np.array([math.sin(ga)]))[0]
-        got = _interp_bands(bands, wl)
+        direct, dark = sh.solar_terms(t, np.array([el]), np.array([math.sin(ga)]))
+        got = _interp_bands(direct[0], wl) * _interp_bands(dark[0], wl)
         worst = max(worst, abs(got - want) / max(abs(want), 1e-300) if want else abs(got))
     check(worst < 1e-9, "solar radiance = the reference C", f"{len(g['sun'])} cases, worst {worst:.2e}")
 

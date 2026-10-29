@@ -103,6 +103,16 @@ def band_weights() -> np.ndarray:
     return xyz @ XYZ_TO_REC709.T
 
 
+@lru_cache(maxsize=1)
+def _sun_grid() -> tuple[np.ndarray, np.ndarray]:
+    """(hats (11, L), Rec.709 weights per 1 nm sample (L, 3)) for the sun, whose direct radiance and limb darkening
+    the reference interpolates separately between bands before multiplying (solar_radiance_internal2)."""
+    bands = load_data()["bands_nm"]
+    lam = np.arange(bands[0], bands[-1] + 0.5, 1.0)
+    hats = np.stack([np.interp(lam, bands, np.eye(len(bands))[i]) for i in range(len(bands))])
+    return hats, cmf_wyman2013(lam) @ XYZ_TO_REC709.T
+
+
 # ------------------------------------------------------------------------------------------------ model
 def _bezier(x: float) -> np.ndarray:
     return np.array([(1 - x) ** 5, 5 * (1 - x) ** 4 * x, 10 * (1 - x) ** 3 * x ** 2, 10 * (1 - x) ** 2 * x ** 3,
@@ -147,9 +157,10 @@ def sky_spectral(configs, rads, cos_theta, cos_gamma) -> np.ndarray:
     return (f * rads[:, None]).T
 
 
-def solar_spectral(turbidity: float, ray_el_rad, sin_gamma) -> np.ndarray:
-    """(N, 11) direct solar radiance (no sky): solar_radiance_internal2 at each band centre, for rays at elevation
-    ray_el_rad (>= 0) and angle gamma from the sun's centre."""
+def solar_terms(turbidity: float, ray_el_rad, sin_gamma) -> tuple[np.ndarray, np.ndarray]:
+    """((N, 11) direct radiance, (N, 11) limb darkening factor) at each band centre, for rays at elevation ray_el_rad
+    (>= 0) and angle gamma from the sun's centre; zero outside the disc. solar_radiance_internal2 interpolates each
+    of the two linearly between bands and multiplies them."""
     d = load_data()
     sol_sin = math.sin(SOLAR_RADIUS_RAD)
     sc2 = np.clip(1.0 - sin_gamma ** 2 / (sol_sin * sol_sin), 0.0, None)
@@ -161,7 +172,8 @@ def solar_spectral(turbidity: float, ray_el_rad, sin_gamma) -> np.ndarray:
     pos = np.minimum((np.power(2.0 * ray_el_rad / math.pi, 1.0 / 3.0) * 45).astype(np.int64), 44)
     x = ray_el_rad - (pos / 45.0) ** 3 * (math.pi * 0.5)
     sol = d["solar"]                                                     # (11, 10, 45, 4), file order
-    out = np.empty((ray_el_rad.size, sol.shape[0]))
+    direct_b = np.empty((ray_el_rad.size, sol.shape[0]))
+    dark_b = np.empty_like(direct_b)
     for b in range(sol.shape[0]):
         def sr(t):
             c = sol[b, t][pos]                                           # (N, 4); constant term last
@@ -170,8 +182,24 @@ def solar_spectral(turbidity: float, ray_el_rad, sin_gamma) -> np.ndarray:
         ld = d["limb"][b]
         dark = ld[0] + sample_cos * (ld[1] + sample_cos * (ld[2] + sample_cos * (ld[3] + sample_cos * (
             ld[4] + sample_cos * ld[5]))))
-        out[:, b] = np.where(sample_cos > 0.0, direct * dark, 0.0)
-    return out
+        inside = sample_cos > 0.0
+        direct_b[:, b] = np.where(inside, direct, 0.0)
+        dark_b[:, b] = np.where(inside, dark, 0.0)
+    return direct_b, dark_b
+
+
+def solar_spectral(turbidity: float, ray_el_rad, sin_gamma) -> np.ndarray:
+    """(N, 11) direct solar radiance (no sky) at each band centre."""
+    direct, dark = solar_terms(turbidity, ray_el_rad, sin_gamma)
+    return direct * dark
+
+
+def solar_rec709(turbidity: float, ray_el_rad, sin_gamma) -> np.ndarray:
+    """(N, 3) Linear Rec.709 of the direct sun: direct radiance and limb darkening each interpolated to 1 nm, then
+    multiplied and integrated against the CMFs (as the reference evaluates any wavelength)."""
+    direct, dark = solar_terms(turbidity, ray_el_rad, sin_gamma)
+    hats, w = _sun_grid()
+    return ((direct @ hats) * (dark @ hats)) @ w
 
 
 # ------------------------------------------------------------------------------------------------ evaluator
@@ -243,7 +271,7 @@ class HosekWilkieEvaluator:
             if near.any():
                 cn = cg[near]
                 ray_el = np.arcsin(np.clip(c[near, 1], 0.0, 1.0))
-                out[near] = solar_spectral(self.turbidity, ray_el, np.sqrt(np.clip(1.0 - cn * cn, 0.0, 1.0))) @ self.W
+                out[near] = solar_rec709(self.turbidity, ray_el, np.sqrt(np.clip(1.0 - cn * cn, 0.0, 1.0)))
             return out
         return self._chunks(directions, f)
 
