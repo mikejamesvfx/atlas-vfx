@@ -19,6 +19,9 @@ Since the public repo started (one commit, 2026-10-29):
   on a narrow node.
 - **OpenImageIO is now required** (`requirements.txt`, `pyproject.toml`): most of what the nodes write is EXR, and
   a ComfyUI Manager install without it could not run the starter. pycolmap stays optional.
+- **Chart Calibrate drops a bad chart detection** instead of averaging it in. OpenCV's exhaustive chessboard
+  search is not deterministic and now and then returns a bogus patch; on CI one such view moved the lens focal 7 %.
+  A view far worse than the rest is dropped, the lens solved again, and the node warns with the frame.
 - **Starter workflow** `workflows/starter_physical_sky.json`: no plate, no other packs.
 - **CI** (`.github/workflows/tests.yml`, Linux, no GPU): every test script on Python 3.11 and 3.12, and
   `tools/clean_install_check.py`, which loads the pack into a fresh ComfyUI v0.43.0 with an empty home folder and

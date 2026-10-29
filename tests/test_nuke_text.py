@@ -132,7 +132,9 @@ def test_resolve_out_dir():
     assert "repo" in msg, msg
     msg = raises(ValueError, pl.resolve_out_dir, str(TMP / ".." / "escape"), TMP)
     assert "work root" in msg, msg
-    msg = raises(ValueError, pl.resolve_out_dir, r"C:\Windows\Temp\avfx", TMP)
+    # an absolute folder outside every work root on this OS (a Windows path is relative on Linux: it fell in the repo)
+    outside = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "Temp" / "avfx" if os.name == "nt" else Path("/var/tmp/avfx")
+    msg = raises(ValueError, pl.resolve_out_dir, str(outside), TMP)
     assert "work root" in msg, msg
     msg = raises(ValueError, pl.resolve_out_dir, "", ROOT / "default_in_repo")
     assert "repo" in msg, msg
