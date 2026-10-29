@@ -1,0 +1,2748 @@
+{
+ "AtlasVFXCameraExport": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "units_per_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "chan",
+    "type": "STRING"
+   },
+   {
+    "name": "usda",
+    "type": "STRING"
+   },
+   {
+    "name": "nuke_camera_json",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXCameraImport": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "source_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "kind",
+    "type": "COMBO",
+    "group": "required"
+   },
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "required"
+   },
+   {
+    "name": "sensor_preset",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "auto",
+     "fujifilm_xh2_dci4k_24p_dis_off",
+     "custom"
+    ]
+   },
+   {
+    "name": "sensor_width_mm",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "sensor_height_mm",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "m_per_unit",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "rot_order",
+    "type": "COMBO",
+    "group": "required"
+   },
+   {
+    "name": "chan_focal_mm",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "crop_to_plate",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "offset_first_frame",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "off",
+     "to 1",
+     "to 1001",
+     "to plate start"
+    ]
+   },
+   {
+    "name": "abc_camera",
+    "type": "STRING",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA"
+   },
+   {
+    "name": "path",
+    "type": "STRING"
+   },
+   {
+    "name": "summary",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXCardProject": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "required"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "card",
+    "type": "ATLAS_VFX_CARD",
+    "group": "required"
+   },
+   {
+    "name": "scale",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "frame_step",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "preview_every",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "preview_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "holdout_depth",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "holdout_margin_m",
+    "type": "FLOAT",
+    "group": "optional"
+   },
+   {
+    "name": "holdout_soft_m",
+    "type": "FLOAT",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "exr_folder",
+    "type": "STRING"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   }
+  ]
+ },
+ "AtlasVFXCharacterInsert": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "images",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "pick_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "pick_u",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "pick_v",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "deck_y",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "height_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "key_lo",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "key_hi",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "erode_px",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "billboard",
+     "fixed"
+    ]
+   },
+   {
+    "name": "clip_start",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "end_mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "hold",
+     "pingpong",
+     "loop"
+    ]
+   },
+   {
+    "name": "source_model",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "mask",
+    "type": "MASK",
+    "group": "optional"
+   },
+   {
+    "name": "exposure_stops",
+    "type": "FLOAT",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "card",
+    "type": "ATLAS_VFX_CARD"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXChartCalibrate": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "video_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "lens",
+     "readout"
+    ]
+   },
+   {
+    "name": "sensor_preset",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "fujifilm_xh2_dci4k_24p_dis_off"
+    ]
+   },
+   {
+    "name": "lens_json",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "every",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "still_px",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "focal_guess_mm",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "lens_path",
+    "type": "STRING"
+   },
+   {
+    "name": "focal_mm",
+    "type": "FLOAT"
+   },
+   {
+    "name": "k1",
+    "type": "FLOAT"
+   },
+   {
+    "name": "k2",
+    "type": "FLOAT"
+   },
+   {
+    "name": "pp_offset_x_px",
+    "type": "FLOAT"
+   },
+   {
+    "name": "pp_offset_y_px",
+    "type": "FLOAT"
+   },
+   {
+    "name": "readout_path",
+    "type": "STRING"
+   },
+   {
+    "name": "readout_ms",
+    "type": "FLOAT"
+   },
+   {
+    "name": "sigma_ms",
+    "type": "FLOAT"
+   },
+   {
+    "name": "rms_rs_px",
+    "type": "FLOAT"
+   },
+   {
+    "name": "rms_gs_px",
+    "type": "FLOAT"
+   },
+   {
+    "name": "measurable",
+    "type": "BOOLEAN"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXCompPreview": {
+  "folder": "deliver",
+  "category": "Atlas VFX/Deliver",
+  "inputs": [
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "required"
+   },
+   {
+    "name": "layer_folders",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "frame_step",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "burn_in",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "label",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "frames",
+    "type": "IMAGE"
+   },
+   {
+    "name": "fps",
+    "type": "FLOAT"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXDepthHoldout": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "background_geometry",
+    "type": "MOGE_GEOMETRY",
+    "group": "required"
+   },
+   {
+    "name": "matte",
+    "type": "MASK",
+    "group": "required"
+   },
+   {
+    "name": "margin",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "soft",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "foot_rows",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "smooth",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "distance_scale",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "blur_px",
+    "type": "FLOAT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "matte",
+    "type": "MASK"
+   },
+   {
+    "name": "occluder",
+    "type": "MASK"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXEXRWrite": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "images",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "input_colorspace",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "colorspace",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "input_premultiplied",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "mask",
+    "type": "MASK",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "pattern",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXForegroundElement": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "image",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "mask",
+    "type": "MASK",
+    "group": "required"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "batch_index",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "distance_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "lateral_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "height_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "ground_y",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "yaw_deg",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "erode_px",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "mask_is_background",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "card",
+    "type": "ATLAS_VFX_CARD"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXLTXPrep": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "required"
+   },
+   {
+    "name": "layer_folder",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "length",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "height",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "mask_thresh",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "shadow_px",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "dilate_px",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "keyframe_every",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "full",
+     "crop"
+    ]
+   },
+   {
+    "name": "crop_margin",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "extra_layers",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "reference",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "plate",
+     "comp"
+    ]
+   },
+   {
+    "name": "mask_mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "layer",
+     "none"
+    ]
+   },
+   {
+    "name": "sensor_rs_folder",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "sensor_lens_folder",
+    "type": "STRING",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "reference",
+    "type": "IMAGE"
+   },
+   {
+    "name": "mask",
+    "type": "MASK"
+   },
+   {
+    "name": "reference_half",
+    "type": "IMAGE"
+   },
+   {
+    "name": "mask_half",
+    "type": "MASK"
+   },
+   {
+    "name": "start_image",
+    "type": "IMAGE"
+   },
+   {
+    "name": "ltx_prep",
+    "type": "ATLAS_VFX_LTX_PREP"
+   },
+   {
+    "name": "keyframes_half",
+    "type": "IMAGE"
+   }
+  ]
+ },
+ "AtlasVFXLTXReturn": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "images",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "ltx_prep",
+    "type": "ATLAS_VFX_LTX_PREP",
+    "group": "required"
+   },
+   {
+    "name": "feather_px",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "source_model",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "preview_every",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "layer_folder",
+    "type": "STRING"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   }
+  ]
+ },
+ "AtlasVFXLightFromPlate": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "background",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "encoding",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "srgb",
+     "linear"
+    ]
+   },
+   {
+    "name": "fov_x",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "sun",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "auto",
+     "manual"
+    ]
+   },
+   {
+    "name": "sun_u",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "sun_v",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "behind",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "smooth",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "sun_colour",
+    "type": "STRING",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "light_rig",
+    "type": "ATLAS_VFX_LIGHT_RIG"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXLockCheck": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "required"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "centre",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "orientation",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "ground",
+     "vertical"
+    ]
+   },
+   {
+    "name": "width_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "height_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "divisions",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "proxy_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "preview_every",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "out_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "measure_report",
+    "type": "STRING",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "mp4",
+    "type": "STRING"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   }
+  ]
+ },
+ "AtlasVFXMeasureScale": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "picks_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "solve_points",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "max_spread_pct",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "force",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA"
+   },
+   {
+    "name": "path",
+    "type": "STRING"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   },
+   {
+    "name": "summary",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXNormals": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "moge_geometry",
+    "type": "MOGE_GEOMETRY",
+    "group": "required"
+   },
+   {
+    "name": "temporal",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "sigma",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "matte",
+    "type": "MASK",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "normals",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXNukeBuilder": {
+  "folder": "deliver",
+  "category": "Atlas VFX/Deliver",
+  "inputs": [
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "required"
+   },
+   {
+    "name": "nuke_camera_json",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "layer_folders",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "shot",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "plate_kind",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "dpx",
+     "prores",
+     "original"
+    ]
+   },
+   {
+    "name": "set_proxy_obj",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "prefix",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "set_root",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "x_offset",
+    "type": "INT",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "script_path",
+    "type": "STRING"
+   },
+   {
+    "name": "script",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXPhysicalSky": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "latitude",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "longitude",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "altitude_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "capture_utc",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "time_offset_h",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "heading_deg",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "fov_x",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "tilt_deg",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "visibility_km",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "ground_albedo",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "exposure_ev",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "sun_mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "metadata",
+     "offset",
+     "manual"
+    ]
+   },
+   {
+    "name": "sun_azimuth_offset",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "sun_elevation_offset",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "sun_azimuth",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "sun_elevation",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "latlong_centre",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "north",
+     "camera heading"
+    ]
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "optional"
+   },
+   {
+    "name": "dataset",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "display",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "view",
+    "type": "STRING",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "hdri_acescg",
+    "type": "IMAGE"
+   },
+   {
+    "name": "light_rig",
+    "type": "ATLAS_VFX_LIGHT_RIG"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   },
+   {
+    "name": "exr_path",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXPlateDepth": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "moge_model",
+    "type": "MOGE_MODEL",
+    "group": "required"
+   },
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "required"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "solve_points",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "proxy_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "resolution_level",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "refine_steps",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "frame_step",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "preview_every",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "depth_folder",
+    "type": "STRING"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXPlateLock": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "plate",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "ai",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "plate_camera",
+    "type": "ATLAS_VFX_PLATELOCK_TRACK",
+    "group": "required"
+   },
+   {
+    "name": "ai_camera",
+    "type": "ATLAS_VFX_PLATELOCK_TRACK",
+    "group": "required"
+   },
+   {
+    "name": "people",
+    "type": "ATLAS_VFX_PLATELOCK_PEOPLE",
+    "group": "required"
+   },
+   {
+    "name": "scale",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "depth_mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "flat",
+     "metric",
+     "inverse"
+    ]
+   },
+   {
+    "name": "flat_distance",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "shutter_deg",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "motion_blur_samples",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "neighbours",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "edge_snap",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "snap_max_px",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "ai_depth",
+    "type": "IMAGE",
+    "group": "optional"
+   },
+   {
+    "name": "plate_matte",
+    "type": "MASK",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "comp",
+    "type": "IMAGE"
+   },
+   {
+    "name": "background",
+    "type": "IMAGE"
+   },
+   {
+    "name": "background_valid",
+    "type": "MASK"
+   },
+   {
+    "name": "result",
+    "type": "ATLAS_VFX_PLATELOCK_RESULT"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXPlateLockCamera": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "frames",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "locked_off",
+     "shot_camera",
+     "platelock_json"
+    ]
+   },
+   {
+    "name": "path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "focal_mm",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "sensor_width_mm",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "readout_ms",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "fps",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "rs_anchor",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "centre",
+     "top"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "name": "camera",
+    "type": "ATLAS_VFX_PLATELOCK_TRACK"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXPlateLockCrossView": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "plate",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "ai",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "plate_ids",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "plate_space",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "ai_space",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "proc_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "first",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "ai_ids",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "matte_channel",
+    "type": "COMBO",
+    "group": "optional"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "base",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "ai",
+     "plate"
+    ]
+   },
+   {
+    "name": "quality",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "medium",
+     "fast",
+     "ultrafast"
+    ]
+   },
+   {
+    "name": "write_comp",
+    "type": "BOOLEAN",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "summary",
+    "type": "STRING"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   }
+  ]
+ },
+ "AtlasVFXPlateLockLayer": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "result",
+    "type": "ATLAS_VFX_PLATELOCK_RESULT",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "rgb",
+    "type": "IMAGE"
+   },
+   {
+    "name": "alpha",
+    "type": "MASK"
+   },
+   {
+    "name": "names",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXPlateLockPerson": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "plate_masks",
+    "type": "MASK",
+    "group": "required"
+   },
+   {
+    "name": "ai_masks",
+    "type": "MASK",
+    "group": "required"
+   },
+   {
+    "name": "depth",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "people",
+    "type": "ATLAS_VFX_PLATELOCK_PEOPLE",
+    "group": "optional"
+   },
+   {
+    "name": "body_plate_npz",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "body_ai_npz",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "correspondences_npz",
+    "type": "STRING",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "people",
+    "type": "ATLAS_VFX_PLATELOCK_PEOPLE"
+   }
+  ]
+ },
+ "AtlasVFXPlateLockQC": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "people",
+    "type": "ATLAS_VFX_PLATELOCK_PEOPLE",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "summary",
+    "type": "STRING"
+   },
+   {
+    "name": "report_json",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXPlateLockReadEXR": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "first",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "every",
+    "type": "INT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "frames",
+    "type": "IMAGE"
+   },
+   {
+    "name": "metadata",
+    "type": "STRING"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT"
+   }
+  ]
+ },
+ "AtlasVFXPlateLockScreenKey": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "plate",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "screen",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "blue",
+     "green"
+    ]
+   },
+   {
+    "name": "low",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "high",
+    "type": "FLOAT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "matte",
+    "type": "MASK"
+   }
+  ]
+ },
+ "AtlasVFXPlateLockWrite": {
+  "folder": "platelock",
+  "category": "Atlas VFX/Layers/Plate Lock",
+  "inputs": [
+   {
+    "name": "result",
+    "type": "ATLAS_VFX_PLATELOCK_RESULT",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "ai_first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "ai_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "write_comp",
+    "type": "BOOLEAN",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "out_dir",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXPlateRead": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "first",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "input_space",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "range",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "auto",
+     "full",
+     "legal"
+    ]
+   },
+   {
+    "name": "frame_offset",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "preview_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "preview_every",
+    "type": "INT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXRSSolve": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "solve_folder",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "points_camera",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "readout",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "free",
+     "held"
+    ]
+   },
+   {
+    "name": "readout_ms",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "max_points",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "max_iter",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "profile_ms",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "profile_points",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA"
+   },
+   {
+    "name": "readout_ms",
+    "type": "FLOAT"
+   },
+   {
+    "name": "path",
+    "type": "STRING"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXRelight": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "element",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "matte",
+    "type": "MASK",
+    "group": "required"
+   },
+   {
+    "name": "normals",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "light_rig",
+    "type": "ATLAS_VFX_LIGHT_RIG",
+    "group": "required"
+   },
+   {
+    "name": "encoding",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "srgb",
+     "linear"
+    ]
+   },
+   {
+    "name": "sun_gain",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "ambient_gain",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "studio_flat",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "facing_power",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "fresnel_power",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "edge_rim",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "edge_px",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "rim_max",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "exposure_match",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "exposure_bias",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "exposure_smooth",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "background",
+    "type": "IMAGE",
+    "group": "optional"
+   },
+   {
+    "name": "sun_rig",
+    "type": "ATLAS_VFX_LIGHT_RIG",
+    "group": "optional"
+   },
+   {
+    "name": "sun_strength_from",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "sun_gain",
+     "physical sky"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "name": "relit",
+    "type": "IMAGE"
+   },
+   {
+    "name": "ambient_pass",
+    "type": "IMAGE"
+   },
+   {
+    "name": "key_pass",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXSensorApply": {
+  "folder": "sensor",
+  "category": "Atlas VFX/Sensor",
+  "inputs": [
+   {
+    "name": "images",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "direction",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "apply camera",
+     "remove camera"
+    ]
+   },
+   {
+    "name": "rs_folder",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "lens_folder",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "window",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "colorspace",
+    "type": "COMBO",
+    "group": "required"
+   },
+   {
+    "name": "use_vignette",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "use_lens",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "use_rs",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "edge",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "edge",
+     "black"
+    ]
+   },
+   {
+    "name": "ltx_prep",
+    "type": "ATLAS_VFX_LTX_PREP",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "images",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXSensorLensMaps": {
+  "folder": "sensor",
+  "category": "Atlas VFX/Sensor",
+  "inputs": [
+   {
+    "name": "lens_source",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "camera",
+     "camera + typed",
+     "typed"
+    ]
+   },
+   {
+    "name": "k1",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "k2",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "k3",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "p1",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "p2",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "ca_r",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "ca_b",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "vig_1",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "vig_2",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "vig_3",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "map_scale",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "optional"
+   },
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "sensor_lens",
+    "type": "ATLAS_VFX_SENSOR_LENS"
+   },
+   {
+    "name": "lens_folder",
+    "type": "STRING"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXSensorRSMaps": {
+  "folder": "sensor",
+  "category": "Atlas VFX/Sensor",
+  "inputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "depth_folder",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "readout_ms",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "readout_source",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "preset rule",
+     "measured if connected",
+     "typed"
+    ]
+   },
+   {
+    "name": "direction",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "both",
+     "apply RS",
+     "remove RS"
+    ]
+   },
+   {
+    "name": "shutter_angle",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "blur_samples",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "map_scale",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "iters",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "readout_measured_ms",
+    "type": "FLOAT",
+    "group": "optional"
+   },
+   {
+    "name": "sensor_lens",
+    "type": "ATLAS_VFX_SENSOR_LENS",
+    "group": "optional"
+   },
+   {
+    "name": "readout_chart_ms",
+    "type": "FLOAT",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "rs_folder",
+    "type": "STRING"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXSensorReadoutSolve": {
+  "folder": "sensor",
+  "category": "Atlas VFX/Sensor",
+  "inputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "solve_folder",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "points_camera",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "frame_step",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "refine_pose",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "max_readout_ms",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "readout_ms",
+    "type": "FLOAT"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXSetProxy": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "depth_folder",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "solve_points",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "deck_y",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "deck_band",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "max_tilt_deg",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "inlier_m",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "frame_every",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "pixel_step",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "obj",
+    "type": "STRING"
+   },
+   {
+    "name": "usda",
+    "type": "STRING"
+   },
+   {
+    "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXSolveCompare": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "camera_a",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   },
+   {
+    "name": "camera_b",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "report",
+    "type": "STRING"
+   },
+   {
+    "name": "summary",
+    "type": "STRING"
+   },
+   {
+    "name": "residual_pct_of_path",
+    "type": "FLOAT"
+   },
+   {
+    "name": "view_angle_median_deg",
+    "type": "FLOAT"
+   },
+   {
+    "name": "scale_b_per_a",
+    "type": "FLOAT"
+   }
+  ]
+ },
+ "AtlasVFXTrackingProxy": {
+  "folder": "camera_side",
+  "category": "Atlas VFX/Camera",
+  "inputs": [
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ",
+    "group": "required"
+   },
+   {
+    "name": "width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "clip_limit",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "preview_every",
+    "type": "INT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "folder",
+    "type": "STRING"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   }
+  ]
+ }
+}

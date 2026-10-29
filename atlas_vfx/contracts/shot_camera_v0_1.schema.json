@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlas.local/contract/shot-camera/0.1",
+  "title": "contract.shot-camera@0.1",
+  "description": "Per-frame camera for a real plate, in metres. Produced by Atlas Camera (solve or import), consumed by atlas-vfx, twentyfive, later Director/Unreal. Nuke .chan and USD are exports of this, not the contract. Axes: right-handed, Y up, camera looks down -Z, X right (Nuke/USD). cam_to_world is a row-major 4x4 for column vectors: rotation in the top-left 3x3 (orthonormal, det +1), camera position in metres in the last column, bottom row [0,0,0,1]. Pixels: origin at the top-left corner of the top-left pixel, x right, y down, so the centre of the first pixel is (0.5, 0.5) and the image centre is (width/2, height/2). Intrinsics use the horizontal aperture: fx = focal_mm * width / sensor.width_mm, fy = fx * pixel_aspect (as Nuke does); sensor.height_mm is checked against them, not used. Frames are shot frames (plate frame index + plate_frame_offset), every frame from frame_start to frame_end exactly once. Rules the schema cannot express (contiguous frames, orthonormal rotations, unit sanity, sensor/pixel aspect agreement) are checked by shot_camera.validate().",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "units", "axes", "shot", "plate", "sensor", "frames", "scale", "source"],
+  "properties": {
+    "contract": {"const": "shot-camera@0.1"},
+    "units": {"const": "m", "description": "translations in metres; focal and sensor always in mm"},
+    "axes": {"const": "y_up_rh_minus_z_forward"},
+    "shot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "frame_start", "frame_end", "fps"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "frame_start": {"type": "integer"},
+        "frame_end": {"type": "integer"},
+        "fps": {"type": "number", "exclusiveMinimum": 0},
+        "plate_frame_offset": {"type": "integer", "description": "shot frame = plate frame index + offset (1001 for Nuke-style numbering)"}
+      }
+    },
+    "plate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "width", "height", "colorspace", "range"],
+      "properties": {
+        "path": {"type": "string", "description": "read in place, never copied"},
+        "sha256": {"type": "string"},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "pixel_aspect": {"type": "number", "exclusiveMinimum": 0, "default": 1.0},
+        "colorspace": {"type": "string", "description": "OCIO colorspace name, e.g. 'F-Log2 F-Gamut'"},
+        "ocio_config": {"type": "string"},
+        "range": {"enum": ["full", "legal"]},
+        "timecode": {"type": "string"},
+        "camera_body": {"type": "string"}
+      }
+    },
+    "sensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width_mm", "height_mm"],
+      "description": "the area of the sensor the plate covers (crop for this recording mode)",
+      "properties": {
+        "width_mm": {"type": "number", "exclusiveMinimum": 0},
+        "height_mm": {"type": "number", "exclusiveMinimum": 0},
+        "preset": {"type": "string", "description": "e.g. 'fujifilm_xh2_dci4k_24p_dis_off'"}
+      }
+    },
+    "lens": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "distortion_model": {"enum": ["none", "simple_radial", "nuke_classic", "brown"], "default": "none"},
+        "distortion_params": {"type": "array", "items": {"type": "number"}},
+        "principal_point_px": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2, "description": "defaults to (width/2, height/2)"}
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["frame", "cam_to_world", "focal_mm"],
+        "properties": {
+          "frame": {"type": "integer"},
+          "cam_to_world": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}}},
+          "focal_mm": {"type": "number", "exclusiveMinimum": 0},
+          "reproj_px": {"type": "number", "minimum": 0}
+        }
+      }
+    },
+    "scale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "m_per_source_unit"],
+      "properties": {
+        "method": {"enum": ["unscaled", "known_lengths", "metric_depth", "imported_metric"]},
+        "m_per_source_unit": {"type": "number", "exclusiveMinimum": 0},
+        "measurements": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["label", "length_m", "measured_units"],
+          "properties": {"label": {"type": "string"}, "length_m": {"type": "number", "exclusiveMinimum": 0}, "measured_units": {"type": "number", "exclusiveMinimum": 0}, "frames": {"type": "array", "items": {"type": "integer"}}}}},
+        "spread_pct": {"type": "number", "minimum": 0},
+        "up_axis_method": {"type": "string"},
+        "ground_y_m": {"type": "number"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["solve", "import", "synthetic"]},
+        "solver": {"type": "string", "description": "e.g. 'pycolmap 4.2.1' or 'Nuke 17.1 CameraTracker'"},
+        "distribution": {"type": "string"},
+        "commit": {"type": "string"},
+        "path": {"type": "string"},
+        "rmse_px": {"type": "number", "minimum": 0},
+        "rmse_px_at_width": {"type": "integer", "minimum": 1}
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "free-form, namespaced by producer (e.g. {\"atlas_camera\": {...}}); consumers must not require anything in here"
+    }
+  }
+}

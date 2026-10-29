@@ -1,0 +1,340 @@
+{
+ "last_node_id": 91,
+ "last_link_id": 5,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    40,
+    70
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      1,
+      4
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~\\Videos\\atlas-vfx_footage\\DSCF3000.MOV",
+    129,
+    296,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    56
+   ]
+  },
+  {
+   "id": 2,
+   "type": "AtlasVFXCameraImport",
+   "pos": [
+    460,
+    40
+   ],
+   "size": [
+    300,
+    466
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      2
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraImport"
+   },
+   "widgets_values": [
+    "~\\ComfyUI_V135\\ComfyUI\\output\\_pick\\vfx_probe\\solve_s1s3_f16",
+    "auto",
+    "auto",
+    23.5,
+    12.39,
+    1.0,
+    "ZXY",
+    0.0,
+    false,
+    "DSCF3000_pycolmap_f16_full",
+    ""
+   ]
+  },
+  {
+   "id": 3,
+   "type": "AtlasVFXMeasureScale",
+   "pos": [
+    880,
+    103
+   ],
+   "size": [
+    300,
+    340
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      3
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXMeasureScale"
+   },
+   "widgets_values": [
+    "~\\atlas-vfx-work\\DSCF3000\\picks\\DSCF3000_S2S3_picks_GUESS.json",
+    "",
+    5.0,
+    false,
+    "DSCF3000_f16_GUESS_stairs",
+    ""
+   ]
+  },
+  {
+   "id": 90,
+   "type": "AtlasVFXCameraExport",
+   "pos": [
+    1300,
+    160
+   ],
+   "size": [
+    300,
+    226
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "chan",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "usda",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "nuke_camera_json",
+     "type": "STRING",
+     "links": [
+      5
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraExport"
+   },
+   "widgets_values": [
+    1.0,
+    "",
+    ""
+   ]
+  },
+  {
+   "id": 91,
+   "type": "AtlasVFXNukeBuilder",
+   "pos": [
+    1720,
+    97
+   ],
+   "size": [
+    300,
+    352
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 4
+    },
+    {
+     "name": "nuke_camera_json",
+     "type": "STRING",
+     "widget": {
+      "name": "nuke_camera_json"
+     },
+     "link": 5
+    }
+   ],
+   "outputs": [
+    {
+     "name": "script_path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "script",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXNukeBuilder"
+   },
+   "widgets_values": [
+    "",
+    "~\\atlas-vfx-work\\DSCF3000\\layers\\DSCF3000_f16_GUESS_stairs_grass_far\n~\\atlas-vfx-work\\DSCF3000\\layers\\DSCF3000_f16_GUESS_stairs_grass_near",
+    "DSCF3000_S2S3",
+    "dpx",
+    "~\\atlas-vfx-work\\DSCF3000\\set_proxy\\DSCF3000_f16_GUESS_stairs_set.obj",
+    "AVFX_",
+    true,
+    ""
+   ]
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   2,
+   2,
+   0,
+   3,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   3,
+   3,
+   0,
+   90,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   4,
+   1,
+   0,
+   91,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   5,
+   90,
+   2,
+   91,
+   1,
+   "STRING"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "T8 Camera Export + Nuke Builder (S2-S3, grass)",
+   "bounding": [
+    -5,
+    -51,
+    2070,
+    602
+   ],
+   "color": "#335159",
+   "font_size": 24
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

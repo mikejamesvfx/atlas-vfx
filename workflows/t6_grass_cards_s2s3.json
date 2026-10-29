@@ -1,0 +1,1272 @@
+{
+ "last_node_id": 43,
+ "last_link_id": 30,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    40,
+    1162
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      1,
+      23,
+      26
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~\\Videos\\atlas-vfx_footage\\DSCF3000.MOV",
+    129,
+    296,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    56
+   ]
+  },
+  {
+   "id": 2,
+   "type": "AtlasVFXCameraImport",
+   "pos": [
+    460,
+    852
+   ],
+   "size": [
+    300,
+    466
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      2
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraImport"
+   },
+   "widgets_values": [
+    "~\\ComfyUI_V135\\ComfyUI\\output\\_pick\\vfx_probe\\solve_s1s3_f16",
+    "auto",
+    "auto",
+    23.5,
+    12.39,
+    1.0,
+    "ZXY",
+    0.0,
+    false,
+    "DSCF3000_pycolmap_f16_full",
+    ""
+   ]
+  },
+  {
+   "id": 3,
+   "type": "AtlasVFXMeasureScale",
+   "pos": [
+    880,
+    767
+   ],
+   "size": [
+    300,
+    340
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      17,
+      20,
+      24,
+      27
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXMeasureScale"
+   },
+   "widgets_values": [
+    "~\\atlas-vfx-work\\DSCF3000\\picks\\DSCF3000_S2S3_picks_GUESS.json",
+    "",
+    5.0,
+    false,
+    "DSCF3000_f16_GUESS_stairs",
+    ""
+   ]
+  },
+  {
+   "id": 10,
+   "type": "UNETLoader",
+   "pos": [
+    40,
+    756
+   ],
+   "size": [
+    300,
+    148
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      3
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "Z_Image_Turbo_BF16.safetensors",
+    "default"
+   ]
+  },
+  {
+   "id": 11,
+   "type": "CLIPLoader",
+   "pos": [
+    40,
+    72
+   ],
+   "size": [
+    300,
+    178
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      8
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "qwen_3_4b.safetensors",
+    "lumina2",
+    "default"
+   ]
+  },
+  {
+   "id": 12,
+   "type": "VAELoader",
+   "pos": [
+    40,
+    320
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      5
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "ae.safetensors"
+   ]
+  },
+  {
+   "id": 13,
+   "type": "ModelSamplingAuraFlow",
+   "pos": [
+    460,
+    634
+   ],
+   "size": [
+    300,
+    148
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      10
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ModelSamplingAuraFlow"
+   },
+   "widgets_values": [
+    3.0,
+    "flow"
+   ]
+  },
+  {
+   "id": 14,
+   "type": "VAEDecode",
+   "pos": [
+    1720,
+    636
+   ],
+   "size": [
+    300,
+    112
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 4
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 5
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      7,
+      14,
+      15,
+      18
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 15,
+   "type": "LoadBackgroundRemovalModel",
+   "pos": [
+    40,
+    974
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "bg_model",
+     "type": "BACKGROUND_REMOVAL",
+     "links": [
+      6
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadBackgroundRemovalModel"
+   },
+   "widgets_values": [
+    "birefnet.safetensors"
+   ]
+  },
+  {
+   "id": 16,
+   "type": "RemoveBackground",
+   "pos": [
+    2140,
+    691
+   ],
+   "size": [
+    300,
+    112
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "bg_removal_model",
+     "type": "BACKGROUND_REMOVAL",
+     "link": 6
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 7
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      16,
+      19
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "RemoveBackground"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 20,
+   "type": "CLIPTextEncode",
+   "pos": [
+    460,
+    446
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 8
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      9,
+      11
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "A clump of tall wild meadow grass with thin seed-head stalks and a few dry blades, about one metre tall, growing straight up from a small patch of soil at the bottom edge, photographed straight on at eye level against a seamless plain light grey studio backdrop. Soft overcast daylight from the upper left, muted natural greens and straw colours, crisp detail on every blade, the whole clump in frame from the roots to the tips, nothing else in the scene."
+   ]
+  },
+  {
+   "id": 21,
+   "type": "ConditioningZeroOut",
+   "pos": [
+    880,
+    597
+   ],
+   "size": [
+    300,
+    100
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "conditioning",
+     "type": "CONDITIONING",
+     "link": 9
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      12
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ConditioningZeroOut"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 22,
+   "type": "EmptySD3LatentImage",
+   "pos": [
+    40,
+    508
+   ],
+   "size": [
+    300,
+    178
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      13
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "EmptySD3LatentImage"
+   },
+   "widgets_values": [
+    832,
+    1216,
+    2
+   ]
+  },
+  {
+   "id": 23,
+   "type": "KSampler",
+   "pos": [
+    1300,
+    507
+   ],
+   "size": [
+    300,
+    370
+   ],
+   "flags": {},
+   "order": 13,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 10
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 11
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 12
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 13
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      4
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    1130,
+    "fixed",
+    8,
+    1.0,
+    "res_multistep",
+    "simple",
+    1.0
+   ]
+  },
+  {
+   "id": 24,
+   "type": "SaveImage",
+   "pos": [
+    2140,
+    243
+   ],
+   "size": [
+    300,
+    378
+   ],
+   "flags": {},
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 14
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SaveImage"
+   },
+   "widgets_values": [
+    "atlas-vfx/T6_grass_zimage"
+   ]
+  },
+  {
+   "id": 30,
+   "type": "AtlasVFXForegroundElement",
+   "pos": [
+    2560,
+    264
+   ],
+   "size": [
+    300,
+    496
+   ],
+   "flags": {},
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 15
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 16
+    },
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 17
+    }
+   ],
+   "outputs": [
+    {
+     "name": "card",
+     "type": "ATLAS_VFX_CARD",
+     "links": [
+      25
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      21
+     ]
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXForegroundElement"
+   },
+   "widgets_values": [
+    0,
+    1130,
+    1.0,
+    -0.6,
+    1.35,
+    "-0.76",
+    0.0,
+    1,
+    false,
+    "",
+    "grass_near",
+    ""
+   ]
+  },
+  {
+   "id": 31,
+   "type": "AtlasVFXForegroundElement",
+   "pos": [
+    2560,
+    830
+   ],
+   "size": [
+    300,
+    496
+   ],
+   "flags": {},
+   "order": 16,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 18
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 19
+    },
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 20
+    }
+   ],
+   "outputs": [
+    {
+     "name": "card",
+     "type": "ATLAS_VFX_CARD",
+     "links": [
+      28
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      22
+     ]
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXForegroundElement"
+   },
+   "widgets_values": [
+    1,
+    1130,
+    2.0,
+    1.3,
+    1.4,
+    "-0.76",
+    0.0,
+    1,
+    false,
+    "",
+    "grass_far",
+    ""
+   ]
+  },
+  {
+   "id": 32,
+   "type": "PreviewImage",
+   "pos": [
+    2980,
+    40
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 17,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 21
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 33,
+   "type": "PreviewImage",
+   "pos": [
+    2980,
+    814
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 18,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 22
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 40,
+   "type": "AtlasVFXCardProject",
+   "pos": [
+    2980,
+    458
+   ],
+   "size": [
+    300,
+    286
+   ],
+   "flags": {},
+   "order": 19,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 23
+    },
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 24
+    },
+    {
+     "name": "card",
+     "type": "ATLAS_VFX_CARD",
+     "link": 25
+    }
+   ],
+   "outputs": [
+    {
+     "name": "exr_folder",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      29
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCardProject"
+   },
+   "widgets_values": [
+    1.0,
+    1,
+    12,
+    1024,
+    ""
+   ]
+  },
+  {
+   "id": 41,
+   "type": "AtlasVFXCardProject",
+   "pos": [
+    2980,
+    1232
+   ],
+   "size": [
+    300,
+    286
+   ],
+   "flags": {},
+   "order": 20,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 26
+    },
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 27
+    },
+    {
+     "name": "card",
+     "type": "ATLAS_VFX_CARD",
+     "link": 28
+    }
+   ],
+   "outputs": [
+    {
+     "name": "exr_folder",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      30
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCardProject"
+   },
+   "widgets_values": [
+    1.0,
+    1,
+    12,
+    1024,
+    ""
+   ]
+  },
+  {
+   "id": 42,
+   "type": "PreviewImage",
+   "pos": [
+    3400,
+    605
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 21,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 29
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 43,
+   "type": "PreviewImage",
+   "pos": [
+    3400,
+    1023
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 22,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 30
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   2,
+   2,
+   0,
+   3,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   3,
+   10,
+   0,
+   13,
+   0,
+   "MODEL"
+  ],
+  [
+   4,
+   23,
+   0,
+   14,
+   0,
+   "LATENT"
+  ],
+  [
+   5,
+   12,
+   0,
+   14,
+   1,
+   "VAE"
+  ],
+  [
+   6,
+   15,
+   0,
+   16,
+   0,
+   "BACKGROUND_REMOVAL"
+  ],
+  [
+   7,
+   14,
+   0,
+   16,
+   1,
+   "IMAGE"
+  ],
+  [
+   8,
+   11,
+   0,
+   20,
+   0,
+   "CLIP"
+  ],
+  [
+   9,
+   20,
+   0,
+   21,
+   0,
+   "CONDITIONING"
+  ],
+  [
+   10,
+   13,
+   0,
+   23,
+   0,
+   "MODEL"
+  ],
+  [
+   11,
+   20,
+   0,
+   23,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   12,
+   21,
+   0,
+   23,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   13,
+   22,
+   0,
+   23,
+   3,
+   "LATENT"
+  ],
+  [
+   14,
+   14,
+   0,
+   24,
+   0,
+   "IMAGE"
+  ],
+  [
+   15,
+   14,
+   0,
+   30,
+   0,
+   "IMAGE"
+  ],
+  [
+   16,
+   16,
+   0,
+   30,
+   1,
+   "MASK"
+  ],
+  [
+   17,
+   3,
+   0,
+   30,
+   2,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   18,
+   14,
+   0,
+   31,
+   0,
+   "IMAGE"
+  ],
+  [
+   19,
+   16,
+   0,
+   31,
+   1,
+   "MASK"
+  ],
+  [
+   20,
+   3,
+   0,
+   31,
+   2,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   21,
+   30,
+   1,
+   32,
+   0,
+   "IMAGE"
+  ],
+  [
+   22,
+   31,
+   1,
+   33,
+   0,
+   "IMAGE"
+  ],
+  [
+   23,
+   1,
+   0,
+   40,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   24,
+   3,
+   0,
+   40,
+   1,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   25,
+   30,
+   0,
+   40,
+   2,
+   "ATLAS_VFX_CARD"
+  ],
+  [
+   26,
+   1,
+   0,
+   41,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   27,
+   3,
+   0,
+   41,
+   1,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   28,
+   31,
+   0,
+   41,
+   2,
+   "ATLAS_VFX_CARD"
+  ],
+  [
+   29,
+   40,
+   1,
+   42,
+   0,
+   "IMAGE"
+  ],
+  [
+   30,
+   41,
+   1,
+   43,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "T6 Foreground grass: Z-Image, BiRefNet matte, two cards, Card Project",
+   "bounding": [
+    -5,
+    -51,
+    3750,
+    1664
+   ],
+   "color": "#335159",
+   "font_size": 24
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

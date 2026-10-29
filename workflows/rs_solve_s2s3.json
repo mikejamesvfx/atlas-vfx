@@ -1,0 +1,260 @@
+{
+ "last_node_id": 4,
+ "last_link_id": 3,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    40,
+    100
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      1
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~/Videos/atlas-vfx_footage/DSCF3000.MOV",
+    129,
+    296,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    56
+   ]
+  },
+  {
+   "id": 2,
+   "type": "AtlasVFXCameraImport",
+   "pos": [
+    460,
+    40
+   ],
+   "size": [
+    300,
+    526
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      2
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraImport"
+   },
+   "widgets_values": [
+    "~/atlas-vfx-work/DSCF3000/camera/DSCF3000_f16_GUESS_stairs.shot_camera.json",
+    "shot_camera",
+    "auto",
+    23.5,
+    12.39,
+    1.0,
+    "ZXY",
+    0.0,
+    true,
+    "DSCF3000_S2S3_GUESS_gs",
+    "",
+    "off",
+    ""
+   ]
+  },
+  {
+   "id": 3,
+   "type": "AtlasVFXRSSolve",
+   "pos": [
+    880,
+    43
+   ],
+   "size": [
+    300,
+    520
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": []
+    },
+    {
+     "name": "readout_ms",
+     "type": "FLOAT",
+     "links": []
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": [
+      3
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXRSSolve"
+   },
+   "widgets_values": [
+    "",
+    "~/atlas-vfx-work/DSCF3000/camera/DSCF3000_f16_GUESS_stairs.shot_camera.json",
+    "free",
+    0.0,
+    0,
+    0,
+    0,
+    100,
+    "0, 10, 20, 26.6, 30.9, 40",
+    8000,
+    "DSCF3000_S2S3_rs_free",
+    ""
+   ]
+  },
+  {
+   "id": 4,
+   "type": "PreviewAny",
+   "pos": [
+    1300,
+    129
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": []
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   2,
+   2,
+   0,
+   3,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   3,
+   3,
+   3,
+   4,
+   0,
+   "*"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "RS Solve, readout free: DSCF3000 S2-S3 (measured GS camera)",
+   "bounding": [
+    -5,
+    -51,
+    1650,
+    662
+   ],
+   "color": "#335159",
+   "font_size": 24
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

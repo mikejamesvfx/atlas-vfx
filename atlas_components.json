@@ -1,0 +1,320 @@
+{
+  "components_version": 1,
+  "tree": "atlas-vfx",
+  "components": [
+    {
+      "id": "atlas-camera",
+      "usage": "source",
+      "note": "Mike's own, MIT. Reused read-only through atlas_vfx/_atlas_camera.py; camera_side/ moves into it later."
+    },
+    {
+      "id": "atlas-scene",
+      "usage": "source",
+      "note": "Mike's own, MIT (its pyproject.toml). Optional: reused read-only through atlas_vfx/_atlas_scene.py, only by Physical Sky (catalogue 48) to render the Prague sky (atlas_scene.environment + its atlas_scene_prague extension). Atlas Scene owns the sky; nothing of it is copied here. Version and git commit go into every Physical Sky info / sidecar."
+    },
+    {
+      "id": "prague-sky-model",
+      "usage": "runtime",
+      "note": "Prague Sky Model C++ implementation (Wilkie et al. 2021, Vevoda et al. 2022), Copyright 2022 Charles University, Apache-2.0. Not vendored here: Atlas Scene vendors it in integrations/prague/vendor/pragueskymodel at upstream commit 2385c912e9051c1258013ff8c3ce2e19e10fb917 (github.com/PetrVevoda/pragueskymodel) and compiles it into atlas_scene_prague._native. Verified 2026-10-28: SPDX-License-Identifier Apache-2.0 in PragueSkyModel.h, upstream LICENSE.txt is Apache 2.0, and the sha256 of PragueSkyModel.h / .cpp / LICENSE.txt match Atlas Scene's integrations/prague/THIRD_PARTY.md pins; the GitHub repo page lists Apache-2.0. Used by Physical Sky only, through Atlas Scene."
+    },
+    {
+      "id": "prague-sky-model-dataset",
+      "usage": "external",
+      "note": "Prague Sky Model precomputed datasets, Apache-2.0 per the authors' Zenodo record 10.5281/zenodo.19140728 (Wilkie, Vevoda, Hosek, Bashford-Rogers, Iser, Kolarova, Rittig, Krivanek; v1.0.0, 2026-03-20; checked 2026-10-28). The GitHub README links the same three files on Google Drive and states no separate data licence, so the Zenodo record is the licence source. Not redistributed by atlas-vfx or Atlas Scene; the node reads the file named by its dataset widget or ATLAS_PRAGUE_DATASET. On ws (atlas-scene-DEV/praguesky_models): SkyModelDatasetGround.dat, 107,632,816 bytes, md5 953864f62c9434269b7f909cdff6c7cd = Zenodo's PragueSkyModelDatasetGround.dat, sha256 76bd619dc6dfcbc900c2996436dd6cf68197c03e3982fe5580f2b109ce1c71c2 (the one Physical Sky uses: ground level, no altitude, no polarisation); SkyModelDataset.dat, 2,397,370,196 bytes, md5 dcfa2bd165cf803c1791c469e05d134c = Zenodo's PragueSkyModelDatasetFull.dat (altitude + polarisation)."
+    },
+    {
+      "id": "three-js",
+      "usage": "runtime",
+      "note": "three.js r185 (npm three 0.185.0), MIT, Copyright 2010-2026 three.js authors, bundled as one ES module with three/examples' fflate 0.8.2 (MIT). Vendored (shipped) as web/lib/atlas-three.bundle.js, used only by the Sun Globe panel (web/atlas_vfx_sun_globe.js, Physical Sky, catalogue 48); display only, no node needs it. Copied byte for byte from Atlas Camera at e2f8d38 (atlas_camera/comfy/web/lib/atlas-three.bundle.js, vendored there in 1b630f0), with a provenance comment added on top; no CDN, no import from the Atlas Camera pack. Licence verified 2026-10-29: the bundle's own embedded licence block (three.core.js / three.module.js SPDX-License-Identifier MIT, fflate 'Licensed under MIT', version 0.8.2), Atlas Camera's ui/node_modules/three/package.json (version 0.185.0, license MIT) and its LICENSE (copied as web/lib/three.LICENSE), and the LICENSE on github.com/mrdoob/three.js (MIT, 'Copyright 2010-2026 three.js authors'). tests/test_sun_globe.py checks the hash.",
+      "files": [
+        {
+          "name": "web/lib/atlas-three.bundle.js",
+          "bytes_upstream": 788010,
+          "sha256": "ed573bb3aa884c5a776321300c817879c37b09b9a78f070454d7d59b7dabf98c",
+          "sha256_means": "the upstream file with LF line ends (as git stores it) and our provenance comment removed; the CRLF Windows checkout of the same file is 43c21aa29926686559f6216ffd9f730c8a415d2519ba0555be113cecb222953f",
+          "hashed": "2026-10-29"
+        },
+        {
+          "name": "web/lib/three.LICENSE",
+          "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc",
+          "sha256_means": "LF line ends, as git stores it",
+          "hashed": "2026-10-29"
+        }
+      ]
+    },
+    {
+      "id": "pycolmap",
+      "usage": "runtime",
+      "note": "4.2.1, BSD-3-Clause (COLMAP). SfM solve, proven on DSCF3000 2026-10-18."
+    },
+    {
+      "id": "opencolorio",
+      "usage": "runtime",
+      "note": "2.6, BSD-3-Clause. Config config/atlas_aces2.0_studio_flog2.ocio is derived from the ACES studio-config-v4.0.0_aces-v2.0_ocio-v2.5 (BSD-3, Academy) with added F-Log2 F-Gamut and F-Log F-Gamut input spaces from the Fujifilm F-Log2 and F-Log data sheets (F-Log added 2026-10-20, checked against colour-science log_decoding_FLog to 1e-6). Installed into V141 venv as opencolorio==2.6.0 on 2026-10-19 (was missing there)."
+    },
+    {
+      "id": "opencv-python",
+      "usage": "runtime",
+      "note": "Apache-2.0. CLAHE proxies, homographies, keying."
+    },
+    {
+      "id": "numpy",
+      "usage": "runtime",
+      "note": "BSD-3-Clause."
+    },
+    {
+      "id": "scipy",
+      "usage": "runtime",
+      "note": "BSD-3-Clause, 1.18.1 in the V141 venv (already there). Plate Lock: RBF correspondence fields, distance transforms, filters."
+    },
+    {
+      "id": "jsonschema",
+      "usage": "runtime",
+      "note": "4.26, MIT (pip show jsonschema, 2026-10-19). Validates shot-camera@0.1 (T1)."
+    },
+    {
+      "id": "openexr",
+      "usage": "runtime (optional)",
+      "note": "OpenEXR 3.5.2 python bindings, BSD-3-Clause (openexr-3.5.2.dist-info/licenses/LICENSE.md in the V141 venv, checked 2026-10-29). Plate Lock's EXR reader fallback when OpenImageIO is missing (platelock/core/seqio.py). Found by the 2026-10-29 spec panel: in use before it was registered."
+    },
+    {
+      "id": "imageio",
+      "usage": "runtime (optional)",
+      "note": "imageio 2.38.1, BSD-2-Clause (License-Expression in its dist metadata, V141 venv, checked 2026-10-29). Plate Lock's second EXR reader fallback (platelock/core/seqio.py). Found by the 2026-10-29 spec panel: in use before it was registered."
+    },
+    {
+      "id": "torch",
+      "usage": "runtime (ComfyUI's)",
+      "note": "PyTorch 2.13.0+cu130, Apache-2.0 AND BSD-2/3-Clause AND BSL-1.0 AND MIT (License-Expression in its dist metadata, V141 venv, checked 2026-10-29). Comes with ComfyUI; nodes use it only to pass IMAGE / MASK tensors."
+    },
+    {
+      "id": "comfyui",
+      "usage": "host",
+      "note": "ComfyUI, GPL-3.0 (LICENSE in ComfyUI_V141, checked 2026-10-29). The host that loads the nodes; a few nodes import comfy.utils for progress bars. atlas-vfx ships as a separate custom-node pack (MIT)."
+    },
+    {
+      "id": "openimageio",
+      "usage": "runtime",
+      "note": "Apache-2.0. EXR read/write. OpenImageIO 3.2.1.3 in the V141 venv (pip, already there) and the vfx_probe venv. Plate Depth EXRs (T5)."
+    },
+    {
+      "id": "ffmpeg",
+      "usage": "runtime",
+      "note": "LGPL/GPL build on ws, used as an external process only (decode, encode). Not linked. Used for decode only (native planes); Y'CbCr->RGB is done in numpy, see camera_side/plate.py."
+    },
+    {
+      "id": "moge-3-vitl",
+      "usage": "model",
+      "note": "Microsoft MoGe-3, MIT; Comfy-Org/MoGe repack moge_3_vitl_fp16.safetensors sha256 52ad9a13037a28fd65003cae7df056c8f903f5aed2c3a5c802be0f5c74a6a7b8, via ComfyUI core MoGe nodes. Used by Plate Depth (T5) through LoadMoGeModel; file present in V141 (moge_3_vitl_fp16.safetensors).",
+      "files": [
+        {
+          "name": "moge_3_vitl_fp16.safetensors",
+          "bytes": 740652334,
+          "sha256": "52ad9a13037a28fd65003cae7df056c8f903f5aed2c3a5c802be0f5c74a6a7b8",
+          "folder": "geometry_estimation",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "minimax-h3-ref2va",
+      "usage": "dropped",
+      "note": "DROPPED 2026-10-24 (owner): excluded in the US/EU/UK/KR by its licence. No workflow, tool or demo uses it or its outputs; kept only so Character Insert can still warn. Was: MiniMax H3 Community Licence (huggingface.co/MiniMaxAI/MiniMax-H3 LICENSE): commercial use allowed below USD 20M revenue; EXCLUDES use in the US, EU, UK and Korea; outputs may not train other models. Comfy-Org repack minimax_h3_ref2va_pruned_int8_convrot + qwen3vl_32b_minimax_h3_nvfp4_awq + minimax_h3 VAEs. Never on client work."
+    },
+    {
+      "id": "nuke-indie-17.1",
+      "usage": "external",
+      "note": "Mike's licence. Target of the Nuke builder; Indie encrypts scripts and limits Python (no WriteGeo from scripts)."
+    },
+    {
+      "id": "z-image-turbo",
+      "usage": "model",
+      "note": "Tongyi-MAI Z-Image-Turbo, Apache-2.0 (huggingface.co/Tongyi-MAI/Z-Image-Turbo licence tag apache-2.0, checked 2026-10-19). File D:/models/diffusion_models/Z_Image_Turbo_BF16.safetensors (12,309,932,329 bytes), from the Comfy-Org/z_image_turbo repack (Apache-2.0). T6 foreground grass element.",
+      "files": [
+        {
+          "name": "Z_Image_Turbo_BF16.safetensors",
+          "bytes": 12309932329,
+          "sha256": "2a14a8ea762c99e61903bdfb96b52c334e8968df8abd3a7396c3f65672e998b8",
+          "folder": "diffusion_models",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "qwen3-4b-text-encoder",
+      "usage": "model",
+      "note": "qwen_3_4b.safetensors, Z-Image text encoder, from Comfy-Org/z_image_turbo (Apache-2.0, checked 2026-10-19; Qwen3-4B is Apache-2.0). D:/models/text_encoders (8,044,982,048 bytes).",
+      "files": [
+        {
+          "name": "qwen_3_4b.safetensors",
+          "bytes": 8044982048,
+          "sha256": "6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a",
+          "folder": "text_encoders",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "flux-ae-vae",
+      "usage": "model",
+      "note": "ae.safetensors, the FLUX.1-schnell autoencoder used by Z-Image, Apache-2.0 (huggingface.co/black-forest-labs/FLUX.1-schnell licence apache-2.0; also shipped in Comfy-Org/z_image_turbo, Apache-2.0; checked 2026-10-19). D:/models/vae/ae.safetensors (335,304,388 bytes).",
+      "files": [
+        {
+          "name": "ae.safetensors",
+          "bytes": 335304388,
+          "sha256": "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38",
+          "folder": "vae",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "birefnet",
+      "usage": "model",
+      "note": "BiRefNet, MIT (huggingface.co/ZhengPeng7/BiRefNet licence tag mit, checked 2026-10-19). File models/background_removal/birefnet.safetensors sha256 9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154, via ComfyUI core LoadBackgroundRemovalModel / RemoveBackground. T6 matte for the generated grass, T7 matte for the test character.",
+      "files": [
+        {
+          "name": "birefnet.safetensors",
+          "bytes": 444473596,
+          "sha256": "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154",
+          "folder": "background_removal",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-distilled",
+      "usage": "model",
+      "note": "Lightricks LTX-2.5 22B distilled transformer, file D:/models/diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors (21,504,034,224 bytes; Lightricks/LTX-2.5 repo). LTX-2.x Community License Agreement (license date 2026-08-11; github.com/Lightricks/LTX-2/blob/main/LICENSE-2_x; HF tag license:other ltx-2.x-community-license-agreement, text embedded in the weights' metadata, checked 2026-10-19): free for entities under USD 10M annual revenue (affiliates counted together); Commercial Entities need a paid licence for anything but non-commercial use; no territory exclusion; outputs may not be used commercially to train other models; Acceptable Use Policy applies; gated download. Mike's own tests OK. Client work: needs a paid licence or a legal check first (the client is a Commercial Entity; licensed-models-only rule).",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+          "bytes": 21504034224,
+          "sha256": "c4279eeff115cbeaca494bd2183e7d768c38fe85a184dc6afbb7159157c44334",
+          "folder": "diffusion_models",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-gemma4-text-encoder",
+      "usage": "model",
+      "note": "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors (15,372,971,786 bytes), shipped in Lightricks/LTX-2.5 text_encoders/: Gemma 4 12B (google/gemma-4-12B-it, Apache-2.0, ai.google.dev/gemma/docs/gemma_4_license, checked 2026-10-19) plus LTX projection weights under the LTX-2.x Community License (see ltx-2.5-distilled).",
+      "files": [
+        {
+          "name": "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors",
+          "bytes": 15372971786,
+          "sha256": "09a89e084de1a149c3de60cfe9dfd3e5161967eb09eea39e806fcdeffdd568de",
+          "folder": "text_encoders",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-vaes",
+      "usage": "model",
+      "note": "ltx-2.5-video-vae-conv-bf16.safetensors (1,452,269,922 bytes) and ltx-2.5-audio-vae-bf16.safetensors (364,866,540 bytes), D:/models/vae, LTX-2.x Community License (metadata, 2026-08-11); terms as ltx-2.5-distilled.",
+      "files": [
+        {
+          "name": "ltx-2.5-video-vae-conv-bf16.safetensors",
+          "bytes": 1452269922,
+          "sha256": "685b06ee3d9b2039647698fc4ea33175112462fc374e2777312c907897dfce8d",
+          "folder": "vae",
+          "hashed": "2026-10-26"
+        },
+        {
+          "name": "ltx-2.5-audio-vae-bf16.safetensors",
+          "bytes": 364866540,
+          "sha256": "c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5",
+          "folder": "vae",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-latent-upscaler",
+      "usage": "model",
+      "note": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors, LTX-2.x Community License; terms as ltx-2.5-distilled.",
+      "files": [
+        {
+          "name": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+          "bytes": 995778752,
+          "sha256": "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
+          "folder": "latent_upscale_models",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.3-ic-lora-in-outpainting",
+      "usage": "model",
+      "note": "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors (1,308,778,338 bytes, D:/models/loras/ltx23; Lightricks/LTX-2.3-22b-IC-LoRA-In-Outpainting), the in/outpainting IC-LoRA the official LTX-2.5 inpaint workflow loads. LTX-2 Community License Agreement (license date 2026-01-05, embedded in metadata): same revenue threshold model as LTX-2.x. Integration pass (the test character) test.",
+      "files": [
+        {
+          "name": "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+          "bytes": 1308778338,
+          "sha256": "73dd0841c0d4f0eb26fb1f017781b841b2752021944ac5ecefe57917f6dae6b5",
+          "folder": "loras/ltx23",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "comfyui-ltxvideo",
+      "usage": "runtime",
+      "note": "Lightricks ComfyUI-LTXVideo node pack (V141 custom_nodes, commit dbaf9e6 2026-10-08), LICENSE file is the LTX-2 Community License Agreement (license date 2026-01-05), checked 2026-10-19; same terms model as the LTX weights. IC-LoRA loader/guide, inpaint preprocess, mask dilation nodes."
+    },
+    {
+      "id": "alembic-ogawa-reader",
+      "usage": "source",
+      "note": "atlas_vfx/camera_side/abc_io.py: our own pure-Python reader for Alembic Ogawa files (cameras and Xforms only), written from the published format; no Alembic library or third-party code. Alembic itself is BSD-3-Clause (Lucasfilm/Sony). Blender 5.2, Maya 2026 and Nuke 17.1 were used only to export test files (2026-10-20)."
+    },
+    {
+      "id": "light-a-video",
+      "usage": "runtime",
+      "note": "ComfyUI_Light_A_Video (smthemex, V141 custom_nodes, commit 1773b37 2025-04-10), Apache-2.0 (LICENSE file); wraps bcmi/Light-A-Video (Apache-2.0, GitHub, checked 2026-10-19): training-free video relighting by progressive light fusion. The test character relight tests."
+    },
+    {
+      "id": "ic-light-sd15-fc",
+      "usage": "model",
+      "note": "iclight_sd15_fc.safetensors (1,719,148,312 bytes, D:/models/controlnet; lllyasviel/ic-light), CreativeML OpenRAIL-M per the HF card (checked 2026-10-19); code github.com/lllyasviel/IC-Light Apache-2.0. Its README's non-commercial note is about BRIA RMBG 1.4, not used here (BiRefNet instead).",
+      "files": [
+        {
+          "name": "iclight_sd15_fc.safetensors",
+          "bytes": 1719148312,
+          "sha256": "a033fbaaa2f3f7859fa6a4477ee63ebbf9c116bf3569d5811856d2807f3468cd",
+          "folder": "controlnet",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "animatediff-motion-adapter-v1-5-3",
+      "usage": "model",
+      "note": "animatediff-motion-adapter-v1-5-3.safetensors (1,670,875,648 bytes, D:/models/controlnet; guoyww/animatediff-motion-adapter-v1-5-3). The HF repo has no licence tag; AnimateDiff (github.com/guoyww/AnimateDiff, which releases these weights) is Apache-2.0. Checked 2026-10-19.",
+      "files": [
+        {
+          "name": "animatediff-motion-adapter-v1-5-3.safetensors",
+          "bytes": 1670875648,
+          "sha256": "aafc03722c0c50000d83852bd308d23743bfa36abd408eda4d66b9d67fa94db2",
+          "folder": "controlnet",
+          "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "realistic-vision-v6",
+      "usage": "model",
+      "note": "realisticVisionV60B1_v51VAE.safetensors (4,265,096,996 bytes, D:/models/checkpoints), SD1.5 fine-tune, CreativeML OpenRAIL-M (HF SG161222/Realistic_Vision_V6.0_B1_noVAE licence tag, checked 2026-10-19): use restrictions apply, commercial use allowed. Light-A-Video base model.",
+      "files": [
+        {
+          "name": "realisticVisionV60B1_v51VAE.safetensors",
+          "bytes": 4265096996,
+          "sha256": "ef76aa2332635f4352463343beec9c5aae3bd107a73c0fd7221abbbcf8bd5470",
+          "folder": "checkpoints",
+          "hashed": "2026-10-26"
+        }
+      ]
+    }
+  ]
+}

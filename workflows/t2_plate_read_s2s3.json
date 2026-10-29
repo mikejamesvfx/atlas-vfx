@@ -1,0 +1,218 @@
+{
+ "last_node_id": 4,
+ "last_link_id": 3,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    40,
+    191
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      1
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      2
+     ]
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~\\Videos\\atlas-vfx_footage\\DSCF3000.MOV",
+    129,
+    296,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    8
+   ]
+  },
+  {
+   "id": 2,
+   "type": "AtlasVFXTrackingProxy",
+   "pos": [
+    460,
+    98
+   ],
+   "size": [
+    300,
+    232
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "folder",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      3
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXTrackingProxy"
+   },
+   "widgets_values": [
+    1024,
+    "",
+    3.0,
+    8
+   ]
+  },
+  {
+   "id": 3,
+   "type": "PreviewImage",
+   "pos": [
+    460,
+    400
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 4,
+   "type": "PreviewImage",
+   "pos": [
+    880,
+    40
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   2,
+   1,
+   1,
+   3,
+   0,
+   "IMAGE"
+  ],
+  [
+   3,
+   2,
+   1,
+   4,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "T2 Plate Read + Tracking Proxy, S2-S3",
+   "bounding": [
+    -5,
+    -51,
+    1230,
+    844
+   ],
+   "color": "#335159",
+   "font_size": 24
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

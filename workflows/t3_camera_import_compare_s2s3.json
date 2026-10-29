@@ -1,0 +1,286 @@
+{
+ "last_node_id": 4,
+ "last_link_id": 4,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    40,
+    338
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      1,
+      2
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~\\Videos\\atlas-vfx_footage\\DSCF3000.MOV",
+    129,
+    296,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    56
+   ]
+  },
+  {
+   "id": 2,
+   "type": "AtlasVFXCameraImport",
+   "pos": [
+    460,
+    40
+   ],
+   "size": [
+    300,
+    466
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      4
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraImport"
+   },
+   "widgets_values": [
+    "~\\howling-yowies\\nuke\\export\\Camera1.json",
+    "auto",
+    "auto",
+    23.5,
+    12.39,
+    1.0,
+    "ZXY",
+    0.0,
+    true,
+    "DSCF3000_S2S3_nuke_Camera1",
+    ""
+   ]
+  },
+  {
+   "id": 3,
+   "type": "AtlasVFXCameraImport",
+   "pos": [
+    460,
+    576
+   ],
+   "size": [
+    300,
+    466
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      3
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraImport"
+   },
+   "widgets_values": [
+    "~\\ComfyUI_V135\\ComfyUI\\output\\_pick\\vfx_probe\\solve_s1s3_f16",
+    "auto",
+    "auto",
+    23.5,
+    12.39,
+    1.0,
+    "ZXY",
+    0.0,
+    true,
+    "DSCF3000_S2S3_pycolmap_f16",
+    ""
+   ]
+  },
+  {
+   "id": 4,
+   "type": "AtlasVFXSolveCompare",
+   "pos": [
+    880,
+    449
+   ],
+   "size": [
+    300,
+    184
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "camera_a",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 3
+    },
+    {
+     "name": "camera_b",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 4
+    }
+   ],
+   "outputs": [
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "residual_pct_of_path",
+     "type": "FLOAT",
+     "links": []
+    },
+    {
+     "name": "view_angle_median_deg",
+     "type": "FLOAT",
+     "links": []
+    },
+    {
+     "name": "scale_b_per_a",
+     "type": "FLOAT",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSolveCompare"
+   },
+   "widgets_values": []
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   2,
+   1,
+   0,
+   3,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   3,
+   3,
+   0,
+   4,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   4,
+   2,
+   0,
+   4,
+   1,
+   "ATLAS_TRACKED_CAMERA"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "T3 Camera Import + Solve Compare, S2-S3",
+   "bounding": [
+    -5,
+    -51,
+    1230,
+    1138
+   ],
+   "color": "#335159",
+   "font_size": 24
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

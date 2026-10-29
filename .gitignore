@@ -1,0 +1,43 @@
+# plates, renders and weights never go in git
+*.mov
+*.MOV
+*.mp4
+*.mxf
+*.dpx
+*.exr
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.wav
+*.safetensors
+*.ckpt
+*.pt
+*.gguf
+*.nk
+*.nkind
+*.nk~
+*.autosave
+
+# but keep small test fixtures
+!tests/fixtures/**
+
+# python
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+
+# local
+.claude/settings.local.json
+*.local.md
+work/
+out/
+
+# agent settings stay local (CLAUDE.md is the owner's machine notes; the shared rules are AGENTS.md)
+.claude/
+CLAUDE.md

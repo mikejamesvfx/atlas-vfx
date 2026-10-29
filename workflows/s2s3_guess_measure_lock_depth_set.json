@@ -1,0 +1,584 @@
+{
+ "last_node_id": 9,
+ "last_link_id": 12,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    40,
+    299
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      1,
+      3,
+      8
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~\\Videos\\atlas-vfx_footage\\DSCF3000.MOV",
+    129,
+    296,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    56
+   ]
+  },
+  {
+   "id": 2,
+   "type": "AtlasVFXCameraImport",
+   "pos": [
+    460,
+    301
+   ],
+   "size": [
+    300,
+    466
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      2
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraImport"
+   },
+   "widgets_values": [
+    "~\\ComfyUI_V135\\ComfyUI\\output\\_pick\\vfx_probe\\solve_s1s3_f16",
+    "auto",
+    "auto",
+    23.5,
+    12.39,
+    1.0,
+    "ZXY",
+    0.0,
+    false,
+    "DSCF3000_pycolmap_f16_full",
+    ""
+   ]
+  },
+  {
+   "id": 3,
+   "type": "AtlasVFXMeasureScale",
+   "pos": [
+    880,
+    364
+   ],
+   "size": [
+    300,
+    340
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      4,
+      9,
+      11
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": [
+      5
+     ]
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXMeasureScale"
+   },
+   "widgets_values": [
+    "~\\atlas-vfx-work\\DSCF3000\\picks\\DSCF3000_S2S3_picks_GUESS.json",
+    "",
+    5.0,
+    false,
+    "DSCF3000_f16_GUESS_stairs",
+    ""
+   ]
+  },
+  {
+   "id": 4,
+   "type": "AtlasVFXLockCheck",
+   "pos": [
+    1300,
+    134
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 3
+    },
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 4
+    },
+    {
+     "name": "measure_report",
+     "type": "STRING",
+     "widget": {
+      "name": "measure_report"
+     },
+     "link": 5
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mp4",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      6
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXLockCheck"
+   },
+   "widgets_values": [
+    "actor_spot",
+    "ground",
+    1.5,
+    1.5,
+    6,
+    1024,
+    24,
+    "",
+    ""
+   ]
+  },
+  {
+   "id": 5,
+   "type": "PreviewImage",
+   "pos": [
+    1720,
+    40
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 6
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 6,
+   "type": "LoadMoGeModel",
+   "pos": [
+    40,
+    775
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MOGE_MODEL",
+     "type": "MOGE_MODEL",
+     "links": [
+      7
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadMoGeModel"
+   },
+   "widgets_values": [
+    "moge_3_vitl_fp16.safetensors"
+   ]
+  },
+  {
+   "id": 7,
+   "type": "AtlasVFXPlateDepth",
+   "pos": [
+    1300,
+    610
+   ],
+   "size": [
+    300,
+    346
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "moge_model",
+     "type": "MOGE_MODEL",
+     "link": 7
+    },
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 8
+    },
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 9
+    }
+   ],
+   "outputs": [
+    {
+     "name": "depth_folder",
+     "type": "STRING",
+     "links": [
+      12
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      10
+     ]
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateDepth"
+   },
+   "widgets_values": [
+    "",
+    1024,
+    9,
+    3,
+    1,
+    24,
+    ""
+   ]
+  },
+  {
+   "id": 8,
+   "type": "PreviewImage",
+   "pos": [
+    1720,
+    964
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 10
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 9,
+   "type": "AtlasVFXSetProxy",
+   "pos": [
+    1720,
+    458
+   ],
+   "size": [
+    300,
+    436
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 11
+    },
+    {
+     "name": "depth_folder",
+     "type": "STRING",
+     "widget": {
+      "name": "depth_folder"
+     },
+     "link": 12
+    }
+   ],
+   "outputs": [
+    {
+     "name": "obj",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "usda",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSetProxy"
+   },
+   "widgets_values": [
+    "",
+    "",
+    0.0,
+    0.3,
+    3.0,
+    0.03,
+    8,
+    8,
+    "",
+    ""
+   ]
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   2,
+   2,
+   0,
+   3,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   3,
+   1,
+   0,
+   4,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   4,
+   3,
+   0,
+   4,
+   1,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   5,
+   3,
+   2,
+   4,
+   2,
+   "STRING"
+  ],
+  [
+   6,
+   4,
+   1,
+   5,
+   0,
+   "IMAGE"
+  ],
+  [
+   7,
+   6,
+   0,
+   7,
+   0,
+   "MOGE_MODEL"
+  ],
+  [
+   8,
+   1,
+   0,
+   7,
+   1,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   9,
+   3,
+   0,
+   7,
+   2,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   10,
+   7,
+   1,
+   8,
+   0,
+   "IMAGE"
+  ],
+  [
+   11,
+   3,
+   0,
+   9,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   12,
+   7,
+   0,
+   9,
+   1,
+   "STRING"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "S2-S3 guessed picks: Measure, Lock Check, Depth, Set Proxy",
+   "bounding": [
+    -5,
+    -51,
+    2070,
+    1408
+   ],
+   "color": "#335159",
+   "font_size": 24
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

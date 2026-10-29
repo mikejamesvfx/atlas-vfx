@@ -1,0 +1,89 @@
+<!doctype html>
+<!-- Sun Globe harness: a fake ComfyUI node for web/atlas_vfx_sun_globe.js, served by tools/sun_globe_review.py through
+     Playwright routes (stub /scripts/app.js, the repo's web/ as /extensions/atlas-vfx/, the node's widgets as
+     /harness/widgets.json). Visible native widgets are listed above the panel, so a screenshot shows what it hid. -->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sun Globe harness</title>
+<style>
+  body { margin: 0; background: #1b1d20; font-family: system-ui, sans-serif; color: #ddd; }
+  #node { width: 480px; margin: 14px; background: #353535; border-radius: 8px; box-shadow: 0 2px 12px #0008;
+          padding: 0 0 10px; }
+  .title { padding: 6px 10px; background: #222; border-radius: 8px 8px 0 0; font: 600 13px system-ui; }
+  .w { display: flex; justify-content: space-between; margin: 3px 10px; padding: 3px 10px; background: #222;
+       border-radius: 10px; font: 12px system-ui; color: #9a9a9a; }
+  .w b { color: #ddd; font-weight: 500; }
+  #dom { margin: 6px 10px 0; }
+</style>
+</head>
+<body>
+<div id="node"><div class="title">Atlas VFX Physical Sky (harness)</div><div id="widgets"></div><div id="dom"></div></div>
+<script type="module">
+import { app } from "/scripts/app.js";
+
+const spec = await (await fetch("/harness/widgets.json")).json();
+await import("/extensions/atlas-vfx/atlas_vfx_sun_globe.js");
+const ext = (window.__exts || [])[0];
+
+class FakeNode {
+  constructor() {
+    this.widgets = spec.map(([name, type, value, options]) => ({ name, type, value, options: { ...(options || {}) },
+      callback: null }));
+    this.inputs = [{ name: "shot_camera", link: null }];
+    this.size = [480, 300];
+    this.properties = {};
+  }
+  addDOMWidget(name, type, element, options) {
+    const w = { name, type, element, options: options || {} };
+    this.widgets.push(w);
+    document.getElementById("dom").appendChild(element);
+    return w;
+  }
+  computeSize() {
+    const visible = this.widgets.filter((w) => !w.element && !w.hidden).length;
+    return [480, 30 + visible * 24 + 460];
+  }
+  setSize(size) { this.size = size; }
+  setDirtyCanvas() { drawWidgets(); }
+}
+
+await ext.beforeRegisterNodeDef(FakeNode, { name: "AtlasVFXPhysicalSky" });
+const node = new FakeNode();
+node.onNodeCreated();
+
+function drawWidgets() {
+  const box = document.getElementById("widgets");
+  box.innerHTML = "";
+  for (const w of node.widgets) {
+    if (w.element || w.hidden || w.type === "atlas_hidden") continue;
+    const d = document.createElement("div");
+    d.className = "w";
+    const v = typeof w.value === "number" ? String(+w.value.toFixed(4)) : String(w.value);
+    d.innerHTML = `<span>${w.name}</span><b>${v}</b>`;
+    box.appendChild(d);
+  }
+}
+drawWidgets();
+
+window.harness = {
+  node,
+  set(values) {
+    for (const [k, v] of Object.entries(values)) {
+      const w = node.widgets.find((x) => x.name === k);
+      if (w) w.value = v;
+    }
+    drawWidgets();
+  },
+  executed(payload) { node.onExecuted({ atlas_sun_globe: [payload] }); },
+  values() { return Object.fromEntries(node.widgets.filter((w) => !w.element).map((w) => [w.name, w.value])); },
+  hidden() { return node.widgets.filter((w) => w.hidden || w.type === "atlas_hidden").map((w) => w.name); },
+  sun() { return node._atlasSunGlobe.sunClientXY(); },
+  text() { return document.getElementById("dom").innerText; },
+  queued() { return window.__queued || 0; },
+};
+window.harnessReady = true;
+</script>
+</body>
+</html>

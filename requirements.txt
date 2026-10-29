@@ -1,0 +1,7 @@
+# What ComfyUI Manager installs into the ComfyUI venv. Same bounds as pyproject.toml (the source of truth).
+# Optional, install by hand: pycolmap==4.2.1 (COLMAP import), OpenImageIO>=3.0 (EXR read/write).
+numpy>=2.0,<3
+scipy>=1.14
+opencv-python>=4.10
+opencolorio>=2.4
+jsonschema>=4.20
