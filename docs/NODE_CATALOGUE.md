@@ -573,7 +573,10 @@ Payloads (all plain JSON-safe dicts unless said):
   north or camera heading. Sun under the model's limit (Prague -4.2, Hosek-Wilkie 0): black HDRI + warning, exact
   direction kept. Sun Globe panel (`web/atlas_vfx_sun_globe.js`, three.js r185 vendored): the sun,
   the day's path and the camera frustum on a globe, drag the sun (writes manual), time-of-day scrubber, reset to
-  metadata, golden hour, auto-queue toggle (off). Drives the native widgets only; headless runs are unchanged.
+  metadata, golden hour, auto-queue toggle (off), sky model switch (writes sky_model), and a flag plus a short
+  reason when the picked model won't render this sun (Hosek-Wilkie twilight, anything under -4.2). Drives the native
+  widgets only; headless runs are unchanged. Pictures: `docs/images/sun_globe_twilight.png`,
+  `docs/images/sky_prague_vs_hosek.png`.
 
 ### 49 Chart Calibrate
 `AtlasVFXChartCalibrate` · camera_side · Atlas VFX/Camera

@@ -14,6 +14,13 @@ VFX nodes for real plates, for ComfyUI (category `Atlas VFX/...`) and plain Pyth
 
 Start with AGENTS.md (rules, layout, import graph) and SECURITY.md (threat model, reporting).
 
+## How it fits
+
+![The main wiring by family: Plate Read and Camera Import feed Card Project and Foreground Element, Chart Calibrate feeds Sensor RS Maps and Sensor Apply, Physical Sky feeds Relight, and the layer folders go to Nuke Builder](docs/images/node_map.png)
+
+Ten of the 37 nodes and the sockets that tie them. Plate Lock's nine nodes run their own chain. The full list, with
+every input and output, is `docs/NODE_CATALOGUE.md`.
+
 ## Install
 
 - Clone (or junction) this repo into `<ComfyUI>/custom_nodes/atlas-vfx` and restart ComfyUI. The nodes appear under
@@ -29,6 +36,22 @@ Start with AGENTS.md (rules, layout, import graph) and SECURITY.md (threat model
   Scene and a Prague Sky Model dataset it uses Prague instead (`sky_model`: auto, prague, hosek-wilkie).
 - Point the nodes at your own plate with the `path` widget of Plate Read (`~` expands) and your camera with
   Camera Import (Nuke JSON or .chan, Alembic, a COLMAP model, or a shot-camera JSON).
+
+## Physical Sky
+
+![Sun Globe panel: the sun 2 degrees under the horizon with Hosek-Wilkie picked, flagged NOT RENDERED, TWILIGHT, with the reason](docs/images/sun_globe_twilight.png)
+
+The Sun Globe panel sits on the Physical Sky node: the sun, the day's path and the camera on a globe. Drag the sun,
+scrub the hour, jump to golden hour, pick the sky model. Here the sun is 2 degrees under the horizon with
+Hosek-Wilkie picked. Hosek stops at the horizon, so the panel says the sky won't render and why, before you queue.
+The panel only drives the node's own widgets: a headless run is the same without it.
+
+![Prague vs Hosek-Wilkie: what each covers, the sun strength ratio at 40 km visibility, and the visibility to turbidity table](docs/images/sky_prague_vs_hosek.png)
+
+Two sky models. Prague (through Atlas Scene) is the quality path: twilight, altitude, visibility. Hosek-Wilkie ships
+here and needs nothing. Fitted to Prague, its sun lands within about 10% of Prague's from 20 to 60 degrees at 20-50 km
+visibility; near the horizon and in very clear air it drifts, so use Prague there. The numbers come from
+`atlas_vfx/layers/data/hosek_visibility_turbidity.json`.
 
 ## Where things go
 

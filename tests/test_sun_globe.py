@@ -98,6 +98,8 @@ out.rel = C.proj.map(([a, e, h, t, f, asp]) => G.sunRelation(a, e, h, t, f, asp)
 out.drag = C.drag.map(([m, a, e, d]) => G.dragWidgets(m, a, e, d));
 out.parse = C.parse.map((s) => G.parseUtc(s));
 out.clock = C.parse.map((s) => G.clockOffsetMin(s));
+out.skyOff = C.skyOff.map(([e, m]) => G.skyNotRendered(e, m));
+Object.assign(out, { skyModels: G.SKY_MODELS, skyWidget: G.SKY_MODEL_WIDGET, minEls: G.MIN_ELEVATION });
 const p0 = G.sunPath(...C.path[0]);
 const cap0 = G.parseUtc(C.path[0][2]);
 out.snap = [0, 0.25, 0.5, 0.731, 1].map((x) => [5, 1].map((m) => G.offsetAtX(x, p0, cap0, null, m)));
@@ -194,20 +196,28 @@ def py_eff(c):
 
 
 # ------------------------------------------------------------------------------------------------ tests
+# (elevation, model, expected flag or None): Hosek's twilight gap, Prague's floor, auto before a run (None)
+SKY_OFF_CASES = [(5.0, "hosek-wilkie", None), (-2.0, "hosek-wilkie", "NOT RENDERED · TWILIGHT"),
+                 (-2.0, "prague", None), (-5.0, "prague", "NOT RENDERED · BELOW HORIZON"),
+                 (-5.0, "hosek-wilkie", "NOT RENDERED · BELOW HORIZON"), (-2.0, None, None),
+                 (-10.0, None, "NOT RENDERED · BELOW HORIZON"), (0.0, "hosek-wilkie", None)]
+
+
 def test_module_and_mirror():
     from atlas_vfx.layers.node_physical_sky import AtlasVFXPhysicalSky
     widgets = list(AtlasVFXPhysicalSky.INPUT_TYPES()["required"])
     drags = drag_cases()
     cases = {"sun": SUN_CASES, "dir": DIR_CASES, "eff": EFF_CASES, "path": PATH_CASES, "basis": BASIS_CASES,
              "proj": PROJ_CASES, "drag": [c[:4] for c in drags], "parse": PARSE_CASES, "widgets": widgets,
-             "dome": [0.0, 252.4, 180.0]}
+             "dome": [0.0, 252.4, 180.0], "skyOff": SKY_OFF_CASES}
     js, stderr = run_js(cases)
 
     # 1. module, extension, hooks
     want = {"NODE_NAME", "EXTENSION_NAME", "SUN_MODES", "OWNED_WIDGETS", "READ_WIDGETS", "PRAGUE_MIN_ELEVATION",
             "AUTO_QUEUE_PROPERTY", "AUTO_QUEUE_DEFAULT", "parseUtc", "clockOffsetMin", "sunAt", "azelToDir",
             "dirToAzel", "effectiveSun", "sunPath", "cameraBasis", "projectToCamera", "sunRelation", "dragWidgets",
-            "offsetAtX", "fmtClock", "wrap180"}
+            "offsetAtX", "fmtClock", "wrap180", "SKY_MODELS", "SKY_MODEL_WIDGET", "MIN_ELEVATION",
+            "skyNotRendered"}
     check(want <= set(js["exports"]), "ES-module import with a stubbed app: the mirror functions are exported",
           sorted(want - set(js["exports"])))
     check(js["exts"] == [{"name": "AtlasVFX.SunGlobe", "hook": "function"}], "one extension registered", js["exts"])
@@ -233,6 +243,17 @@ def test_module_and_mirror():
                                          "sun_azimuth", "sun_elevation"]), "the owned set is the six sun widgets")
     check(js["modes"] == list(it["required"]["sun_mode"][0]), "sun modes match the node's combo", js["modes"])
     check(js["minEl"] == ps.PRAGUE_MIN_ELEVATION, "below-horizon threshold = Prague's -4.2")
+    check(js["skyWidget"] == "sky_model" and js["skyModels"] == list(it["optional"]["sky_model"][0]),
+          "the sky model switch offers the node's sky_model combo, in order", js["skyModels"])
+    check(js["minEls"] == ps.MIN_ELEVATION, "per-model lowest sun = physical_sky.MIN_ELEVATION", js["minEls"])
+    for (el, model, want), got in zip(SKY_OFF_CASES, js["skyOff"]):
+        limit = ps.MIN_ELEVATION.get(model, ps.PRAGUE_MIN_ELEVATION)
+        check((got is None) == (el >= limit), f"sky at {el} deg with {model}: rendered = (el >= {limit})", got)
+        if got is not None:
+            check(got["flag"] == want and got["minEl"] == limit and "zero strength" in got["why"],
+                  f"sky at {el} deg with {model}: flag {want}, the rig reason", got)
+    tw = js["skyOff"][1]
+    check(tw and "Prague" in tw["why"] and "-4.2" in tw["why"], "the Hosek twilight reason names Prague and -4.2", tw)
     committed = ["latitude", "longitude", "altitude_m", "capture_utc", "time_offset_h", "heading_deg", "fov_x",
                  "tilt_deg", "visibility_km", "ground_albedo", "exposure_ev", "sun_mode", "sun_azimuth_offset",
                  "sun_elevation_offset", "sun_azimuth", "sun_elevation", "width", "latlong_centre", "name", "out_dir"]
@@ -386,6 +407,8 @@ def test_source_rules():
              SRC.split("function scrubTo(", 1)[1].split("\n  }", 1)[0]]
     check(all("queue" not in m.lower() and "endInteraction" not in m for m in moves), "nothing queues while dragging")
     hide_at = SRC.index("OWNED_WIDGETS.forEach((n) => hideNativeWidget(owned[n]))")
+    check(SRC.index("if (skyW) hideNativeWidget(skyW);") > hide_at, "sky_model is hidden only with the owned widgets")
+    check('if (!skyW) skyRow.style.display = "none";' in SRC, "an old graph without sky_model gets no switch")
     check(SRC.index("node.addDOMWidget(") < hide_at and SRC.index("new THREE.WebGLRenderer(") < hide_at,
           "widgets are hidden only after the renderer and the DOM widget exist")
     js_files = sorted(p.relative_to(WEB).as_posix() for p in WEB.rglob("*.js"))

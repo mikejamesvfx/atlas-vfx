@@ -17,6 +17,8 @@
  *     back to manual when the elevation offset would leave its widget range.
  *   - the time scrubber writes time_offset_h; in manual it first returns to metadata (manual ignores the clock).
  *   - RESET TO METADATA: sun_mode metadata, time_offset_h 0, both offsets 0.
+ *   - the sky model switch (AUTO / PRAGUE / HOSEK-WILKIE) writes the optional sky_model widget, hidden while the
+ *     panel runs. A graph saved before sky_model existed has no such widget, and the switch stays hidden.
  * Nothing queues while dragging. With AUTO-QUEUE on (a panel toggle kept in node.properties, default off, the sky
  * node usually feeds a heavy graph) one prompt is queued when an interaction ends.
  *
@@ -35,6 +37,27 @@ export const OWNED_WIDGETS = ["time_offset_h", "sun_mode", "sun_azimuth_offset",
   "sun_azimuth", "sun_elevation"];
 export const READ_WIDGETS = ["latitude", "longitude", "capture_utc", "heading_deg", "fov_x", "tilt_deg"];
 export const PRAGUE_MIN_ELEVATION = -4.2;
+export const SKY_MODEL_WIDGET = "sky_model";
+export const SKY_MODELS = ["auto", "prague", "hosek-wilkie"];
+// lowest sun each model renders (layers/physical_sky.py MIN_ELEVATION; tests/test_sun_globe.py compares)
+export const MIN_ELEVATION = { prague: PRAGUE_MIN_ELEVATION, "hosek-wilkie": 0 };
+const MODEL_LABEL = { prague: "Prague", "hosek-wilkie": "Hosek-Wilkie" };
+
+/** Why the sky will not render at this elevation, or null when it will. `model` is the model that rendered (or
+ * will render) the sky; null (auto before a run) uses Prague's limit, the lowest any model reaches. Mirrors the
+ * warning node_physical_sky.py logs. */
+export function skyNotRendered(el, model) {
+  const minEl = MIN_ELEVATION[model] ?? PRAGUE_MIN_ELEVATION;
+  if (!Number.isFinite(el) || el >= minEl) return null;
+  const rig = "The light rig keeps the sun direction at zero strength.";
+  if (model === "hosek-wilkie" && el >= PRAGUE_MIN_ELEVATION) {
+    return { minEl, flag: "NOT RENDERED · TWILIGHT", why: "Hosek-Wilkie covers 0 to 90°, so this twilight sky is " +
+      `black. Prague (Atlas Scene) renders twilight down to ${PRAGUE_MIN_ELEVATION}°. ${rig}` };
+  }
+  const who = MODEL_LABEL[model] ? `${MODEL_LABEL[model]} covers` : "No sky model goes below";
+  return { minEl, flag: "NOT RENDERED · BELOW HORIZON", why: `${who} ${minEl}°${MODEL_LABEL[model] ? " to 90°" : ""}: ` +
+    `the HDRI is black. ${rig}` };
+}
 export const AUTO_QUEUE_PROPERTY = "atlas_sun_globe_auto_queue";
 export const AUTO_QUEUE_DEFAULT = false;
 
@@ -347,12 +370,13 @@ function radialTexture(THREE, ring) {
   return tex;
 }
 
-const PANEL_H = 476;
+const PANEL_H = 512;
 
 // ------------------------------------------------------------------------------------------- the panel
 function buildGlobe(node, THREE) {
   const W = (name) => node.widgets?.find((w) => w.name === name);
   const owned = Object.fromEntries(OWNED_WIDGETS.map((n) => [n, W(n)]));
+  const skyW = W(SKY_MODEL_WIDGET);                     // optional: absent on graphs saved before it existed
   const missing = OWNED_WIDGETS.filter((n) => !owned[n]);
   if (missing.length) throw new Error(`Physical Sky widgets missing: ${missing.join(", ")}`);
   const num = (name, d = 0) => { const v = Number(W(name)?.value); return Number.isFinite(v) ? v : d; };
@@ -388,7 +412,11 @@ function buildGlobe(node, THREE) {
   const flag = overlay({ left: "50%", top: "86px", transform: "translateX(-50%)", borderRadius: "99px",
     padding: "4px 9px", font: "800 9px system-ui", letterSpacing: ".11em", color: "#ffd0c0", background: "#5a1d12",
     border: "1px solid #c0523a", display: "none", whiteSpace: "nowrap" });
-  flag.textContent = "BELOW HORIZON · SKY NOT RENDERED";
+  flag.textContent = "NOT RENDERED · BELOW HORIZON";
+  // why the sky is black, shown with the flag (the node logs the same reason)
+  const why = overlay({ left: "14px", right: "14px", top: "234px", padding: "5px 9px", borderRadius: "7px",
+    color: "#cfe9ee", background: "rgba(6,13,18,.86)", border: "1px solid #375568", font: "500 9.5px/12.5px system-ui",
+    display: "none" });
   // up to two lines: a long relation ("... 72° RIGHT OF THE LENS · IN FRAME") wrapped off the edge before
   const relation = overlay({ left: "14px", right: "14px", top: "286px", color: "#9fe0e8",
     font: "700 9.5px/12px system-ui", letterSpacing: ".08em", maxHeight: "24px", overflow: "hidden" });
@@ -414,7 +442,21 @@ function buildGlobe(node, THREE) {
   const queueBtn = button("AUTO-QUEUE OFF", "Queue the graph when a drag, scrub or button ends. Off by default: the " +
     "sky usually feeds a heavy graph");
   controls.append(resetBtn, goldenBtn, viewBtn, queueBtn);
-  root.append(canvas, heading, badge, status, legend, camLabel, flag, relation, readout, scrub, controls);
+  // sky model: one segmented row driving the sky_model widget
+  const skyRow = document.createElement("div");
+  Object.assign(skyRow.style, { position: "absolute", left: "12px", right: "12px", top: "402px", display: "grid",
+    gridTemplateColumns: "auto repeat(3, minmax(0, 1fr))", alignItems: "center", columnGap: "4px", zIndex: 2 });
+  const skyLabel = document.createElement("div");
+  Object.assign(skyLabel.style, { color: "#5f8f99", font: "600 8.5px ui-monospace, monospace", letterSpacing: ".1em",
+    paddingRight: "4px" });
+  skyLabel.textContent = "SKY";
+  const SKY_TIPS = { auto: "Prague when Atlas Scene and its dataset are reachable, else Hosek-Wilkie",
+    prague: "Atlas Scene's Prague sky: twilight down to -4.2 deg, needs Atlas Scene and the dataset",
+    "hosek-wilkie": "Analytic Hosek-Wilkie sky shipped with atlas-vfx: sun 0 to 90 deg, renders anywhere" };
+  const skyBtns = Object.fromEntries(SKY_MODELS.map((m) => [m, button(m.toUpperCase(), SKY_TIPS[m])]));
+  skyRow.append(skyLabel, ...SKY_MODELS.map((m) => skyBtns[m]));
+  if (!skyW) skyRow.style.display = "none";
+  root.append(canvas, heading, badge, status, legend, camLabel, flag, why, relation, readout, scrub, skyRow, controls);
 
   // ---------------------------------------------------------------- three.js scene
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -514,7 +556,7 @@ function buildGlobe(node, THREE) {
   // ---------------------------------------------------------------- state
   let payload = null, payloadId = 0, domeSrc = "", domeTex = null, domeReady = false;
   let st = null, builtPath = null, dirty = true, lastKey = "", lastSize = "", disposed = false, warned = false;
-  let flashMsg = null;
+  let flashMsg = null, modelAtRun = null;
   const view = { yaw: 0, pitch: 0.55, dist: 6.3, follow: false };
   const pathCache = { key: null, path: null };
 
@@ -540,7 +582,8 @@ function buildGlobe(node, THREE) {
     let fresh = false;
     if (payload?.sun && !sunNow.error) {
       fresh = Math.abs(wrap180(payload.sun.azimuth_deg - sunNow.azimuth_deg)) < 0.02
-        && Math.abs(payload.sun.elevation_deg - sunNow.elevation_deg) < 0.02;
+        && Math.abs(payload.sun.elevation_deg - sunNow.elevation_deg) < 0.02
+        && (!skyW || String(skyW.value) === modelAtRun);    // a new sky model needs a new run too
     }
     return { lat, lon, cap, mode, toff, sun: sunNow, cam, path: currentPath(lat, lon, cap), fresh,
       clock: clockOffsetMin(cap) };
@@ -548,6 +591,7 @@ function buildGlobe(node, THREE) {
 
   function onPayload(g) {
     payload = g; payloadId += 1; dirty = true;
+    modelAtRun = skyW ? String(skyW.value) : null;
     const src = typeof g?.preview === "string" && g.preview.startsWith("data:image/") ? g.preview : "";
     if (src === domeSrc) return;
     domeSrc = src; domeReady = false;
@@ -680,9 +724,23 @@ function buildGlobe(node, THREE) {
     status.style.color = flashOn ? "#ffd28b" : "#6f98a2";
     const src = s.cam.source === "shot" ? "SHOT CAM" : (s.cam.source === "shot_pending" ? "SHOT CAM (RUN TO READ)" : "CAM");
     camLabel.textContent = `${src} ${s.cam.heading.toFixed(1)}° · HFOV ${s.cam.fov.toFixed(1)}° · TILT ${signed(s.cam.tilt)}°`;
-    // the last run's model sets the limit (Hosek-Wilkie stops at the horizon); before a run, Prague's
-    const minEl = s.fresh && typeof payload?.min_elevation_deg === "number" ? payload.min_elevation_deg : PRAGUE_MIN_ELEVATION;
-    flag.style.display = !s.sun.error && s.sun.elevation_deg < minEl ? "block" : "none";
+      // the model that drew the last run sets the limit (Hosek-Wilkie stops at the horizon); before a run the one
+    // asked for, and for auto Prague's
+    const requested = skyW ? String(skyW.value) : "auto";
+    const model = s.fresh && payload?.sky_model_used ? payload.sky_model_used
+      : (MIN_ELEVATION[requested] !== undefined ? requested : null);
+    const off = s.sun.error ? null : skyNotRendered(s.sun.elevation_deg, model);
+    flag.style.display = off ? "block" : "none";
+    why.style.display = off ? "block" : "none";
+    if (off) { flag.textContent = off.flag; why.textContent = off.why; }
+    for (const m of SKY_MODELS) {
+      const on = m === requested;
+      skyBtns[m].textContent = m === "auto" && on && s.fresh && MODEL_LABEL[payload?.sky_model_used]
+        ? `AUTO: ${payload.sky_model_used === "prague" ? "PRAGUE" : "HOSEK"}` : m.toUpperCase();
+      skyBtns[m].setAttribute("aria-pressed", String(on));
+      Object.assign(skyBtns[m].style, on ? { color: "#ffd28b", background: "#4b2d0c", borderColor: "#b87721" }
+        : { color: "#d9f7ff", background: "#122430", borderColor: "#375568" });
+    }
     if (s.sun.error) {
       relation.textContent = s.sun.error.toUpperCase();
       relation.style.color = "#ffb4a0";
@@ -898,6 +956,7 @@ function buildGlobe(node, THREE) {
     dirty = true;
   };
   queueBtn.onclick = () => { node.properties[AUTO_QUEUE_PROPERTY] = !autoQueue(); dirty = true; };
+  for (const m of SKY_MODELS) skyBtns[m].onclick = () => endInteraction(setNative(skyW, m));
 
   // ---------------------------------------------------------------- frame loop (renders only when something changed)
   function tick() {
@@ -908,7 +967,7 @@ function buildGlobe(node, THREE) {
     if (view.follow) view.yaw = -st.cam.heading * DEG;
     const flashOn = Boolean(flashMsg && performance.now() < flashMsg.until);
     const key = JSON.stringify([st.mode, st.toff, st.lat, st.lon, st.cap, st.sun.azimuth_deg, st.sun.elevation_deg,
-      st.sun.error, st.cam, st.fresh, payloadId, domeReady, view, w, h, autoQueue(), flashOn]);
+      st.sun.error, st.cam, st.fresh, payloadId, domeReady, view, w, h, autoQueue(), flashOn, skyW?.value]);
     if (!dirty && key === lastKey) return;
     dirty = false;
     lastKey = key;
@@ -955,6 +1014,7 @@ function buildGlobe(node, THREE) {
     getMinHeight: () => PANEL_H + 8, getMaxHeight: () => PANEL_H + 8 });
   domWidget.serialize = false;
   OWNED_WIDGETS.forEach((n) => hideNativeWidget(owned[n]));
+  if (skyW) hideNativeWidget(skyW);
   const size = node.computeSize?.() || [0, 0];
   node.setSize?.([Math.max(node.size?.[0] || 0, size[0], 470), Math.max(size[1], 0)]);
 
