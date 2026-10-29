@@ -10,7 +10,7 @@
     {
       "id": "atlas-scene",
       "usage": "source",
-      "note": "Mike's own, MIT (its pyproject.toml). Optional: reused read-only through atlas_vfx/_atlas_scene.py, only by Physical Sky (catalogue 48) to render the Prague sky (atlas_scene.environment + its atlas_scene_prague extension). Atlas Scene owns the sky; nothing of it is copied here. Version and git commit go into every Physical Sky info / sidecar."
+      "note": "Mike's own, MIT (its pyproject.toml). Optional (Physical Sky's Prague mode only; without it the node renders the Hosek-Wilkie fallback): reused read-only through atlas_vfx/_atlas_scene.py, only by Physical Sky (catalogue 48) to render the Prague sky (atlas_scene.environment + its atlas_scene_prague extension). Atlas Scene owns the sky; nothing of it is copied here. Version and git commit go into every Physical Sky info / sidecar."
     },
     {
       "id": "prague-sky-model",
@@ -21,6 +21,16 @@
       "id": "prague-sky-model-dataset",
       "usage": "external",
       "note": "Prague Sky Model precomputed datasets, Apache-2.0 per the authors' Zenodo record 10.5281/zenodo.19140728 (Wilkie, Vevoda, Hosek, Bashford-Rogers, Iser, Kolarova, Rittig, Krivanek; v1.0.0, 2026-03-20; checked 2026-10-28). The GitHub README links the same three files on Google Drive and states no separate data licence, so the Zenodo record is the licence source. Not redistributed by atlas-vfx or Atlas Scene; the node reads the file named by its dataset widget or ATLAS_PRAGUE_DATASET. On ws (atlas-scene-DEV/praguesky_models): SkyModelDatasetGround.dat, 107,632,816 bytes, md5 953864f62c9434269b7f909cdff6c7cd = Zenodo's PragueSkyModelDatasetGround.dat, sha256 76bd619dc6dfcbc900c2996436dd6cf68197c03e3982fe5580f2b109ce1c71c2 (the one Physical Sky uses: ground level, no altitude, no polarisation); SkyModelDataset.dat, 2,397,370,196 bytes, md5 dcfa2bd165cf803c1791c469e05d134c = Zenodo's PragueSkyModelDatasetFull.dat (altitude + polarisation)."
+    },
+    {
+      "id": "hosek-wilkie-sky-model",
+      "usage": "source (data + numpy port)",
+      "note": "Hosek-Wilkie analytic skylight model (SIGGRAPH 2012) + solar radiance function (IEEE CG&A 2013), v1.4a, Copyright (c) 2012-2013 Lukas Hosek and Alexander Wilkie, Charles University, BSD-3-Clause (the licence text heads ArHosekSkyModel.c/.h and ArHosekSkyModelData_Spectral.h). Taken from pbrt-v4 at commit 9772673e43e74b931675081b2826f4acc91ba348 (src/ext/skymodel, checked 2026-10-29): ArHosekSkyModelData_Spectral.h sha256 46459aefe7cfa14759495200b107a0db7ac0f8d5cec8792582123286ddf0cc09, ArHosekSkyModel.c 16cca27268ed1cf27067edef8e9526e6ffa157b0e0467dab422bfdd13ff21fe8, ArHosekSkyModel.h 0f51b75b7207f336224f0154c58be99537e419c89d26a51add34aa1db6209774. The coefficients are converted to atlas_vfx/layers/data/hosek_wilkie_spectral.npz by tools/hosek_wilkie_data.py; the formulas are ported to numpy in atlas_vfx/layers/sky_hosek.py. Notice kept in atlas_vfx/layers/data/THIRD_PARTY_HOSEK_WILKIE.md. Physical Sky's fallback sky when Atlas Scene's Prague is not reachable."
+    },
+    {
+      "id": "cie-cmf-wyman2013",
+      "usage": "source (formula)",
+      "note": "Analytic multi-lobe Gaussian fit to the CIE 1931 2-degree colour matching functions: Wyman, Sloan, Shirley, 'Simple Analytic Approximations to the CIE XYZ Color Matching Functions', JCGT 2(2), 2013. Implemented here from the paper's published equations and coefficients (a mathematical formula; no code copied). Used by atlas_vfx/layers/sky_hosek.py to turn the Hosek-Wilkie spectra into XYZ."
     },
     {
       "id": "three-js",

@@ -11,6 +11,10 @@ pack treats every widget, and every file a widget names, as untrusted:
   (`atlas_vfx/camera_side/nuke_text.py`), never by pasting strings. Review a generated script before you run it.
 - Files the nodes read (camera JSON, .chan, .abc, COLMAP models, npz, EXR, movies, OCIO configs) are parsed as data:
   no pickle, no exec. External tools (ffmpeg, ffprobe, git) run with argument lists, never a shell.
+- Shipped data files (the Hosek-Wilkie sky coefficients) are read from fixed paths inside the package with
+  `allow_pickle=False` and checked against their sha256 manifest; no widget names them. Physical Sky's Prague
+  `dataset` widget names a file that Atlas Scene's compiled Prague loader parses, so treat it like any other
+  input path.
 - Nodes read any input path you give them, like most ComfyUI file nodes. Keep ComfyUI on 127.0.0.1, or behind
   authentication, if other people or machines can reach it.
 

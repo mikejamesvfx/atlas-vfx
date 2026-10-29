@@ -1,0 +1,77 @@
+{
+ "model": "Hosek-Wilkie skylight 2012 + solar radiance 2013, v1.4a, spectral",
+ "licence": "BSD-3-Clause, Copyright (c) 2012-2013 Lukas Hosek and Alexander Wilkie",
+ "source": {
+  "repo": "github.com/mmp/pbrt-v4",
+  "commit": "9772673e43e74b931675081b2826f4acc91ba348",
+  "path": "src/ext/skymodel",
+  "files": {
+   "ArHosekSkyModel.c": {
+    "url": "https://raw.githubusercontent.com/mmp/pbrt-v4/9772673e43e74b931675081b2826f4acc91ba348/src/ext/skymodel/ArHosekSkyModel.c",
+    "sha256": "16cca27268ed1cf27067edef8e9526e6ffa157b0e0467dab422bfdd13ff21fe8",
+    "bytes": 27791
+   },
+   "ArHosekSkyModel.h": {
+    "url": "https://raw.githubusercontent.com/mmp/pbrt-v4/9772673e43e74b931675081b2826f4acc91ba348/src/ext/skymodel/ArHosekSkyModel.h",
+    "sha256": "0f51b75b7207f336224f0154c58be99537e419c89d26a51add34aa1db6209774",
+    "bytes": 19888
+   },
+   "ArHosekSkyModelData_Spectral.h": {
+    "url": "https://raw.githubusercontent.com/mmp/pbrt-v4/9772673e43e74b931675081b2826f4acc91ba348/src/ext/skymodel/ArHosekSkyModelData_Spectral.h",
+    "sha256": "46459aefe7cfa14759495200b107a0db7ac0f8d5cec8792582123286ddf0cc09",
+    "bytes": 513703
+   }
+  }
+ },
+ "built": "2026-10-29",
+ "tool": "tools/hosek_wilkie_data.py",
+ "units": "spectral radiance W / (m^2 sr nm) at bands_nm",
+ "arrays": {
+  "bands_nm": {
+   "shape": [
+    11
+   ],
+   "dtype": "float64",
+   "sha256": "eb04c589ab96b9d2cd339430e9e7d8ec141402871aab9463fd970a158f0d464f"
+  },
+  "sky_config": {
+   "shape": [
+    11,
+    2,
+    10,
+    6,
+    9
+   ],
+   "dtype": "float64",
+   "sha256": "acff5487285c6be4766a76f4cd256636ba627b46c36829b29ee31bff52638f1d"
+  },
+  "sky_radiance": {
+   "shape": [
+    11,
+    2,
+    10,
+    6
+   ],
+   "dtype": "float64",
+   "sha256": "6f2f574c1911407c2563551af2d93e28a59e536b63104ee7633063071c1885c5"
+  },
+  "solar": {
+   "shape": [
+    11,
+    10,
+    45,
+    4
+   ],
+   "dtype": "float64",
+   "sha256": "efcf3d1385291b9ced1b9ca4d6a8d3ef9f2a14c2d5971fd8b6831eed8c376be0"
+  },
+  "limb": {
+   "shape": [
+    11,
+    6
+   ],
+   "dtype": "float64",
+   "sha256": "08e31d5ad992c444306abd5ea3e74cabf69d5b2c366d9eb9e4e7307c37af9ba2"
+  }
+ }
+}

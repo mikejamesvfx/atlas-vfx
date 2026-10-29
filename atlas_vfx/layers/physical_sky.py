@@ -1,8 +1,11 @@
-"""Physical Sky core: GPS + capture time -> clear sky HDRI and sun light rig, through Atlas Scene's Prague sky.
+"""Physical Sky core: GPS + capture time -> clear sky HDRI and sun light rig.
 
-Packaging, not new science. The sun position is NOAA (layers/solar.py); the sky and sun radiance come from Atlas
-Scene (`atlas_scene.environment.render_environment` with the `atlas_scene_prague` evaluator, the official Prague Sky
-Model), reached only through atlas_vfx/_atlas_scene.py. Nothing of the sky model is copied here.
+Packaging, not new science. The sun position is NOAA (layers/solar.py). Two sky models:
+  prague         Atlas Scene's (`atlas_scene.environment.render_environment` with the `atlas_scene_prague`
+                 evaluator, the official Prague Sky Model), reached only through atlas_vfx/_atlas_scene.py. Atlas
+                 Scene owns it; nothing of it is copied here.
+  hosek-wilkie   the analytic fallback that ships with atlas-vfx (layers/sky_hosek.py, the authors' BSD-3 model
+                 ported to numpy), rendered by `render_latlong` below. Sea level, sun 0-90 deg, approximate.
 
 Frames and the lat-long convention (the part that bit on 2026-10-28):
   sky frame      right-handed, Y up, north = -Z, east = +X. Compass azimuth A (clockwise from north), elevation e:
@@ -26,16 +29,18 @@ info says so; the sun direction is still exact and the rig carries it with zero 
 """
 from __future__ import annotations
 
+import json
 import logging
 import math
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 
 from .. import _atlas_scene
 from ..camera_side import plate as pl
 from ..contracts import shot_camera as sc
-from . import solar
+from . import sky_hosek, solar
 
 log = logging.getLogger("atlas_vfx")
 
@@ -43,6 +48,9 @@ REC709 = "Linear Rec.709 (sRGB)"
 WORKING = "ACEScg"
 PRAGUE_MIN_ELEVATION = -4.2           # Prague's (and Atlas Scene's) solar elevation domain starts here
 PRAGUE_VISIBILITY_KM = (20.0, 131.8)
+HOSEK_MIN_ELEVATION = 0.0             # Hosek-Wilkie's domain starts at the horizon (no twilight)
+SKY_MODELS = ("prague", "hosek-wilkie")
+MIN_ELEVATION = {"prague": PRAGUE_MIN_ELEVATION, "hosek-wilkie": HOSEK_MIN_ELEVATION}
 SUN_RADIUS_DEG = 0.2667               # the Prague model's sun disk radius (PragueSkyModel.cpp SUN_RADIUS)
 LUM709 = np.array([0.2126, 0.7152, 0.0722], np.float64)
 LATLONG_CONVENTION = ("lat-long seen from inside: centre column = compass `centre` looking down -Z, +X a quarter "
@@ -139,7 +147,7 @@ def project_uv(d_cam, fov_x_deg, aspect):
 
 # ------------------------------------------------------------------------------------------------ the sun
 def effective_sun(mode: str, latitude, longitude, capture_utc: str, time_offset_h=0.0, az_offset=0.0, el_offset=0.0,
-                  manual_az=0.0, manual_el=0.0) -> dict:
+                  manual_az=0.0, manual_el=0.0, min_elevation=PRAGUE_MIN_ELEVATION) -> dict:
     """The sun the sky is rendered for. metadata: NOAA from GPS + capture time (+ offset hours); offset: that plus an
     artist offset in azimuth / elevation; manual: the typed azimuth / elevation (capture time only recorded)."""
     out = {"mode": mode, "time_offset_h": float(time_offset_h)}
@@ -161,7 +169,7 @@ def effective_sun(mode: str, latitude, longitude, capture_utc: str, time_offset_
         raise ValueError(f"sun mode {mode!r}: metadata, offset or manual")
     if not -90.0 <= el <= 90.0:
         raise ValueError(f"sun elevation {el:.3f} deg is outside -90..90 (check the elevation offset)")
-    out.update(azimuth_deg=az % 360.0, elevation_deg=el, renderable=el >= PRAGUE_MIN_ELEVATION)
+    out.update(azimuth_deg=az % 360.0, elevation_deg=el, renderable=el >= float(min_elevation))
     return out
 
 
@@ -402,8 +410,68 @@ def render_sky(az, el, *, width, centre_deg=0.0, visibility_km=40.0, ground_albe
                 px, az, el, centre_deg, exposure_ev, e_sun)}
 
 
+# ------------------------------------------------------------------------------------------------ Hosek-Wilkie render
+def render_latlong(ev, width, ground_albedo, exposure_ev, e_sun, e_sky_up, el):
+    """Our own lat-long render for an evaluator already in the lat-long frame (sky + sun per pixel centre, the
+    lower hemisphere filled with a Lambertian ground albedo / pi * (E_sky_up + E_sun sin el), as light_rig and Atlas
+    Scene fill it), x 2^exposure_ev. float32 (H, W, 3) Linear Rec.709. Used for Hosek-Wilkie; the Prague path keeps
+    Atlas Scene's renderer."""
+    W, H = int(width), int(width) // 2
+    lon = 2 * math.pi * (np.arange(W) + 0.5) / W - math.pi
+    ground = float(ground_albedo) / math.pi * (np.asarray(e_sky_up, np.float64) +
+                                               np.asarray(e_sun, np.float64) * max(math.sin(math.radians(el)), 0.0))
+    out = np.empty((H, W, 3), np.float32)
+    rows = max(1, (1 << 18) // W)
+    for r0 in range(0, H, rows):
+        lat = math.pi / 2 - math.pi * (np.arange(r0, min(H, r0 + rows)) + 0.5) / H
+        LON, LAT = np.meshgrid(lon, lat)
+        d = np.stack([np.sin(LON) * np.cos(LAT), np.sin(LAT), -np.cos(LON) * np.cos(LAT)], -1).reshape(-1, 3)
+        L = np.asarray(ev.sky_radiance(d), np.float64) + np.asarray(ev.sun_radiance(d), np.float64)
+        L[d[:, 1] <= 0.0] = ground
+        out[r0:r0 + LAT.shape[0]] = (L * 2.0 ** float(exposure_ev)).reshape(LAT.shape[0], W, 3)
+    return out
+
+
+def turbidity_for_visibility(visibility_km: float) -> tuple[float, dict]:
+    """Hosek-Wilkie turbidity for a meteorological visibility, from data/hosek_visibility_turbidity.json
+    (piecewise linear in log visibility, clamped to the table). Approximate; the table records how it was made."""
+    t = json.loads((Path(__file__).resolve().parent / "data" / "hosek_visibility_turbidity.json").read_text(
+        encoding="utf-8"))
+    v = np.array([p[0] for p in t["points"]], np.float64)
+    T = np.array([p[1] for p in t["points"]], np.float64)
+    x = float(np.clip(visibility_km, v[0], v[-1]))
+    return float(np.interp(math.log(x), np.log(v), T)), {"method": t["method"], "provenance": t["provenance"]}
+
+
+def render_sky_hosek(az, el, *, width, centre_deg=0.0, visibility_km=40.0, ground_albedo=0.25, exposure_ev=0.0,
+                     altitude_m=0.0) -> dict:
+    """render_sky's result with the Hosek-Wilkie fallback (atlas_vfx/layers/sky_hosek.py) instead of Prague."""
+    width = int(width)
+    if width < 64 or width % 4:
+        raise ValueError(f"width {width}: at least 64 and a multiple of 4")
+    if not PRAGUE_VISIBILITY_KM[0] <= visibility_km <= PRAGUE_VISIBILITY_KM[1]:
+        raise ValueError(f"visibility {visibility_km} km outside {PRAGUE_VISIBILITY_KM[0]}-{PRAGUE_VISIBILITY_KM[1]} km")
+    if el < HOSEK_MIN_ELEVATION:
+        raise ValueError(f"sun elevation {el:.3f} below Hosek-Wilkie's {HOSEK_MIN_ELEVATION} deg; nothing to render")
+    notes = []
+    if altitude_m and altitude_m > 0:
+        notes.append(f"altitude {altitude_m} m not used: Hosek-Wilkie is sea level")
+    turb, mapping = turbidity_for_visibility(visibility_km)
+    inner = sky_hosek.HosekWilkieEvaluator.from_compass(float(az), float(el), turb, float(ground_albedo))
+    ev = _Oriented(inner, centre_deg)
+    d_sun = azel_to_dir(float(az) - float(centre_deg), float(el))
+    e_sun = _sun_irradiance(ev, d_sun)
+    e_sky = _sky_irradiance_up(ev)
+    px = render_latlong(ev, width, ground_albedo, exposure_ev, e_sun, e_sky, float(el))
+    return {"lin_rec709": px, "e_sun": e_sun, "e_sky_up": e_sky, "capabilities": inner.capabilities().to_dict(),
+            "altitude_used_m": 0.0, "notes": notes, "metadata": {"renderer": "atlas_vfx physical_sky.render_latlong"},
+            "evaluator": ev.implementation_version, "turbidity": turb, "turbidity_mapping": mapping,
+            "model": "hosek-wilkie", "hdri_sun_energy": hdri_sun_energy(px, az, el, centre_deg, exposure_ev, e_sun)}
+
+
 # ------------------------------------------------------------------------------------------------ light rig
-def light_rig(sun_dirs_cam, e_sun, e_sky_up, ground_albedo, sun_el, fov_x_deg, aspect) -> dict:
+def light_rig(sun_dirs_cam, e_sun, e_sky_up, ground_albedo, sun_el, fov_x_deg, aspect,
+              source="physical sky (Prague via Atlas Scene)") -> dict:
     """ATLAS_VFX_LIGHT_RIG (the dict Light From Plate makes and Relight reads) from the physical sky.
 
     Normalised so the sky ambient seen by an up-facing surface (E_sky_up / pi) has luminance 1:
@@ -430,7 +498,7 @@ def light_rig(sun_dirs_cam, e_sun, e_sky_up, ground_albedo, sun_el, fov_x_deg, a
             "sun_strength": round(peak / math.pi * k, 6),
             "sky": [(sky * k).round(6).tolist()] * F, "ground": [(ground * k).round(6).tolist()] * F,
             "colourspace": REC709, "normalised": "sky (E_sky_up / pi) luminance = 1",
-            "source": "physical sky (Prague via Atlas Scene)", "sun_visible": bool(peak > 0)}
+            "source": source, "sun_visible": bool(peak > 0)}
 
 
 # ------------------------------------------------------------------------------------------------ colour + preview

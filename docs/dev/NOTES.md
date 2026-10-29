@@ -2,6 +2,34 @@
 
 Running log for whoever works here. Newest at the top. Keep it short: what was decided, what was learned, what broke.
 
+## 2026-10-29 (Physical Sky: Hosek-Wilkie fallback; branch feat/sky-hosek-fallback)
+
+- Why: the repo is public but Atlas Scene is private, so Physical Sky failed for everyone else. Rule now: Atlas Scene
+  owns Prague; atlas-vfx owns one analytic fallback, `layers/sky_hosek.py` (never imports Atlas Scene).
+- Model: Hosek-Wilkie 2012 sky + 2013 sun, the authors' BSD-3 v1.4a data from pbrt-v4 at a pinned commit, converted
+  by `tools/hosek_wilkie_data.py` (hash-pinned sources, numbers-only parser) to a 191 KB `.npz` + manifest +
+  licence notice under `layers/data/`. Colour: CIE 1931 via the Wyman 2013 fit (checked against colour-science's
+  table: max error 0.024, integrals within 0.1%), the BT.709 matrix from its chromaticities.
+- Units: Atlas Scene's Prague returns radiometric CIE-weighted values (no 683 lm/W); Hosek now matches that scale,
+  so exposure_ev means the same in both (median Hosek/Prague 1.03).
+- New widget `sky_model` auto | prague | hosek-wilkie, LAST in optional (old GUI graphs fill widgets by position;
+  `test_widget_order`). auto = Prague when Atlas Scene + extension + dataset are reachable, else Hosek with the
+  reason in notes and the log. info / sidecar / EXR attribute / Sun Globe status name the model. prague with the sun
+  below its domain still needs no dataset.
+- Prague output is bit-identical to before (two renders hashed before and after).
+- Turbidity table: v0 analytic (Koschmieder) replaced by a fit to Prague (`tools/hosek_calibrate.py`) on light
+  (sun_strength + E_sky_up). A first fit that also weighed sky colour pulled turbidity away from the light; colour is
+  now only reported (dxy about 0.01-0.035). At 20-50 km and sun 20 deg up the rig's sun_strength is within 10% of
+  Prague; above ~60 km Hosek can't get as clear (turbidity floor 1, sun_strength 0.55-0.85); near the horizon
+  (2-5 deg) its sun is far too bright (x1.8 at 5 deg, x7 at 2 deg). Twilight (-4.2 to 0): black HDRI + a warning
+  naming Prague.
+- Found on the way: Atlas Scene's render_environment fills the ground from the irradiance its pixels caught, so at
+  low widths it misses a sun disc that falls between pixel centres; ours adds the sun analytically (as light_rig
+  always did). In UPSTREAM_TODO.
+- Not done here: the golden check against the compiled reference C. Building and running downloaded C was blocked
+  in this session; `tests/test_sky_hosek.py` SKIPs it until `tools/hosek_wilkie_data.py --golden` is run (MSVC is
+  on ws). Not yet run inside V141 (needs a restart for the new widget).
+
 ## 2026-10-29 (catalogue spec panel fixes; branch fix/catalogue-panel-2026-10-29)
 
 - Spec panel on NODE_CATALOGUE.md (`docs/reviews/SPEC_PANEL_2026-10-29.md`), all nine items done the same day.

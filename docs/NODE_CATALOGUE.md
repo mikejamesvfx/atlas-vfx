@@ -79,7 +79,7 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 45 | LTX Return | layers | atlas-vfx | built | plate V141 | LTX clean loop | |
 | 46 | Comp Preview | deliver | atlas-vfx | built | plate V141 | after T8 | |
 | 47 | RS Solve | camera_side | Atlas Camera | built | synthetic; plate script (DSCF2973) | S3 | tools/rs_clip_solve.py (same code) |
-| 48 | Physical Sky | layers | atlas-vfx (wraps Atlas Scene) | built | plate script (DSCF2977, not yet in V141) | with 18 | *external* hy_relight/prague make_prague_sky.py, day24_sky.py |
+| 48 | Physical Sky | layers | atlas-vfx (Prague via Atlas Scene; Hosek-Wilkie fallback here) | built | plate script (DSCF2977, not yet in V141) | with 18 | *external* hy_relight/prague make_prague_sky.py, day24_sky.py |
 | 49 | Chart Calibrate | camera_side | Atlas Camera | built | synthetic (chart not shot) | S4 | tools/grid_rs_shoot.py (same code) |
 
 37 rows are built or deprecated, and those are the 37 nodes that load. Categories: `Atlas VFX/Camera`
@@ -551,19 +551,27 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 48 Physical Sky
 `AtlasVFXPhysicalSky` · layers · Atlas VFX/Layers
 - in: latitude FLOAT, longitude FLOAT, altitude_m FLOAT, capture_utc STRING, time_offset_h FLOAT, heading_deg FLOAT, fov_x FLOAT, tilt_deg FLOAT, visibility_km FLOAT, ground_albedo FLOAT, exposure_ev FLOAT, sun_mode metadata|offset|manual, sun_azimuth_offset FLOAT, sun_elevation_offset FLOAT, sun_azimuth FLOAT, sun_elevation FLOAT, width INT, latlong_centre north|camera heading, name STRING, out_dir STRING
-- in, optional: shot_camera ATLAS_TRACKED_CAMERA, dataset STRING, ocio_config STRING, display STRING, view STRING
+- in, optional: shot_camera ATLAS_TRACKED_CAMERA, dataset STRING, ocio_config STRING, display STRING, view STRING, sky_model auto|prague|hosek-wilkie
 - out: hdri_acescg IMAGE, light_rig ATLAS_VFX_LIGHT_RIG, preview IMAGE, info STRING, exr_path STRING
-- test: tests/test_physical_sky.py, tests/test_sun_globe.py
-- proof: plate script (DSCF2977 check shot on ws); not yet run inside V141
-- licences: `atlas-scene`, `prague-sky-model`, `prague-sky-model-dataset`, `three-js` (Sun Globe panel),
-  `openimageio`, `jsonschema`
-- needs: Atlas Scene through `_atlas_scene.py` (run: the node loads without it and raises AtlasSceneMissing with
-  the install steps when queued); OpenImageIO (run)
+- test: tests/test_physical_sky.py, tests/test_sky_hosek.py, tests/test_sun_globe.py
+- proof: plate script (DSCF2977 check shot on ws, Prague); not yet run inside V141. Hosek-Wilkie: synthetic plus
+  the Prague comparison on ws (2026-10-29)
+- licences: `hosek-wilkie-sky-model`, `cie-cmf-wyman2013` (fallback, shipped); `atlas-scene`, `prague-sky-model`,
+  `prague-sky-model-dataset` (Prague, optional); `three-js` (Sun Globe panel), `openimageio`, `jsonschema`
+- needs: nothing for the Hosek-Wilkie sky; Prague needs Atlas Scene through `_atlas_scene.py` and a dataset (run:
+  sky_model auto falls back to Hosek-Wilkie and says why, prague raises AtlasSceneMissing with the install steps);
+  OpenImageIO (run)
 - writes: `<name>.exr` (float32 ACEScg lat-long) + sidecar + info JSON with the atlas_scene commit, under
   ~/atlas-vfx-work/physical_sky/<name>
-- notes: GPS + UTC capture time (+ offset hours) -> NOAA sun (metadata / offset / manual) -> Atlas Scene's Prague
-  sky. Nuke lat-long layout, azimuth grows right, centre north or camera heading. Sun under -4.2 deg: black HDRI +
-  warning, exact direction kept. Sun Globe panel (`web/atlas_vfx_sun_globe.js`, three.js r185 vendored): the sun,
+- notes: GPS + UTC capture time (+ offset hours) -> NOAA sun (metadata / offset / manual) -> the sky. sky_model
+  (last widget, default auto): prague = Atlas Scene's Prague (twilight to -4.2 deg, visibility, altitude with the
+  full dataset); hosek-wilkie = the analytic fallback in `layers/sky_hosek.py` (sea level, sun 0-90 deg, visibility
+  mapped to turbidity by a table fitted to Prague, same radiometric scale; at 20-50 km visibility and sun 20 deg up
+  the rig's sun_strength is within about 10% of Prague's and the sky within 25%; near the horizon its sun is too
+  bright, and above ~60 km it can't get as clear as Prague: sun_strength 0.55-0.85 of Prague's); auto = Prague when reachable, else
+  Hosek-Wilkie. info / sidecar / EXR attribute record the model. Nuke lat-long layout, azimuth grows right, centre
+  north or camera heading. Sun under the model's limit (Prague -4.2, Hosek-Wilkie 0): black HDRI + warning, exact
+  direction kept. Sun Globe panel (`web/atlas_vfx_sun_globe.js`, three.js r185 vendored): the sun,
   the day's path and the camera frustum on a globe, drag the sun (writes manual), time-of-day scrubber, reset to
   metadata, golden hour, auto-queue toggle (off). Drives the native widgets only; headless runs are unchanged.
 

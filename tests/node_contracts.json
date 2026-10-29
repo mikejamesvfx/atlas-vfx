@@ -1364,6 +1364,16 @@
     "name": "view",
     "type": "STRING",
     "group": "optional"
+   },
+   {
+    "name": "sky_model",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "auto",
+     "prague",
+     "hosek-wilkie"
+    ]
    }
   ],
   "outputs": [

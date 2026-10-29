@@ -661,17 +661,22 @@ function buildGlobe(node, THREE) {
   const signed = (v) => `${v >= 0 ? "+" : "-"}${Math.abs(v).toFixed(1)}`;
   const clockLabel = (m) => (m === null ? "UTC" : `${m >= 0 ? "+" : "-"}${String(Math.floor(Math.abs(m) / 60)).padStart(2, "0")}:${String(Math.abs(m) % 60).padStart(2, "0")}`);
 
+  // which sky model drew the last run (textContent only)
+  const skyModelTag = () => (payload?.sky_model_used === "hosek-wilkie" ? " · HOSEK-WILKIE" : "");
+
   function updatePanel(s, rel, flashOn) {
     const look = s.sun.error ? MODE_LOOK.error : (MODE_LOOK[s.mode] || MODE_LOOK.error);
     badge.textContent = look.text;
     Object.assign(badge.style, { color: look.color, background: look.background, border: `1px solid ${look.border}` });
     status.textContent = flashOn ? flashMsg.text : (!payload ? "NOT RUN YET · DRAWN FROM WIDGETS"
-      : s.fresh ? (payload.sky_rendered ? "LAST RUN · SKY RENDERED" : "LAST RUN · SKY NOT RENDERED")
+      : s.fresh ? (payload.sky_rendered ? `LAST RUN · SKY RENDERED${skyModelTag()}` : "LAST RUN · SKY NOT RENDERED")
         : `CHANGED SINCE LAST RUN${autoQueue() ? "" : " · QUEUE TO RENDER"}`);
     status.style.color = flashOn ? "#ffd28b" : "#6f98a2";
     const src = s.cam.source === "shot" ? "SHOT CAM" : (s.cam.source === "shot_pending" ? "SHOT CAM (RUN TO READ)" : "CAM");
     camLabel.textContent = `${src} ${s.cam.heading.toFixed(1)}° · HFOV ${s.cam.fov.toFixed(1)}° · TILT ${signed(s.cam.tilt)}°`;
-    flag.style.display = !s.sun.error && s.sun.elevation_deg < PRAGUE_MIN_ELEVATION ? "block" : "none";
+    // the last run's model sets the limit (Hosek-Wilkie stops at the horizon); before a run, Prague's
+    const minEl = s.fresh && typeof payload?.min_elevation_deg === "number" ? payload.min_elevation_deg : PRAGUE_MIN_ELEVATION;
+    flag.style.display = !s.sun.error && s.sun.elevation_deg < minEl ? "block" : "none";
     if (s.sun.error) {
       relation.textContent = s.sun.error.toUpperCase();
       relation.style.color = "#ffb4a0";

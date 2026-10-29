@@ -24,4 +24,4 @@ exr = ["OpenImageIO>=3.0"]
 include = ["atlas_vfx*"]
 
 [tool.setuptools.package-data]
-atlas_vfx = ["contracts/*.json"]
+atlas_vfx = ["contracts/*.json", "layers/data/*"]
