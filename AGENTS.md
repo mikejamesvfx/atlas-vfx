@@ -18,7 +18,9 @@ atlas_vfx/platelock/        Plate Lock: lock an AI take back onto its plate. cor
                             camera_side and contracts.
 atlas_vfx/contracts/        shot_camera_v0_1.schema.json + loader/validator. Pure python, no ComfyUI imports.
 atlas_vfx/_atlas_camera.py  the ONLY place that imports Atlas Camera (lazy adapter).
-atlas_vfx/_atlas_scene.py   the ONLY place that imports Atlas Scene (optional, lazy; Physical Sky's sky render).
+atlas_vfx/_atlas_scene.py   the ONLY place that imports Atlas Scene (optional, lazy; Physical Sky's Prague sky).
+                            Atlas Scene owns Prague; atlas-vfx owns one analytic fallback, layers/sky_hosek.py
+                            (Hosek-Wilkie, numpy, never imports Atlas Scene). Never copy Atlas Scene code.
 web/                        ComfyUI frontend (Sun Globe panel, vendored three.js r185). Display only: panels drive
                             native widgets, every node runs the same without them.
 config/                     the shipped OCIO config (ACES 2.0 studio + F-Log2 and F-Log F-Gamut input spaces)
@@ -30,7 +32,7 @@ atlas_components.json       licence register: every model, runtime and source th
 The import graph, enforced by `tests/test_import.py` over every `.py` in the six packages (absolute, relative and
 `import_module` strings alike): contracts imports nothing of atlas_vfx; camera_side: contracts and `_atlas_camera`;
 platelock: camera_side, contracts; sensor: those plus platelock; layers: camera_side, contracts, sensor and
-`_atlas_scene` (optional: every node loads without Atlas Scene, only the sky render needs it); deliver: every package
+`_atlas_scene` (optional: every node loads and renders without Atlas Scene; only the Prague sky needs it); deliver: every package
 and `_atlas_camera` (not `_atlas_scene`). `registry` is the root's alone. A new edge is a decision: change this
 paragraph and the test's `ALLOWED` in the same commit.
 

@@ -237,8 +237,8 @@ def test_module_and_mirror():
                  "tilt_deg", "visibility_km", "ground_albedo", "exposure_ev", "sun_mode", "sun_azimuth_offset",
                  "sun_elevation_offset", "sun_azimuth", "sun_elevation", "width", "latlong_centre", "name", "out_dir"]
     check(list(it["required"]) == committed and list(it["optional"]) == ["shot_camera", "dataset", "ocio_config",
-                                                                          "display", "view"],
-          "node inputs unchanged from 8723e35 (headless graphs identical; a new input would go last)")
+                                                                          "display", "view", "sky_model"],
+          "node inputs unchanged from 8723e35 plus sky_model last (headless graphs identical; a new input goes last)")
 
     # 2. mirror
     worst = 0.0
@@ -422,7 +422,7 @@ def test_payload():
     prev = np.dstack(list(np.meshgrid(np.linspace(0, 1, 2048), np.linspace(0, 1, 1024))) + [np.full((1024, 2048), 0.5)])
     g = nps.globe_ui(sun, cam, 69.5, 16 / 9, 0.0, DSCF[0], DSCF[1], DSCF[2], 0.0, "metadata", 180.0, True, prev)
     keys = {"version", "sun", "inputs", "path", "clock", "camera", "latlong_centre_deg", "sky_rendered",
-            "min_elevation_deg", "preview", "convention"}
+            "min_elevation_deg", "sky_model_used", "preview", "convention"}
     check(set(g) == keys and g["version"] == 1, "payload keys", sorted(set(g) ^ keys))
     check(json.loads(json.dumps(g)) == g, "payload is plain JSON")
     check(len(json.dumps(g)) < 400_000, "payload stays small", len(json.dumps(g)))

@@ -1,8 +1,9 @@
 """The only place atlas-vfx imports Atlas Scene. Read-only: never write into its trees from here.
 
-Atlas Scene OWNS the physical sky (its `environment` package plus the `atlas_scene_prague` extension, which wraps
+Atlas Scene OWNS the Prague sky (its `environment` package plus the `atlas_scene_prague` extension, which wraps
 the official Prague Sky Model). atlas-vfx never copies that code; Physical Sky asks for it here, lazily, and only
-when it renders a sky. Nothing is imported until a module is asked for, so every node loads without Atlas Scene.
+when it renders a Prague sky. atlas-vfx owns one analytic fallback of its own (layers/sky_hosek.py, Hosek-Wilkie),
+which never imports Atlas Scene. Nothing is imported until a module is asked for, so every node loads without Atlas Scene.
 
 Atlas Scene lookup order:
   1. atlas_scene already imported

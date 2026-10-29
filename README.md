@@ -25,6 +25,8 @@ Start with AGENTS.md (rules, layout, import graph) and SECURITY.md (threat model
 - `ffmpeg` and `ffprobe` on PATH (plates are decoded as native planes; the colour maths is in numpy).
 - Tests: `python tests/run_all.py` with the ComfyUI venv's python runs every `tests/test_*.py` as a script
   (about 7 minutes; `python tests/run_all.py plate camera` filters by name). No pytest.
+- Physical Sky renders a sky out of the box (the Hosek-Wilkie model that ships here). With the author's Atlas
+  Scene and a Prague Sky Model dataset it uses Prague instead (`sky_model`: auto, prague, hosek-wilkie).
 - Point the nodes at your own plate with the `path` widget of Plate Read (`~` expands) and your camera with
   Camera Import (Nuke JSON or .chan, Alembic, a COLMAP model, or a shot-camera JSON).
 

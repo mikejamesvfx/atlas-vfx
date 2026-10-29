@@ -40,7 +40,8 @@ def graph() -> dict:
             "ground_albedo": 0.25, "exposure_ev": 0.0, "sun_mode": "metadata", "sun_azimuth_offset": 0.0,
             "sun_elevation_offset": 0.0, "sun_azimuth": 250.0, "sun_elevation": 15.0, "width": 2048,
             "latlong_centre": "north", "name": "DSCF2977_physical_sky", "out_dir": "", "dataset": "",
-            "ocio_config": "", "display": "sRGB - Display", "view": "ACES 2.0 - SDR 100 nits (Rec.709)"}},
+            "ocio_config": "", "display": "sRGB - Display", "view": "ACES 2.0 - SDR 100 nits (Rec.709)",
+            "sky_model": "auto"}},
         "2": {"class_type": "PreviewImage", "inputs": {"images": ["1", 2]}},
     }
 

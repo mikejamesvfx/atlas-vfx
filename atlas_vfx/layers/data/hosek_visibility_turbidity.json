@@ -1,0 +1,318 @@
+{
+ "about": "Hosek-Wilkie turbidity for Physical Sky's visibility_km (Prague's input), piecewise linear in log visibility.",
+ "method": "fitted to Prague renders (tools/hosek_calibrate.py): golden-section on turbidity per visibility, summed squared log error of sun_strength and E_sky_up (colour and zenith/horizon reported in fit, not fitted), sun elevations [10.0, 20.0, 40.0, 60.0] deg, azimuth 250.0, albedo 0.25, width 256",
+ "provenance": {
+  "date": "2026-10-29",
+  "atlas_scene_version": "0.1.0",
+  "atlas_scene_commit": "ed15bf88aafced777d8a87bdbc23a4003976ee69",
+  "prague_upstream_commit": "2385c912e9051c1258013ff8c3ce2e19e10fb917",
+  "dataset": {
+   "name": "SkyModelDatasetGround.dat",
+   "bytes": 107632816,
+   "quick_sha256": "e05e8a3d959b3c25682fcb76be9c575f70a7eb38d95663ce275105103d33017c"
+  },
+  "hosek_data": "1fe46b8d5328",
+  "absolute_scale_hosek_over_prague_median": 1.0305
+ },
+ "fit": [
+  {
+   "visibility_km": 20.0,
+   "turbidity": 4.9997,
+   "residual": 0.40926,
+   "sun_strength_ratio": [
+    1.412,
+    1.052,
+    0.923,
+    0.915
+   ],
+   "e_sky_ratio": [
+    1.607,
+    1.232,
+    1.067,
+    0.992
+   ],
+   "zenith_horizon_ratio": [
+    0.461,
+    0.579,
+    0.596,
+    0.519
+   ],
+   "dxy_90deg": [
+    0.0166,
+    0.012,
+    0.0194,
+    0.0233
+   ]
+  },
+  {
+   "visibility_km": 25.0,
+   "turbidity": 4.0246,
+   "residual": 0.26789,
+   "sun_strength_ratio": [
+    1.336,
+    1.047,
+    0.942,
+    0.946
+   ],
+   "e_sky_ratio": [
+    1.473,
+    1.156,
+    1.009,
+    0.936
+   ],
+   "zenith_horizon_ratio": [
+    0.579,
+    0.669,
+    0.619,
+    0.486
+   ],
+   "dxy_90deg": [
+    0.016,
+    0.0137,
+    0.0203,
+    0.0242
+   ]
+  },
+  {
+   "visibility_km": 30.0,
+   "turbidity": 3.4112,
+   "residual": 0.18721,
+   "sun_strength_ratio": [
+    1.259,
+    1.023,
+    0.935,
+    0.939
+   ],
+   "e_sky_ratio": [
+    1.387,
+    1.112,
+    0.983,
+    0.921
+   ],
+   "zenith_horizon_ratio": [
+    0.711,
+    0.767,
+    0.648,
+    0.471
+   ],
+   "dxy_90deg": [
+    0.0183,
+    0.0122,
+    0.0195,
+    0.0235
+   ]
+  },
+  {
+   "visibility_km": 40.0,
+   "turbidity": 2.246,
+   "residual": 0.11288,
+   "sun_strength_ratio": [
+    1.169,
+    0.996,
+    0.935,
+    0.934
+   ],
+   "e_sky_ratio": [
+    1.28,
+    1.057,
+    0.944,
+    0.897
+   ],
+   "zenith_horizon_ratio": [
+    0.989,
+    0.962,
+    0.697,
+    0.439
+   ],
+   "dxy_90deg": [
+    0.0207,
+    0.0109,
+    0.0187,
+    0.0226
+   ]
+  },
+  {
+   "visibility_km": 50.0,
+   "turbidity": 1.117,
+   "residual": 0.09131,
+   "sun_strength_ratio": [
+    1.13,
+    0.99,
+    0.942,
+    0.934
+   ],
+   "e_sky_ratio": [
+    1.239,
+    1.029,
+    0.921,
+    0.886
+   ],
+   "zenith_horizon_ratio": [
+    1.219,
+    1.093,
+    0.73,
+    0.42
+   ],
+   "dxy_90deg": [
+    0.0191,
+    0.0123,
+    0.0195,
+    0.0213
+   ]
+  },
+  {
+   "visibility_km": 60.0,
+   "turbidity": 1.0005,
+   "residual": 0.15754,
+   "sun_strength_ratio": [
+    0.973,
+    0.873,
+    0.834,
+    0.829
+   ],
+   "e_sky_ratio": [
+    1.28,
+    1.099,
+    1.007,
+    0.975
+   ],
+   "zenith_horizon_ratio": [
+    1.344,
+    1.181,
+    0.794,
+    0.466
+   ],
+   "dxy_90deg": [
+    0.0227,
+    0.012,
+    0.0163,
+    0.0177
+   ]
+  },
+  {
+   "visibility_km": 80.0,
+   "turbidity": 1.0005,
+   "residual": 0.52854,
+   "sun_strength_ratio": [
+    0.805,
+    0.742,
+    0.716,
+    0.713
+   ],
+   "e_sky_ratio": [
+    1.373,
+    1.217,
+    1.137,
+    1.108
+   ],
+   "zenith_horizon_ratio": [
+    1.427,
+    1.243,
+    0.863,
+    0.532
+   ],
+   "dxy_90deg": [
+    0.0276,
+    0.0171,
+    0.0123,
+    0.0137
+   ]
+  },
+  {
+   "visibility_km": 100.0,
+   "turbidity": 1.0005,
+   "residual": 1.06823,
+   "sun_strength_ratio": [
+    0.696,
+    0.651,
+    0.63,
+    0.629
+   ],
+   "e_sky_ratio": [
+    1.46,
+    1.329,
+    1.263,
+    1.235
+   ],
+   "zenith_horizon_ratio": [
+    1.477,
+    1.285,
+    0.922,
+    0.595
+   ],
+   "dxy_90deg": [
+    0.0315,
+    0.0212,
+    0.009,
+    0.0104
+   ]
+  },
+  {
+   "visibility_km": 131.8,
+   "turbidity": 1.0005,
+   "residual": 1.99556,
+   "sun_strength_ratio": [
+    0.588,
+    0.557,
+    0.542,
+    0.541
+   ],
+   "e_sky_ratio": [
+    1.588,
+    1.486,
+    1.436,
+    1.411
+   ],
+   "zenith_horizon_ratio": [
+    1.493,
+    1.307,
+    0.984,
+    0.68
+   ],
+   "dxy_90deg": [
+    0.0361,
+    0.0259,
+    0.0133,
+    0.0083
+   ]
+  }
+ ],
+ "points": [
+  [
+   20.0,
+   4.9997
+  ],
+  [
+   25.0,
+   4.0246
+  ],
+  [
+   30.0,
+   3.4112
+  ],
+  [
+   40.0,
+   2.246
+  ],
+  [
+   50.0,
+   1.117
+  ],
+  [
+   60.0,
+   1.0005
+  ],
+  [
+   80.0,
+   1.0005
+  ],
+  [
+   100.0,
+   1.0005
+  ],
+  [
+   131.8,
+   1.0005
+  ]
+ ]
+}
