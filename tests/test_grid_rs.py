@@ -266,7 +266,8 @@ def main() -> int:
 
     # 1b. a bogus detection (a 7 x 5 patch with the wrong local indices, as OpenCV returned on CI) is dropped, not
     # averaged in. Planted here so it is checked every run, not when the detector happens to misfire.
-    good = [v for v in views if len(v["xy"]) >= 35]
+    gone = {i for i, _ in cal["dropped"]}                   # the detector's own misfires, if any, stay out
+    good = [v for k, v in enumerate(views) if k not in gone and len(v["xy"]) >= 35]
     bad = dict(good[0])
     sel = np.arange(35)
     bad["xy"] = good[0]["xy"][sel] + 0.0
