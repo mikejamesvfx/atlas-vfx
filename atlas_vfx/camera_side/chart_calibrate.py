@@ -112,8 +112,13 @@ def calibrate_lens(ref: dict, *, preset: str = DEFAULT_PRESET, first: int | None
     cal = grid_rs.calibrate(views, (W, H), focal_guess_px=focal_guess_mm / p["width_mm"] * W)
     K = cal["K"]
     warnings = [w for w in [_aspect_warning(ref, p, preset)] if w]
+    dropped = [{"frame": kept[i][0], "rms_px": round(e, 3)} for i, e in cal["dropped"]]
+    if dropped:
+        warnings.append(f"chart lens: dropped {len(dropped)} still view(s) far worse than the rest (a bad chart "
+                        f"detection): frames {[d['frame'] for d in dropped]}")
+        log.warning("atlas-vfx %s", warnings[-1])
     return {"K": K, "dist_k1_k2_p1_p2_k3": cal["dist"], "rms_px": cal["rms_px"], "views": kept,
-            "n_views": len(views), "n_sampled": len(starts),
+            "n_views": cal["n_views"], "dropped_views": dropped, "n_sampled": len(starts),
             "focal_px": float(K[0, 0]), "focal_mm": float(K[0, 0] * p["width_mm"] / W),
             "k1": float(cal["dist"][0]), "k2": float(cal["dist"][1]),
             "principal_point_px": [float(K[0, 2]), float(K[1, 2])],

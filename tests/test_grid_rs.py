@@ -158,7 +158,9 @@ def check_node(static_imgs, takes, cal, fails):
             fails.append(f"node lens: focal off by {100 * fe:.2f} %")
         if abs(r["k1"] - DIST[0]) > 0.01 or abs(r["k2"] - DIST[1]) > 0.02:
             fails.append(f"node lens: distortion {r['k1']:.4f} {r['k2']:.4f} vs {DIST[:2]}")
-        if lens_doc["rms_px"] > 0.3 or lens_doc["n_views"] != len(static_imgs) or pp_err > 2.0:
+        # a bad detection may be dropped (OpenCV's exhaustive search is not deterministic); every view is accounted for
+        n_seen = lens_doc["n_views"] + len(lens_doc.get("dropped_views", []))
+        if lens_doc["rms_px"] > 0.3 or n_seen != len(static_imgs) or pp_err > 2.0:
             fails.append(f"node lens: rms {lens_doc['rms_px']:.3f}, {lens_doc['n_views']} views, pp off {pp_err:.2f} px")
         if not Path(r["lens_path"]).with_suffix(".sidecar.json").is_file() or r["readout_path"] or r["measurable"]:
             fails.append("node lens: no sidecar, or readout outputs set in lens mode")
@@ -259,6 +261,23 @@ def main() -> int:
         fails.append(f"focal off by {100 * fe:.2f} %")
     if abs(cal["dist"][0] - DIST[0]) > 0.01 or abs(cal["dist"][1] - DIST[1]) > 0.02:
         fails.append(f"distortion off: {cal['dist'][:2]} vs {DIST[:2]}")
+    if cal["dropped"]:
+        print(f"calibration dropped {len(cal['dropped'])} bad detection(s): {cal['dropped']}")
+
+    # 1b. a bogus detection (a 7 x 5 patch with the wrong local indices, as OpenCV returned on CI) is dropped, not
+    # averaged in. Planted here so it is checked every run, not when the detector happens to misfire.
+    gone = {i for i, _ in cal["dropped"]}                   # the detector's own misfires, if any, stay out
+    good = [v for k, v in enumerate(views) if k not in gone and len(v["xy"]) >= 35]
+    bad = dict(good[0])
+    sel = np.arange(35)
+    bad["xy"] = good[0]["xy"][sel] + 0.0
+    bad["ij"] = np.column_stack([sel % 7, sel // 7])          # wrong grid for those corners
+    bad["shape"] = (7, 5)
+    cal_bad = grid_rs.calibrate(good + [bad], (W, H), focal_guess_px=0.8 * F_PX)
+    fe_bad = cal_bad["K"][0, 0] / F_PX - 1
+    print(f"planted bad view: dropped {[(i, round(e, 1)) for i, e in cal_bad['dropped']]}, focal {100 * fe_bad:+.3f} %")
+    if [i for i, _ in cal_bad["dropped"]] != [len(good)] or abs(fe_bad) > 0.003 or cal_bad["rms_px"] > 0.3:
+        fails.append(f"planted bad view not dropped cleanly: {cal_bad['dropped']}, focal {100 * fe_bad:+.2f} %")
     if cal["rms_px"] > 0.3:
         fails.append(f"calibration rms {cal['rms_px']:.2f} px")
 

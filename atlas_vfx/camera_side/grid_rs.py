@@ -10,7 +10,8 @@ height is the readout, measured on sub-pixel corners.
 Pieces:
   detect(gray8)            corners of the visible part of the chart, with local (col, row) indices and the
                            checker parity of each corner (so a 180 degree index flip can be told apart)
-  calibrate(views, size)   OpenCV pinhole + k1, k2 (tangential and k3 held at 0, as the Sensor Lens Maps model)
+  calibrate(views, size)   OpenCV pinhole + k1, k2 (tangential and k3 held at 0, as the Sensor Lens Maps model);
+                           drops a view far worse than the rest (a bogus detection) and solves again
   index_sequence(...)      local indices -> chart indices that stay the same across a pan (absolute when the whole
                            chart is in view; otherwise predicted from the previous frames' homographies)
   fit_readout(...)         per-frame pose + one readout, points fixed on the chart, row time from the sensor
@@ -61,20 +62,38 @@ def chart_xyz(ij, square=CHART["square_m"]) -> np.ndarray:
 
 # ---------------------------------------------------------------------------------------------- calibration
 
-def calibrate(views, size, focal_guess_px: float | None = None):
+def calibrate(views, size, focal_guess_px: float | None = None, max_view_rms_px: float = 1.0, min_views: int = 4):
     """views: list of detect() results from static (or slow) frames; size (W, H). Local indices are fine here
-    (each view gets its own pose). Returns dict(K, dist [k1, k2, p1, p2, k3], rms_px, n_views)."""
+    (each view gets its own pose). Returns dict(K, dist [k1, k2, p1, p2, k3], rms_px, n_views, view_rms_px, dropped).
+
+    A view whose reprojection error is over max_view_rms_px AND 4x the median of the others is dropped and the
+    lens solved again, one view at a time, keeping at least min_views. OpenCV's exhaustive chessboard search is
+    not deterministic: now and then it returns a bogus patch (a 7 x 5 piece of an 18 x 10 board, 2026-10-29, CI at 4
+    threads), and one such view moved the focal 7 %. dropped = [(index into views, its rms px)]."""
     import cv2
 
     W, H = size
-    obj = [chart_xyz(v["ij"]).astype(np.float32) for v in views]
-    img = [v["xy"].astype(np.float32).reshape(-1, 1, 2) for v in views]
+    obj_all = [chart_xyz(v["ij"]).astype(np.float32) for v in views]
+    img_all = [v["xy"].astype(np.float32).reshape(-1, 1, 2) for v in views]
     f0 = focal_guess_px or 0.7 * W
-    K0 = np.array([[f0, 0, W / 2], [0, f0, H / 2], [0, 0, 1]], float)
     flags = (cv2.CALIB_USE_INTRINSIC_GUESS | cv2.CALIB_FIX_ASPECT_RATIO | cv2.CALIB_ZERO_TANGENT_DIST
              | cv2.CALIB_FIX_K3)
-    rms, K, dist, _, _ = cv2.calibrateCamera(obj, img, (W, H), K0, np.zeros(5), flags=flags)
-    return {"K": K, "dist": dist.ravel()[:5], "rms_px": float(rms), "n_views": len(views)}
+    keep, dropped = list(range(len(views))), []
+    while True:
+        K0 = np.array([[f0, 0, W / 2], [0, f0, H / 2], [0, 0, 1]], float)
+        obj, img = [obj_all[i] for i in keep], [img_all[i] for i in keep]
+        rms, K, dist, rv, tv = cv2.calibrateCamera(obj, img, (W, H), K0, np.zeros(5), flags=flags)
+        per = []
+        for o, im, r, t in zip(obj, img, rv, tv):
+            pr, _ = cv2.projectPoints(o, r, t, K, dist)
+            per.append(float(np.sqrt(np.mean(np.sum((pr.reshape(-1, 2) - im.reshape(-1, 2)) ** 2, axis=1)))))
+        worst = int(np.argmax(per))
+        others = np.median([e for k, e in enumerate(per) if k != worst]) if len(per) > 1 else per[worst]
+        if len(keep) <= min_views or per[worst] <= max_view_rms_px or per[worst] <= 4 * others:
+            break
+        dropped.append((keep.pop(worst), per[worst]))
+    return {"K": K, "dist": dist.ravel()[:5], "rms_px": float(rms), "n_views": len(keep),
+            "view_rms_px": dict(zip(keep, per)), "dropped": dropped}
 
 
 def undistort_px(xy, K, dist) -> np.ndarray:

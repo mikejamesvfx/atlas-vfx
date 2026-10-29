@@ -1,0 +1,68 @@
+# Linux CI. ws (Windows, RTX 5090) runs the same scripts before every PR; this proves the pack off the owner's
+# machine: no Atlas Camera, no Atlas Scene, no plate, no GPU.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COMFYUI_REF: v0.43.0          # the ComfyUI the ws test instance runs
+  TORCH_INDEX: https://download.pytorch.org/whl/cpu
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  scripts:
+    name: test scripts (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - uses: actions/setup-node@v4     # tests/test_sun_globe.py runs the panel's JS in node
+        with:
+          node-version: "20"
+      - name: system packages
+        run: sudo apt-get update -q && sudo apt-get install -yq ffmpeg libgl1 libglib2.0-0
+      - name: python packages
+        run: |
+          python -m pip install torch --index-url "$TORCH_INDEX"
+          python -m pip install -r requirements.txt "pycolmap==4.2.1"
+      - name: tests/run_all.py
+        run: python tests/run_all.py
+
+  clean-install:
+    name: clean ComfyUI install + starter workflow
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0              # tools/clean_install_check.py clones this checkout
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: system packages
+        run: sudo apt-get update -q && sudo apt-get install -yq ffmpeg libgl1 libglib2.0-0
+      - name: ComfyUI ${{ env.COMFYUI_REF }}
+        run: |
+          git clone -q --depth 1 --branch "$COMFYUI_REF" https://github.com/comfyanonymous/ComfyUI.git "$RUNNER_TEMP/ComfyUI"
+          python -m pip install torch torchvision torchaudio --index-url "$TORCH_INDEX"
+          python -m pip install -r "$RUNNER_TEMP/ComfyUI/requirements.txt"
+      - name: atlas-vfx requirements.txt (exactly what ComfyUI Manager installs)
+        run: python -m pip install -r requirements.txt
+      - name: tools/clean_install_check.py
+        run: python tools/clean_install_check.py --comfy "$RUNNER_TEMP/ComfyUI" --cpu --ref HEAD

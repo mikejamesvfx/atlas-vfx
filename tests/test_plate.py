@@ -108,7 +108,9 @@ def test_full(td: Path):
 def test_legal(td: Path, full_path: Path):
     p = make_plate(td / "plates" / "legal.mov", "prores", "tv")
     ref = pl.plate_ref(p)
-    assert ref["range"] == "legal" and "tv" in ref["range_source"], ref
+    # newer ffmpeg (ws, 2025 build) tags ProRes color_range=tv; Ubuntu 24.04's 6.1 leaves it unset and plate_ref
+    # assumes legal, as ProRes is by spec. Both must land on legal.
+    assert ref["range"] == "legal" and ("tv" in ref["range_source"] or ref["range_source"].startswith("assumed")), ref
     img = dict(pl.decode_rgb(ref, 0, 0))[0]
     left, right = patch_means(img)
     want_l, want_r = (LEFT_CODES[0] - 64) / 876, (GREY_CODE - 64) / 876
