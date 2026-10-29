@@ -1,6 +1,6 @@
 [project]
 name = "atlas-vfx"
-version = "0.0.1"
+version = "0.1.0"
 description = "VFX nodes for real plates: camera side, layers, Nuke delivery (Atlas estate)"
 requires-python = ">=3.11"
 license = "MIT"
@@ -14,11 +14,11 @@ dependencies = [
   "opencv-python>=4.10",
   "opencolorio>=2.4",
   "jsonschema>=4.20",
+  "OpenImageIO>=3.0",          # EXR read/write: most of what the nodes write is EXR
 ]
 
 [project.optional-dependencies]
 solve = ["pycolmap==4.2.1"]
-exr = ["OpenImageIO>=3.0"]
 
 [tool.setuptools.packages.find]
 include = ["atlas_vfx*"]

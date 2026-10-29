@@ -79,7 +79,7 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 45 | LTX Return | layers | atlas-vfx | built | plate V141 | LTX clean loop | |
 | 46 | Comp Preview | deliver | atlas-vfx | built | plate V141 | after T8 | |
 | 47 | RS Solve | camera_side | Atlas Camera | built | synthetic; plate script (DSCF2973) | S3 | tools/rs_clip_solve.py (same code) |
-| 48 | Physical Sky | layers | atlas-vfx (Prague via Atlas Scene; Hosek-Wilkie fallback here) | built | plate script (DSCF2977, not yet in V141) | with 18 | *external* hy_relight/prague make_prague_sky.py, day24_sky.py |
+| 48 | Physical Sky | layers | atlas-vfx (Prague via Atlas Scene; Hosek-Wilkie fallback here) | built | plate V141 | with 18 | *external* hy_relight/prague make_prague_sky.py, day24_sky.py |
 | 49 | Chart Calibrate | camera_side | Atlas Camera | built | synthetic (chart not shot) | S4 | tools/grid_rs_shoot.py (same code) |
 
 37 rows are built or deprecated, and those are the 37 nodes that load. Categories: `Atlas VFX/Camera`
@@ -554,8 +554,9 @@ Payloads (all plain JSON-safe dicts unless said):
 - in, optional: shot_camera ATLAS_TRACKED_CAMERA, dataset STRING, ocio_config STRING, display STRING, view STRING, sky_model auto|prague|hosek-wilkie
 - out: hdri_acescg IMAGE, light_rig ATLAS_VFX_LIGHT_RIG, preview IMAGE, info STRING, exr_path STRING
 - test: tests/test_physical_sky.py, tests/test_sky_hosek.py, tests/test_sun_globe.py
-- proof: plate script (DSCF2977 check shot on ws, Prague); not yet run inside V141. Hosek-Wilkie: synthetic plus
-  the Prague comparison on ws (2026-10-29)
+- proof: plate V141 (DSCF2977 check shot, Prague and Hosek-Wilkie through the panel, 2026-10-29); Hosek-Wilkie
+  also against the compiled reference C and Prague, and in a clean ComfyUI with nothing of the owner's machine
+  (`tools/clean_install_check.py`, ws and Linux CI)
 - licences: `hosek-wilkie-sky-model`, `cie-cmf-wyman2013` (fallback, shipped); `atlas-scene`, `prague-sky-model`,
   `prague-sky-model-dataset` (Prague, optional); `three-js` (Sun Globe panel), `openimageio`, `jsonschema`
 - needs: nothing for the Hosek-Wilkie sky; Prague needs Atlas Scene through `_atlas_scene.py` and a dataset (run:

@@ -2,4 +2,4 @@
 
 camera_side/ is destined for Atlas Camera and must not import from layers/ or deliver/.
 """
-__version__ = "0.0.1"
+__version__ = "0.1.0"
