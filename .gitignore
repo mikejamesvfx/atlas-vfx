@@ -22,6 +22,8 @@
 
 # but keep small test fixtures
 !tests/fixtures/**
+# and the small doc images (diagrams and UI shots: never plates, frames or renders)
+!docs/images/*.png
 
 # python
 venv/
