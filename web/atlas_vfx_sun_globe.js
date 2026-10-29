@@ -437,8 +437,8 @@ function buildGlobe(node, THREE) {
     "time offset 0, offsets 0");
   const goldenBtn = button("GOLDEN HOUR", "Move the clock to the golden hour on the capture day (the NOAA sun at " +
     "4 deg): evening after solar noon, morning before");
-  const viewBtn = button("VIEW NORTH", "View from the south with north up (east to the right), or from behind the " +
-    "camera. Drag empty space to orbit, double-click to reset");
+  const viewBtn = button("VIEW CAMERA", "From behind the camera, looking where it looks (the default), or from the " +
+    "south with north up (east to the right). Drag empty space to orbit, double-click to go back behind the camera");
   const queueBtn = button("AUTO-QUEUE OFF", "Queue the graph when a drag, scrub or button ends. Off by default: the " +
     "sky usually feeds a heavy graph");
   controls.append(resetBtn, goldenBtn, viewBtn, queueBtn);
@@ -557,7 +557,9 @@ function buildGlobe(node, THREE) {
   let payload = null, payloadId = 0, domeSrc = "", domeTex = null, domeReady = false;
   let st = null, builtPath = null, dirty = true, lastKey = "", lastSize = "", disposed = false, warned = false;
   let flashMsg = null, modelAtRun = null;
-  const view = { yaw: 0, pitch: 0.55, dist: 6.3, follow: false };
+  // opens behind the camera, looking where it looks (from the south a south-facing camera pointed at the viewer)
+  const CAMERA_VIEW = { pitch: 0.42, follow: true }, NORTH_VIEW = { yaw: 0, pitch: 0.55, follow: false };
+  const view = { yaw: 0, dist: 6.3, ...CAMERA_VIEW };
   const pathCache = { key: null, path: null };
 
   function currentPath(lat, lon, cap) {
@@ -905,7 +907,7 @@ function buildGlobe(node, THREE) {
   };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
-  canvas.addEventListener("dblclick", () => { Object.assign(view, { yaw: 0, pitch: 0.55, follow: false }); dirty = true; });
+  canvas.addEventListener("dblclick", () => { Object.assign(view, CAMERA_VIEW); dirty = true; });
   // The loop only renders on change, so a lost and restored context (too many WebGL canvases, a GPU reset) would stay
   // blank: draw again once three.js has the context back.
   canvas.addEventListener("webglcontextrestored", () => { dirty = true; });
@@ -952,7 +954,7 @@ function buildGlobe(node, THREE) {
   };
   viewBtn.onclick = () => {
     view.follow = !view.follow;
-    Object.assign(view, view.follow ? { pitch: 0.42 } : { yaw: 0, pitch: 0.55 });
+    Object.assign(view, view.follow ? CAMERA_VIEW : NORTH_VIEW);
     dirty = true;
   };
   queueBtn.onclick = () => { node.properties[AUTO_QUEUE_PROPERTY] = !autoQueue(); dirty = true; };
