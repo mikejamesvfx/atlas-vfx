@@ -9,6 +9,7 @@ import numpy as np
 from atlas_vfx.contracts import shot_camera as sc
 
 from . import light_transfer as lt
+from . import ltx_integration as li
 from . import relight as rl
 
 
@@ -61,15 +62,22 @@ class AtlasVFXRelightTransfer:
                 "shot_camera": ("ATLAS_TRACKED_CAMERA", {"tooltip": "sh fit in world space"}),
                 "first_frame": ("INT", {"default": 1001, "min": 0, "max": 1_000_000,
                                         "tooltip": "shot frame of the first image (for shot_camera)"}),
+                "relit_mirrored": ("BOOLEAN", {"default": False,
+                                               "tooltip": "the relit take was rendered on a left-right flipped "
+                                                          "reference (the sun-on-the-left trick): flip it back here. "
+                                                          "Leave off for LTX Return output (Return already flips)"}),
             },
         }
 
     def run(self, element, matte, relit, encoding, mode, analysis_width, blur_px, max_stops, temporal, eps,
-            subsample, geo_weight, min_r2, normals=None, moge_geometry=None, shot_camera=None, first_frame=1001):
+            subsample, geo_weight, min_r2, normals=None, moge_geometry=None, shot_camera=None, first_frame=1001,
+            relit_mirrored=False):
         import torch
 
         el = element.float().cpu().numpy()[..., :3]
         rel = relit.float().cpu().numpy()[..., :3]
+        if relit_mirrored:
+            rel = li.mirror(rel)
         if encoding == "srgb":
             el, rel = rl.srgb_to_lin(el), rl.srgb_to_lin(rel)
         m = matte.float().cpu().numpy()
@@ -98,6 +106,7 @@ class AtlasVFXRelightTransfer:
                                      progress=(lambda t: pbar.update(1)) if pbar else None)
         if encoding == "srgb":
             out = rl.lin_to_srgb(out)
+        rep["relit_mirrored"] = bool(relit_mirrored)
         if rots is not None:
             rep["shot_frames"] = [int(first_frame), int(first_frame + len(el) - 1)]
         return (torch.from_numpy(np.ascontiguousarray(out)), torch.from_numpy(np.ascontiguousarray(gain)),

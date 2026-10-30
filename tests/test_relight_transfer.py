@@ -233,6 +233,10 @@ def test_node():
                              normals=lt.decode_normals(n * 0.5 + 0.5)[None])
     check(np.allclose(img.numpy(), want, atol=1e-6), "node = module (sh, encoded normals)")
     check(gain.shape == img.shape and json.loads(info)["mode"] == "sh", "node gives gain and info")
+    img_m, _, info_m = node.run(t(element), t(matte), t(relit_low[:, ::-1]), normals=t(n * 0.5 + 0.5),
+                                relit_mirrored=True, **kw)
+    check(np.array_equal(img_m.numpy(), img.numpy()) and json.loads(info_m)["relit_mirrored"],
+          "relit_mirrored flips a mirrored take back (same result as the unflipped take)")
 
     srgb = (lambda a: rl.lin_to_srgb(a))
     e2, r2 = element * 0.4, relit_low * 0.4                                         # below 1: sRGB clips there

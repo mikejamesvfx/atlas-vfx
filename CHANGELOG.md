@@ -17,6 +17,9 @@ when it does, the entry says so and names the tool that rewrites them.
   harmonics on MoGe-3 normals and re-shades at their sharpness. Starter: `workflows/relight_transfer_element.json`
   (`tools/relight_transfer_workflow.py`). The three LoRAs are in the licence register. `subsample` runs the fast
   guided filter (default 2: 2.6x faster at 4K, within 0.01 stop of exact).
+- **Mirror for LTX relights**: LTX Prep `mirror` flips what LTX sees left-right and LTX Return flips the take back;
+  Relight Transfer `relit_mirrored` does the same for a raw take. On DSCF3000 the LTX-2.3 Relight LoRA kept the sun
+  on frame right whatever the light ball said; mirrored, with the ball on the right, the sun lands on the left.
 
 ## 0.1.0 (2026-10-30), first public beta
 

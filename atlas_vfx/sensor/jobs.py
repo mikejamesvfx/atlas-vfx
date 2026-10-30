@@ -353,6 +353,8 @@ def apply_batch(images: np.ndarray, maps: Maps, *, direction: str = "apply camer
 def frames_windows_from_prep(ltx_prep: dict, n_images: int):
     """(first Nuke frame, per-frame windows or None) from an ATLAS_VFX_LTX_PREP (LTX Prep's output)."""
     f0, f1 = ltx_prep["frames"]
+    if ltx_prep.get("mirror"):
+        raise ValueError("LTX Prep mirror is on: these frames are flipped. Run LTX Return first (it flips them back)")
     if n_images < f1 - f0 + 1:
         raise ValueError(f"LTX gave {n_images} frames for {f0}-{f1}")
     wins = ltx_prep.get("windows")

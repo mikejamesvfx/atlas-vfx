@@ -79,6 +79,15 @@ def make_mask(alpha: np.ndarray, size: tuple[int, int], thresh: float = 0.05, sh
     return m.astype(np.float32)
 
 
+def mirror(frames: np.ndarray) -> np.ndarray:
+    """Left-right flip of a frame stack (N, H, W[, C]). LTX Prep's mirror: the LTX-2.3 Relight LoRA kept the sun on
+    frame right on DSCF3000 whatever the light ball said, so the reference is flipped, lit from the right and the take
+    flipped back (LTX Return / Relight Transfer). Its own inverse."""
+    if frames.ndim < 3:
+        raise ValueError(f"mirror wants a frame stack (N, H, W[, C]), got shape {frames.shape}")
+    return np.ascontiguousarray(frames[:, :, ::-1])
+
+
 def resize(img: np.ndarray, size: tuple[int, int]) -> np.ndarray:
     import cv2
 

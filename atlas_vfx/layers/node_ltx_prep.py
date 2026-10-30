@@ -61,12 +61,18 @@ class AtlasVFXLTXPrep:
                                                 "de-rolling-shuttered before LTX (clean space). LTX Return puts it back"}),
                 "sensor_lens_folder": ("STRING", {"default": "", "tooltip": "Sensor Lens Maps folder: the plate is "
                                                   "undistorted / devignetted before LTX. LTX Return puts it back"}),
+                "mirror": ("BOOLEAN", {"default": False,
+                                       "tooltip": "flip every output left-right before LTX; LTX Return flips the take "
+                                                  "back. On DSCF3000 the LTX-2.3 Relight LoRA kept the sun on frame "
+                                                  "right whatever the ball said: mirror and ask for the right to get "
+                                                  "the sun on the left. Add the light ball after Prep, on the mirrored "
+                                                  "frame"}),
             },
         }
 
     def run(self, plate_ref, layer_folder, first_frame, length, width, height, mask_thresh, shadow_px, dilate_px,
             keyframe_every=24, mode="full", crop_margin=96, extra_layers="", reference="plate", mask_mode="layer",
-            sensor_rs_folder="", sensor_lens_folder=""):
+            sensor_rs_folder="", sensor_lens_folder="", mirror=False):
         import torch
 
         if (length - 1) % 8:
@@ -138,11 +144,12 @@ class AtlasVFXLTXPrep:
                 "masks_work": None, "view": [pl.DEFAULT_DISPLAY, pl.DEFAULT_VIEW], "roundtrip": rt,
                 "mask_coverage": float(np.mean(m_full)), "keyframes": key_idx,
                 "layers": [L["name"] for L in layers], "reference": reference, "mask_mode": mask_mode,
-                "sensor": li.sensor_record(sensor)}
+                "sensor": li.sensor_record(sensor), "mirror": bool(mirror)}
         masks = np.stack(m_full).astype(np.float32)
-        prep["masks_work"] = masks                       # kept in memory for Return (not JSON)
-        t = lambda a: torch.from_numpy(np.ascontiguousarray(a, dtype=np.float32))
-        return (t(np.stack(ref_full)), t(masks), t(np.stack(ref_half)), t(np.stack(m_half)), t(start[None]), prep, t(np.stack(keys)))
+        prep["masks_work"] = masks                       # kept in memory for Return (not JSON), never mirrored
+        t = lambda a: torch.from_numpy(np.ascontiguousarray(li.mirror(a) if mirror else a, dtype=np.float32))
+        return (t(np.stack(ref_full)), t(masks), t(np.stack(ref_half)), t(np.stack(m_half)), t(start[None]), prep,
+                t(np.stack(keys)))
 
 
 NODE_CLASS_MAPPINGS = {"AtlasVFXLTXPrep": AtlasVFXLTXPrep}

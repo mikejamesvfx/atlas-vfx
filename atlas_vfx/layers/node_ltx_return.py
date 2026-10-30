@@ -23,7 +23,8 @@ class AtlasVFXLTXReturn:
     RETURN_NAMES = ("layer_folder", "preview")
     DESCRIPTION = ("Takes the LTX output (display-referred, work size), inverts the named view back to ACEScg, upscales "
                    "it to plate size and keeps it only inside the inpaint mask: <name>.<frame>.exr, RGBA half, "
-                   "premultiplied ACEScg. Outside the mask alpha is 0, so the plate (and its lock) is untouched.")
+                   "premultiplied ACEScg. Outside the mask alpha is 0, so the plate (and its lock) is untouched. "
+                   "If Prep mirrored the frames, the take is flipped back first.")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -54,6 +55,8 @@ class AtlasVFXLTXReturn:
         ww, wh = ltx_prep["work_size"]
         if ltx.shape[1:3] != (wh, ww):
             ltx = np.stack([li.resize(f, (ww, wh)) for f in ltx])
+        if ltx_prep.get("mirror"):
+            ltx = li.mirror(ltx)                            # Prep mirrored the frames LTX saw: flip the take back
         _, inv = li.view_processors(ref["ocio_config"])
         fwd, _ = li.view_processors(ref["ocio_config"])
         stem = Path(ref["path"]).stem
@@ -83,6 +86,7 @@ class AtlasVFXLTXReturn:
                   "replaces_layer": ltx_prep["layer"], "work_size": [ww, wh], "plate_size": [W, H],
                   "roundtrip": ltx_prep["roundtrip"], "mask": ltx_prep["mask"], "feather_px": feather_px,
                   "coverage_max": max(cover), "source_model": source_model, "mode": ltx_prep.get("mode", "full"),
+                  "mirror": bool(ltx_prep.get("mirror")),
                   "window_scale": ([round(w[3] / wh, 3) for w in ltx_prep["windows"]] if ltx_prep.get("windows") else None),
                   "sensor": ({**sens, "applied": "vignette -> CA + distortion -> RS"} if sensor is not None else None),
                   "note": "inside the mask: LTX output upscaled from work size; outside: alpha 0 (plate untouched)"}

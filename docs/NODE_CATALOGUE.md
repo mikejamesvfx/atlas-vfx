@@ -509,7 +509,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 44 LTX Prep
 `AtlasVFXLTXPrep` · layers · Atlas VFX/Layers
 - in: plate_ref ATLAS_PLATE_SEQ, layer_folder STRING, first_frame INT, length INT, width INT, height INT, mask_thresh FLOAT, shadow_px INT, dilate_px INT, keyframe_every INT, mode full|crop, crop_margin INT, extra_layers STRING, reference plate|comp, mask_mode layer|none
-- in, optional: sensor_rs_folder STRING, sensor_lens_folder STRING
+- in, optional: sensor_rs_folder STRING, sensor_lens_folder STRING, mirror BOOLEAN
 - out: reference IMAGE, mask MASK, reference_half IMAGE, mask_half MASK, start_image IMAGE, ltx_prep ATLAS_VFX_LTX_PREP, keyframes_half IMAGE
 - test: tests/test_ltx_integration.py, tests/test_ltx_sensor_loop.py
 - proof: plate V141 (LTX clean loop, S2-S3)
@@ -518,7 +518,11 @@ Payloads (all plain JSON-safe dicts unless said):
 - needs: scipy (load); OpenImageIO (run)
 - writes: nothing (images + record out)
 - notes: plate -> ACEScg -> named SDR view, element alpha as mask, start image + keyframes; crop mode; Sensor Pass
-  maps. Reads the plate from ATLAS_PLATE_SEQ itself, so a de-RS'd clean plate can't be fed in yet.
+  maps. Reads the plate from ATLAS_PLATE_SEQ itself, so a de-RS'd clean plate can't be fed in yet. mirror
+  (2026-10-30) flips every image output left-right; Return flips the take back, Sensor Apply refuses mirrored frames.
+  Why: on DSCF3000 the LTX-2.3 Relight LoRA kept the sun on frame right whatever the light ball or prompt said
+  (left, front-left, back-left, right, strength 1.5); mirrored with the ball on the right, the take comes back lit
+  from the left.
 
 ### 45 LTX Return
 `AtlasVFXLTXReturn` · layers · Atlas VFX/Layers
@@ -529,6 +533,7 @@ Payloads (all plain JSON-safe dicts unless said):
 - licences: `scipy`, `openimageio`; the render is upstream (see 44)
 - needs: scipy (load); OpenImageIO (run)
 - writes: an EXR layer folder + sidecar (inverse view, paste-back with a faded edge)
+- notes: flips the take back when Prep's mirror was on (recorded in the sidecar).
 
 ### 46 Comp Preview
 `AtlasVFXCompPreview` · deliver · Atlas VFX/Deliver
@@ -649,7 +654,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 53 Relight Transfer
 `AtlasVFXRelightTransfer` · layers · Atlas VFX/Layers
 - in: element IMAGE, matte MASK, relit IMAGE, encoding linear|srgb, mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT
-- in, optional: normals IMAGE, moge_geometry MOGE_GEOMETRY, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT
+- in, optional: normals IMAGE, moge_geometry MOGE_GEOMETRY, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT, relit_mirrored BOOLEAN
 - out: images IMAGE, gain IMAGE, info STRING
 - test: tests/test_relight_transfer.py
 - proof: synthetic
@@ -668,4 +673,5 @@ Payloads (all plain JSON-safe dicts unless said):
   size. For full-res normals run MoGe-3 on the element at its own size, not a 1024 proxy. subsample is the fast guided
   filter (He & Sun 2015: coefficients solved at 1/N res, applied with the full-res guide, matte-weighted shrink so
   the halo fix holds): on a 4K LTX frame with a 5-channel guide, 2 is 2.6x faster than exact and within 0.008 stops
-  rms (p99 0.03); 4 is 4.4x, 0.044 rms (p99 0.17, at edges).
+  rms (p99 0.03); 4 is 4.4x, 0.044 rms (p99 0.17, at edges). relit_mirrored flips a raw take rendered on a
+  mirrored reference back (the sun-on-the-left trick, see 44); LTX Return output is already flipped back.

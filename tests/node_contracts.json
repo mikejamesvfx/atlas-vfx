@@ -944,6 +944,11 @@
     "name": "sensor_lens_folder",
     "type": "STRING",
     "group": "optional"
+   },
+   {
+    "name": "mirror",
+    "type": "BOOLEAN",
+    "group": "optional"
    }
   ],
   "outputs": [
@@ -2467,6 +2472,11 @@
    {
     "name": "first_frame",
     "type": "INT",
+    "group": "optional"
+   },
+   {
+    "name": "relit_mirrored",
+    "type": "BOOLEAN",
     "group": "optional"
    }
   ],
