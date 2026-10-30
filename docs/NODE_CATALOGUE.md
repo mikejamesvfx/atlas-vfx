@@ -81,9 +81,13 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 47 | RS Solve | camera_side | Atlas Camera | built | synthetic; plate script (DSCF2973) | S3 | tools/rs_clip_solve.py (same code) |
 | 48 | Physical Sky | layers | atlas-vfx (Prague via Atlas Scene; Hosek-Wilkie fallback here) | built | plate V141 | with 18 | *external* hy_relight/prague make_prague_sky.py, day24_sky.py |
 | 49 | Chart Calibrate | camera_side | Atlas Camera | built | synthetic (chart not shot) | S4 | tools/grid_rs_shoot.py (same code) |
+| 50 | Chunk Plan | layers | atlas-vfx | built | synthetic | Frame chunks | |
+| 51 | Sequence Read Chunk | layers | atlas-vfx | built | synthetic | Frame chunks | |
+| 52 | Chunk Stitch | layers | atlas-vfx | built | synthetic | Frame chunks | |
 
-37 rows are built or deprecated, and those are the 37 nodes that load. Categories: `Atlas VFX/Camera`
-(camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Deliver`
+40 rows are built or deprecated, and those are the 40 nodes that load. Categories: `Atlas VFX/Camera`
+(camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
+(layers), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
 
 ## Planned and elsewhere
@@ -126,6 +130,8 @@ Payloads (all plain JSON-safe dicts unless said):
 - `ATLAS_VFX_PLATELOCK_TRACK`, `ATLAS_VFX_PLATELOCK_PEOPLE`, `ATLAS_VFX_PLATELOCK_RESULT`: Plate Lock's camera track
   (RS, readout, anchor), performer chain and lock result (python objects from `platelock/core`, not JSON). Were
   `PLATELOCK_*`.
+- `ATLAS_VFX_CHUNK_PLAN`: Chunk Plan's split of a frame range (`layers/chunks.ChunkPlan.to_dict`: first, last,
+  max_len, overlap, the chunks' start/end/tag, seams). Chunk Stitch rebuilds the plan from it and checks they agree.
 - `MOGE_MODEL`, `MOGE_GEOMETRY`: ComfyUI core's MoGe nodes; not ours, not renamed.
 
 <!-- types:begin (generated) -->
@@ -134,6 +140,7 @@ Payloads (all plain JSON-safe dicts unless said):
 | `ATLAS_PLATE_SEQ` | 1 Plate Read | 2 Tracking Proxy, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview |
 | `ATLAS_TRACKED_CAMERA` | 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky |
 | `ATLAS_VFX_CARD` | 15 Foreground Element, 16 Character Insert | 14 Card Project |
+| `ATLAS_VFX_CHUNK_PLAN` | 50 Chunk Plan | 52 Chunk Stitch |
 | `ATLAS_VFX_LIGHT_RIG` | 33 Light From Plate, 48 Physical Sky | 18 Light Probe & Relight |
 | `ATLAS_VFX_LTX_PREP` | 44 LTX Prep | 31 Sensor Apply, 45 LTX Return |
 | `ATLAS_VFX_PLATELOCK_PEOPLE` | 38 Plate Lock Person | 38 Plate Lock Person, 39 Plate Lock QC, 40 Plate Lock |
@@ -592,3 +599,48 @@ Payloads (all plain JSON-safe dicts unless said):
   (takes B-E with A's lens JSON: readout_ms + sigma, RS against GS rms). A locked-off take is reported not
   measurable (measurable False, readout_ms 0, which RS Maps reads as no chart value). readout_ms wires into Sensor
   RS Maps' readout_chart_ms. Wraps `chart_calibrate.py`, the code `tools/grid_rs_shoot.py` calls.
+
+### 50 Chunk Plan
+`AtlasVFXChunkPlan` · layers · Atlas VFX/Layers/Chunks
+- in: first INT, last INT, max_len INT, overlap INT, chunk INT
+- out: chunk_plan ATLAS_VFX_CHUNK_PLAN, start INT, length INT, end INT, tag STRING, chunk_count INT, info STRING
+- test: tests/test_chunks.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing
+- writes: nothing
+- notes: a long range (1001-1400) as equal 8k+1 chunks for LTX 2.x: stride = length - overlap, the last chunk moved
+  back to end on `last` (no padded frames, so its seam is longer). 1001-1400 at 121 / 24 is 1001-1121, 1098-1218,
+  1195-1315, 1280-1400. start / length / end wire into LTX Prep and the LTX latent / audio lengths. chunk -1 outputs
+  every chunk as lists (ComfyUI runs the downstream once per chunk, one queue); for long LTX runs use
+  `tools/queue_chunks.py`, which queues one prompt per chunk and fills {tag} / {chunk} in output names.
+
+### 51 Sequence Read Chunk
+`AtlasVFXSequenceReadChunk` · layers · Atlas VFX/Layers/Chunks
+- in: path STRING, start INT, length INT, numbering frame|sequential, width INT, input_colorspace STRING, colorspace STRING, ocio_config STRING
+- out: images IMAGE, first_frame INT, info STRING
+- test: tests/test_chunks.py
+- proof: synthetic
+- licences: `openimageio`
+- needs: OpenImageIO (run)
+- writes: nothing (reads the sequence, never writes it)
+- notes: one chunk of an image sequence (EXR, DPX, PNG, TIFF, JPEG; `####`, `%04d`, `{frame}` or a folder with one
+  sequence) as an IMAGE batch. numbering frame (file numbers are shot frames) or sequential (files in order). Any
+  missing frame is one error listing them. Colour is passed through as stored unless input_colorspace is set (then a
+  named OCIO transform). width resizes; a batch over 8 GB gets a note.
+
+### 52 Chunk Stitch
+`AtlasVFXChunkStitch` · layers · Atlas VFX/Layers/Chunks
+- in: chunk_plan ATLAS_VFX_CHUNK_PLAN, pattern STRING, numbering frame|sequential, colorspace STRING, name STRING, out_dir STRING
+- out: pattern STRING, first_frame INT, info STRING
+- test: tests/test_chunks.py
+- proof: synthetic
+- licences: `openimageio`
+- needs: OpenImageIO (run)
+- writes: `<name>.####.exr` (RGBA half) from the plan's first frame, `<name>.stitch.json` (sources and weights per
+  frame) and a sidecar under atlas-vfx-work/chunks/<name>
+- notes: pattern names each chunk's sequence with {chunk} (00) or {tag} (c00). Every chunk is checked before a frame
+  is written. Seams crossfade with smoothstep weights that sum to 1 and are 0 outside a chunk (three chunks on a
+  frame chain their handovers). Blends the files' own values: scene-linear for EXR, display-encoded for PNG / JPEG.
+  Crossfading hides a seam only when the two takes agree; if they ghost, the next step is conditioning each chunk
+  on the previous one's tail.
