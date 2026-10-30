@@ -20,12 +20,12 @@ Start with AGENTS.md (rules, layout, import graph) and SECURITY.md (threat model
 
 ![The main wiring by family: Plate Read and Camera Import feed Card Project and Foreground Element, Chart Calibrate feeds Sensor RS Maps and Sensor Apply, Physical Sky feeds Relight, and the layer folders go to Nuke Builder](docs/images/node_map.png)
 
-Ten of the 37 nodes and the sockets that tie them. Plate Lock's nine nodes run their own chain. The full list, with
+Ten of the 40 nodes and the sockets that tie them. Plate Lock's nine nodes run their own chain. The full list, with
 every input and output, is `docs/NODE_CATALOGUE.md`.
 
 ## Status (0.1.0, beta)
 
-37 nodes ship and load; the catalogue's other 12 entries are planned or live elsewhere. How far each node is
+40 nodes ship and load; the catalogue's other 12 entries are planned or live elsewhere. How far each node is
 proven:
 
 - **Accepted in Nuke** (3): EXR Write, Nuke Builder, Camera Export.
@@ -33,8 +33,9 @@ proven:
   Plate Depth, Card Project, Foreground Element, Sensor Lens Maps, Sensor RS Maps, Sensor Apply, LTX Prep, LTX
   Return, Comp Preview, Physical Sky, and on an LTX plate: Light Probe & Relight, Normals, Light From Plate, Depth
   Holdout. Measure & Scale and Set Proxy ran on the plate with guessed picks and a guessed scale (2 more).
-- **Synthetic only**, tests with a known answer, not yet a real plate (12): the nine Plate Lock nodes, Chart
-  Calibrate (the chart isn't shot yet), Character Insert (its plate run was withdrawn), RS Solve.
+- **Synthetic only**, tests with a known answer, not yet a real plate (15): the nine Plate Lock nodes, Chart
+  Calibrate (the chart isn't shot yet), Character Insert (its plate run was withdrawn), RS Solve, and the three
+  frame chunk nodes (Chunk Plan, Sequence Read Chunk, Chunk Stitch).
 - **Deprecated** (1): Sensor Readout Solve, biased low on the plate; RS Solve replaces it.
 
 What that means for you: the camera to cards to Nuke path, Sensor Pass and Physical Sky are the solid parts. Plate

@@ -3,6 +3,14 @@
 Versions follow `pyproject.toml` (and `atlas_vfx.__version__`). Before 1.0, a minor version can break saved graphs;
 when it does, the entry says so and names the tool that rewrites them.
 
+## Unreleased
+
+- **Frame chunks** for shots longer than one LTX run (catalogue 50-52, `Atlas VFX/Layers/Chunks`). Chunk Plan
+  splits a range such as 1001-1400 into equal 8k+1 chunks with a set overlap (the last one moved back to end on the
+  last frame, nothing padded); Sequence Read Chunk reads one chunk of an EXR/DPX/PNG sequence; Chunk Stitch joins
+  the rendered chunks into one sequence numbered from the first frame, crossfading the overlaps.
+  `tools/queue_chunks.py` queues one prompt per chunk from an API workflow. New socket type `ATLAS_VFX_CHUNK_PLAN`.
+
 ## 0.1.0 (2026-10-30), first public beta
 
 The first tagged release of the public repo. 37 nodes in five families (Camera, Layers, Plate Lock, Sensor,

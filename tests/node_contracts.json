@@ -467,6 +467,121 @@
    }
   ]
  },
+ "AtlasVFXChunkPlan": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers/Chunks",
+  "inputs": [
+   {
+    "name": "first",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "max_len",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "overlap",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "chunk",
+    "type": "INT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "chunk_plan",
+    "type": "ATLAS_VFX_CHUNK_PLAN"
+   },
+   {
+    "name": "start",
+    "type": "INT"
+   },
+   {
+    "name": "length",
+    "type": "INT"
+   },
+   {
+    "name": "end",
+    "type": "INT"
+   },
+   {
+    "name": "tag",
+    "type": "STRING"
+   },
+   {
+    "name": "chunk_count",
+    "type": "INT"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXChunkStitch": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers/Chunks",
+  "inputs": [
+   {
+    "name": "chunk_plan",
+    "type": "ATLAS_VFX_CHUNK_PLAN",
+    "group": "required"
+   },
+   {
+    "name": "pattern",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "numbering",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "frame",
+     "sequential"
+    ]
+   },
+   {
+    "name": "colorspace",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "pattern",
+    "type": "STRING"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
  "AtlasVFXCompPreview": {
   "folder": "deliver",
   "category": "Atlas VFX/Deliver",
@@ -2597,6 +2712,70 @@
    },
    {
     "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXSequenceReadChunk": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers/Chunks",
+  "inputs": [
+   {
+    "name": "path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "start",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "length",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "numbering",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "frame",
+     "sequential"
+    ]
+   },
+   {
+    "name": "width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "input_colorspace",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "colorspace",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "images",
+    "type": "IMAGE"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT"
+   },
+   {
+    "name": "info",
     "type": "STRING"
    }
   ]
