@@ -2372,6 +2372,114 @@
    }
   ]
  },
+ "AtlasVFXRelightTransfer": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "element",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "matte",
+    "type": "MASK",
+    "group": "required"
+   },
+   {
+    "name": "relit",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "encoding",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "linear",
+     "srgb"
+    ]
+   },
+   {
+    "name": "mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "guided",
+     "sh"
+    ]
+   },
+   {
+    "name": "analysis_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "blur_px",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "max_stops",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "temporal",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "eps",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "geo_weight",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "min_r2",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "normals",
+    "type": "IMAGE",
+    "group": "optional"
+   },
+   {
+    "name": "moge_geometry",
+    "type": "MOGE_GEOMETRY",
+    "group": "optional"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "optional"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "images",
+    "type": "IMAGE"
+   },
+   {
+    "name": "gain",
+    "type": "IMAGE"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
  "AtlasVFXSensorApply": {
   "folder": "sensor",
   "category": "Atlas VFX/Sensor",

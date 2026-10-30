@@ -84,8 +84,9 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 50 | Chunk Plan | layers | atlas-vfx | built | synthetic | Frame chunks | |
 | 51 | Sequence Read Chunk | layers | atlas-vfx | built | synthetic | Frame chunks | |
 | 52 | Chunk Stitch | layers | atlas-vfx | built | synthetic | Frame chunks | |
+| 53 | Relight Transfer | layers | atlas-vfx | built | synthetic | with 18 | tools/light_transfer.py (Gaussian ratio, superseded) |
 
-40 rows are built or deprecated, and those are the 40 nodes that load. Categories: `Atlas VFX/Camera`
+41 rows are built or deprecated, and those are the 41 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
 (layers), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
@@ -138,7 +139,7 @@ Payloads (all plain JSON-safe dicts unless said):
 | Type | Made by | Read by |
 |---|---|---|
 | `ATLAS_PLATE_SEQ` | 1 Plate Read | 2 Tracking Proxy, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview |
-| `ATLAS_TRACKED_CAMERA` | 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky |
+| `ATLAS_TRACKED_CAMERA` | 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky, 53 Relight Transfer |
 | `ATLAS_VFX_CARD` | 15 Foreground Element, 16 Character Insert | 14 Card Project |
 | `ATLAS_VFX_CHUNK_PLAN` | 50 Chunk Plan | 52 Chunk Stitch |
 | `ATLAS_VFX_LIGHT_RIG` | 33 Light From Plate, 48 Physical Sky | 18 Light Probe & Relight |
@@ -147,7 +148,7 @@ Payloads (all plain JSON-safe dicts unless said):
 | `ATLAS_VFX_PLATELOCK_RESULT` | 40 Plate Lock | 41 Plate Lock Layer, 42 Plate Lock Write |
 | `ATLAS_VFX_PLATELOCK_TRACK` | 37 Plate Lock Camera | 40 Plate Lock |
 | `ATLAS_VFX_SENSOR_LENS` | 29 Sensor Lens Maps | 30 Sensor RS Maps |
-| `MOGE_GEOMETRY` | - | 32 Normals, 34 Depth Holdout (element) |
+| `MOGE_GEOMETRY` | - | 32 Normals, 34 Depth Holdout (element), 53 Relight Transfer |
 | `MOGE_MODEL` | - | 9 Plate Depth |
 <!-- types:end -->
 
@@ -644,3 +645,24 @@ Payloads (all plain JSON-safe dicts unless said):
   frame chain their handovers). Blends the files' own values: scene-linear for EXR, display-encoded for PNG / JPEG.
   Crossfading hides a seam only when the two takes agree; if they ghost, the next step is conditioning each chunk
   on the previous one's tail.
+
+### 53 Relight Transfer
+`AtlasVFXRelightTransfer` · layers · Atlas VFX/Layers
+- in: element IMAGE, matte MASK, relit IMAGE, encoding linear|srgb, mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, geo_weight FLOAT, min_r2 FLOAT
+- in, optional: normals IMAGE, moge_geometry MOGE_GEOMETRY, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT
+- out: images IMAGE, gain IMAGE, info STRING
+- test: tests/test_relight_transfer.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: moves the light of a low-res relit take (LTX relight IC-LoRAs: `ltx-2.3-ic-lora-relight` at 1280x704,
+  `ltx-2.5-ic-lora-day-to-night`, `ltx-2.5-ic-lora-golden-hour`, run upstream; the graph that runs them owns that
+  check) onto the full-res element and keeps the element's pixels. log2(relit / element) is measured at
+  analysis_width from pixels fully inside the matte, blurred inside the matte, filled outward, and brought to full
+  res by a matte-weighted guided filter on the element's log luminance (plus MoGe depth / normals), so a bright
+  background does not bend the edge. mode sh fits 2nd-order spherical harmonics from normal to gain per frame (in
+  world space with a shot camera) and re-shades at the normals' sharpness, plus the guided residual for cast
+  shadows; a frame under min_r2 falls back to guided. Synthetic: guided halves the error of a plain upscale (0.22 vs
+  0.47 stops), sh is 4x better than guided on fine normal detail (0.13 vs 0.55). Cast shadows stay at the analysis
+  size. For full-res normals run MoGe-3 on the element at its own size, not a 1024 proxy.

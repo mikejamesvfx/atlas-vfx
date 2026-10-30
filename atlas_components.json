@@ -270,6 +270,48 @@
       ]
     },
     {
+      "id": "ltx-2.3-ic-lora-relight",
+      "usage": "model",
+      "note": "ltx-2.3-22b-ic-lora-relight-1.0.safetensors (D:/models/loras/ltx23; Lightricks/LTX-2.3-22b-IC-LoRA-Relight): relights a clip from a light-direction ball composited top-right, trained 1280x704 x 121 frames, exteriors, single-stage only (stage 2 drops the IC-LoRA). LTX-2 Community License Agreement, licence date 2026-01-05, embedded in the file's metadata (model_version 2.3). Its text counts subsidiaries, affiliates and companies under common control together for its revenue thresholds; the newer LTX-2.x text (2026-08-11, embedded in the Day-to-Night file) states the threshold: entities with annual revenues of at least $10,000,000 (\"Commercial Entities\") need a paid licence for any use beyond a Non-Commercial Purpose. No LTX-2.3 base on ws: runs on the LTX-2.5 base like the in/outpainting IC-LoRA. Source take for Relight Transfer (catalogue 53); hashed 2026-10-30.",
+      "files": [
+        {
+          "name": "ltx-2.3-22b-ic-lora-relight-1.0.safetensors",
+          "bytes": 327309305,
+          "sha256": "c0d519f83681395d160e115829a9044d7d2ec013be6a2655834d235a2e866ebd",
+          "folder": "loras/ltx23",
+          "hashed": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-ic-lora-day-to-night",
+      "usage": "model",
+      "note": "ltx-2.5-22b-ic-lora-day-to-night-0.9.safetensors (D:/models/loras/ltx25; Lightricks LTX-2.5 Day-to-Night IC-LoRA). LTX-2.x Community License Agreement, licence date 2026-08-11, embedded in the file's metadata (model_version 2.5). Commercial terms quoted from the embedded 2026-08-11 text: entities with annual revenues of at least $10,000,000 (\"Commercial Entities\") need a paid licence for any use beyond a Non-Commercial Purpose, and subsidiaries, affiliates and companies under common control count together. Tested 2026-10-19 (NOTES.md): the take lags the plate ~0.5-1 frame. Source take for Relight Transfer (catalogue 53); hashed 2026-10-30.",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-ic-lora-day-to-night-0.9.safetensors",
+          "bytes": 327318440,
+          "sha256": "2212838ea446628a07eddb57734427b2150e9cf159b19360cda28365a30b275b",
+          "folder": "loras/ltx25",
+          "hashed": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-ic-lora-golden-hour",
+      "usage": "model",
+      "note": "ltx-2.5-22b-ic-lora-golden-hour.safetensors (D:/models/loras/ltx25). The file carries no metadata (no licence text, no version), so its terms are NOT verified: treated as the LTX-2.x Community License (2026-08-11) like the other LTX-2.5 IC-LoRAs until the download source is confirmed. Personal tests only until then. Source take for Relight Transfer (catalogue 53); hashed 2026-10-30.",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-ic-lora-golden-hour.safetensors",
+          "bytes": 327287352,
+          "sha256": "f622a687fcfdca3b0b7145e7e54f0a822ec9466b1cc234a1c77d85616b5c2b6a",
+          "folder": "loras/ltx25",
+          "hashed": "2026-10-30"
+        }
+      ]
+    },
+    {
       "id": "comfyui-ltxvideo",
       "usage": "runtime",
       "note": "Lightricks ComfyUI-LTXVideo node pack (V141 custom_nodes, commit dbaf9e6 2026-10-08), LICENSE file is the LTX-2 Community License Agreement (license date 2026-01-05), checked 2026-10-19; same terms model as the LTX weights. IC-LoRA loader/guide, inpaint preprocess, mask dilation nodes."

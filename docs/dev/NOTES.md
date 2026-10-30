@@ -2,6 +2,26 @@
 
 Running log for whoever works here. Newest at the top. Keep it short: what was decided, what was learned, what broke.
 
+## 2026-10-30 (Relight Transfer, catalogue 53; branch feat/relight-transfer)
+
+- Why: LTX relight IC-LoRAs run at their own size (2.3 Relight 1280x704, single-stage: LTX's stage 2 drops the
+  IC-LoRA and the reference; the pixel upscaler invents texture). So the full-res result keeps the element's pixels
+  and takes only the change of light. Decided with Mike: sources 2.3 Relight + 2.5 Day-to-Night / Golden-Hour,
+  elements only, guided first then SH on MoGe-3 normals. Prior art: Hi-Light (arXiv 2601.23167) does the same in LAB
+  from 480p; ours is linear, per channel.
+- Two bugs found by the synthetic test, both the old light_transfer.py halo: (1) edge pixels of the shrunk image are
+  part background, so the gain is now measured only from analysis pixels fully inside the matte and filled outward;
+  (2) the guided filter's luma guide saw a bright background across the edge, so the filter is matte-weighted (every
+  window statistic a weighted mean). Bright background now moves the edge gain 0.016 stops (was 1.2).
+- MoGe-3 in core does predict normals (moge_3_vitl_fp16 has a normal_head; the core comment "v2 only" is stale).
+- No LTX-2.3 base on ws: the 2.3 Relight LoRA would run on the 2.5 base, as the 2.3 in/outpainting LoRA does.
+  Golden-Hour's file has no metadata, so its licence is unverified (register says personal tests only).
+- Live plumbing on a side ComfyUI (8191, GPU), 12 DSCF3000 frames 1230-1241 at 4096x2160, matte = Plate Depth
+  door208 < 3.2 m (60% of frame), relit = a stand-in: the frames at 1280 under a known gain field. Starter graph
+  (MoGe-3 at element size -> Normals -> Transfer sh -> EXR) ran in 240 s. Against the known gain: 0.0006 stops rms
+  (plain upscale 0.14), fine detail kept (high-pass correlation 0.99999 vs 0.86). Guided alone is ~3 s per 4K
+  frame. This proves the graph and the maths, not the look: next is a real LTX relight take.
+
 ## 2026-10-29 (Physical Sky: Hosek-Wilkie fallback; branch feat/sky-hosek-fallback)
 
 - Why: the repo is public but Atlas Scene is private, so Physical Sky failed for everyone else. Rule now: Atlas Scene

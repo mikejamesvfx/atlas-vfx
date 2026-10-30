@@ -10,6 +10,12 @@ when it does, the entry says so and names the tool that rewrites them.
   last frame, nothing padded); Sequence Read Chunk reads one chunk of an EXR/DPX/PNG sequence; Chunk Stitch joins
   the rendered chunks into one sequence numbered from the first frame, crossfading the overlaps.
   `tools/queue_chunks.py` queues one prompt per chunk from an API workflow. New socket type `ATLAS_VFX_CHUNK_PLAN`.
+- **Relight Transfer** (catalogue 53, `Atlas VFX/Layers`): an LTX relight IC-LoRA runs at its own size (2.3 Relight
+  at 1280x704, 2.5 Day-to-Night / Golden-Hour), and this node moves only the change of light onto the full-res
+  element, keeping every element pixel. mode guided measures the gain at the LoRA's size and brings it up with a
+  matte-weighted guided filter (element luminance, plus MoGe depth / normals); mode sh fits the light as spherical
+  harmonics on MoGe-3 normals and re-shades at their sharpness. Starter: `workflows/relight_transfer_element.json`
+  (`tools/relight_transfer_workflow.py`). The three LoRAs are in the licence register.
 
 ## 0.1.0 (2026-10-30), first public beta
 
