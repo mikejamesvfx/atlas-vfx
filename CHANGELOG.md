@@ -23,6 +23,10 @@ when it does, the entry says so and names the tool that rewrites them.
 - **Mirror for LTX relights**: LTX Prep `mirror` flips what LTX sees left-right and LTX Return flips the take back;
   Relight Transfer `relit_mirrored` does the same for a raw take. On DSCF3000 the LTX-2.3 Relight LoRA kept the sun
   on frame right whatever the light ball said; mirrored, with the ball on the right, the sun lands on the left.
+  Starter: `workflows/ltx_relight_mirror.json` (`tools/ltx_relight_workflow.py`): Plate Read, LTX Prep (comp
+  reference, mirror on, 1280x704, 97 frames), the light ball pasted top-right, the LTX-2.3 Relight IC-LoRA on the
+  LTX-2.5 distilled base, LTX Return. Its layer is the `relit` input of the Relight Transfer starter. Put the ball
+  PNG (`the right__low.png`) in ComfyUI's input folder.
 
 ## 0.1.0 (2026-10-30), first public beta
 
