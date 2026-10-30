@@ -46,6 +46,10 @@ class AtlasVFXRelightTransfer:
                                      "tooltip": "average the gain (and SH fit) over +-N frames"}),
                 "eps": ("FLOAT", {"default": 0.01, "min": 1e-5, "max": 1.0, "step": 0.001,
                                   "tooltip": "guided filter smoothness (stops squared)"}),
+                "subsample": ("INT", {"default": 2, "min": 1, "max": 16,
+                                      "tooltip": "fast guided filter: solve at 1/N res, apply at full res. 2 is "
+                                                 "within 0.01 stop of exact at 4K; 4 is faster, ~0.2 stop at edges; "
+                                                 "1 = exact"}),
                 "geo_weight": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 4.0, "step": 0.05,
                                          "tooltip": "weight of depth / normals in the guide"}),
                 "min_r2": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.05,
@@ -61,7 +65,7 @@ class AtlasVFXRelightTransfer:
         }
 
     def run(self, element, matte, relit, encoding, mode, analysis_width, blur_px, max_stops, temporal, eps,
-            geo_weight, min_r2, normals=None, moge_geometry=None, shot_camera=None, first_frame=1001):
+            subsample, geo_weight, min_r2, normals=None, moge_geometry=None, shot_camera=None, first_frame=1001):
         import torch
 
         el = element.float().cpu().numpy()[..., :3]
@@ -89,7 +93,7 @@ class AtlasVFXRelightTransfer:
         except ImportError:  # outside ComfyUI (tests)
             pass
         out, gain, rep = lt.transfer(el, rel, m, mode=mode, analysis_width=analysis_width, blur_px=blur_px,
-                                     max_stops=max_stops, temporal=temporal, eps=eps, normals=n, depth=depth,
+                                     max_stops=max_stops, temporal=temporal, eps=eps, subsample=subsample, normals=n, depth=depth,
                                      cam_rotations=rots, geo_weight=geo_weight, min_r2=min_r2,
                                      progress=(lambda t: pbar.update(1)) if pbar else None)
         if encoding == "srgb":

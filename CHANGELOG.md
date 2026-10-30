@@ -15,7 +15,8 @@ when it does, the entry says so and names the tool that rewrites them.
   element, keeping every element pixel. mode guided measures the gain at the LoRA's size and brings it up with a
   matte-weighted guided filter (element luminance, plus MoGe depth / normals); mode sh fits the light as spherical
   harmonics on MoGe-3 normals and re-shades at their sharpness. Starter: `workflows/relight_transfer_element.json`
-  (`tools/relight_transfer_workflow.py`). The three LoRAs are in the licence register.
+  (`tools/relight_transfer_workflow.py`). The three LoRAs are in the licence register. `subsample` runs the fast
+  guided filter (default 2: 2.6x faster at 4K, within 0.01 stop of exact).
 
 ## 0.1.0 (2026-10-30), first public beta
 

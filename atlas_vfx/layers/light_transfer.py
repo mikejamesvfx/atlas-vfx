@@ -132,13 +132,8 @@ def temporal_smooth(seq, weights, k):
 
 
 # ----------------------------------------------------------------------------------------------- guided filter
-def guided_filter(guide, src, r, eps, weight=None):
-    """He et al. guided filter. guide (H, W, k), src (H, W, c); every output channel is locally a linear function of
-    the k guide channels within radius r. eps regularises (units of the guide squared). weight (H, W) makes every
-    window statistic a weighted mean, so pixels with weight 0 (outside the matte) never shape the result: without
-    it a bright background beside the element bends the gain at its edge."""
-    I = _f32(guide if guide.ndim == 3 else guide[..., None])
-    p = _f32(src if src.ndim == 3 else src[..., None])
+def _guided_coeffs(I, p, r, eps, weight):
+    """The guided filter's window-averaged linear coefficients: (mean_a (H, W, k, c), mean_b (H, W, c))."""
     k = I.shape[-1]
     if weight is None:
         mean = (lambda x: _box_n(x, r))
@@ -155,7 +150,7 @@ def guided_filter(guide, src, r, eps, weight=None):
         cov = mean(I1[..., None] * p) - mI1[..., None] * mp
         a = cov / (var[..., None] + eps)
         b = mp - a * mI1[..., None]
-        return (mean(a) * I1[..., None] + mean(b)).astype(np.float32)
+        return mean(a)[:, :, None, :], mean(b)
     cII = np.empty((H, W, k, k), np.float32)
     for i in range(k):
         for j in range(i, k):
@@ -170,7 +165,48 @@ def guided_filter(guide, src, r, eps, weight=None):
     del cII, cIp
     b = mp - np.einsum("hwk,hwkc->hwc", mI, a)
     ma = np.stack([mean(np.ascontiguousarray(a[..., i, :])) for i in range(k)], 2)
-    return (np.einsum("hwk,hwkc->hwc", I, ma) + mean(b)).astype(np.float32)
+    return ma, mean(b)
+
+
+def guided_filter(guide, src, r, eps, weight=None, subsample=1):
+    """He et al. guided filter. guide (H, W, k), src (H, W, c); every output channel is locally a linear function of
+    the k guide channels within radius r. eps regularises (units of the guide squared). weight (H, W) makes every
+    window statistic a weighted mean, so pixels with weight 0 (outside the matte) never shape the result: without
+    it a bright background beside the element bends the gain at its edge.
+
+    subsample s > 1 is the fast guided filter (He & Sun 2015): the coefficients a, b are window averages, so they are
+    smooth and are solved on the guide and source shrunk by s (radius r/s), then upsampled and applied with the
+    FULL-res guide. Edges still come from the full-res guide; the heavy part costs about 1/s^2."""
+    I = _f32(guide if guide.ndim == 3 else guide[..., None])
+    p = _f32(src if src.ndim == 3 else src[..., None])
+    H, W, k = I.shape
+    s = int(subsample)
+    if s <= 1 or min(H, W) < 4 * s:
+        ma, mb = _guided_coeffs(I, p, r, eps, weight)
+        return (np.einsum("hwk,hwkc->hwc", I, ma) + mb).astype(np.float32)
+    h, w = max(1, round(H / s)), max(1, round(W / s))
+    def shrink(x):                                        # per channel: OpenCV resizes at most 4 at once
+        x = _f32(x)
+        if x.ndim == 2:
+            return cv2.resize(x, (w, h), interpolation=cv2.INTER_AREA)
+        return np.stack([cv2.resize(np.ascontiguousarray(x[..., c]), (w, h), interpolation=cv2.INTER_AREA)
+                         for c in range(x.shape[-1])], -1)
+    if weight is None:
+        Is, ps, ws = shrink(I), shrink(p), None
+    else:                                                 # weighted shrink: an edge pixel keeps only element values
+        wt = _f32(weight)
+        ws = shrink(wt)
+        dn = np.maximum(ws, 1e-6)[..., None]
+        Is, ps = shrink(I * wt[..., None]) / dn, shrink(p * wt[..., None]) / dn
+    ma, mb = _guided_coeffs(Is, ps, max(1, round(r / s)), eps, ws)
+    grow = (lambda x: cv2.resize(_f32(x), (W, H), interpolation=cv2.INTER_LINEAR))
+    out = np.empty((H, W, p.shape[-1]), np.float32)
+    for c in range(p.shape[-1]):
+        acc = grow(mb[..., c])
+        for i in range(k):
+            acc += grow(np.ascontiguousarray(ma[..., i, c])) * I[..., i]
+        out[..., c] = acc
+    return out
 
 
 # ----------------------------------------------------------------------------------------------- spherical harmonics
@@ -222,7 +258,7 @@ def _guide(element, depth, normals, geo_weight):
 
 
 def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_px=2.0, max_stops=3.0,
-             temporal=0, eps=0.01, radius=0, normals=None, depth=None, cam_rotations=None, geo_weight=0.5,
+             temporal=0, eps=0.01, radius=0, subsample=2, normals=None, depth=None, cam_rotations=None, geo_weight=0.5,
              min_r2=0.3, progress=None):
     """element (T, H, W, 3) full res; relit (T, h, w, 3) same framing, any res; matte (T, H', W') any res.
     normals (T, Hn, Wn, 3) unit OpenGL camera space, depth (T, Hd, Wd) metric, any res; cam_rotations (T, 3, 3)
@@ -313,7 +349,7 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
         g_t = masked_blur(g_t, w_low[t], blur_px)
         g_up = _resize(g_t, W, H, down=False)[sl]
         guide = _guide(element[t][sl], d_full, n_full, geo_weight)
-        g_full = guided_filter(guide, g_up, r, eps, weight=np.maximum(m_full[sl], 1e-3))
+        g_full = guided_filter(guide, g_up, r, eps, weight=np.maximum(m_full[sl], 1e-3), subsample=subsample)
         if sh_full is not None:
             g_full = g_full + sh_full
         g_full = np.clip(g_full, -max_stops, max_stops)
@@ -326,7 +362,8 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
             progress(t)
 
     rep = {"mode": mode, "frames": T, "size": [W, H], "analysis_size": [aw, ah], "relit_size": [rw, rh],
-           "scale": round(scale, 4), "radius_px": r, "eps": eps, "blur_px": blur_px, "max_stops": max_stops,
+           "scale": round(scale, 4), "radius_px": r, "subsample": int(subsample), "eps": eps, "blur_px": blur_px,
+           "max_stops": max_stops,
            "temporal": temporal, "guides": ["luma"] + (["depth"] if depth is not None else [])
            + (["normals"] if normals is not None else []),
            "camera": "world (shot camera)" if cam_rotations is not None else "camera space",

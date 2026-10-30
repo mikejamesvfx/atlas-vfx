@@ -226,10 +226,10 @@ def test_node():
     n, matte, bump, element, truth, relit_low = setup()
     node = AtlasVFXRelightTransfer()
     kw = dict(encoding="linear", mode="sh", analysis_width=0, blur_px=2.0, max_stops=3.0, temporal=0, eps=0.01,
-              geo_weight=0.5, min_r2=0.3)
+              subsample=4, geo_weight=0.5, min_r2=0.3)
     t = (lambda a: torch.from_numpy(np.ascontiguousarray(a[None])))
     img, gain, info = node.run(t(element), t(matte), t(relit_low), normals=t(n * 0.5 + 0.5), **kw)
-    want, _, _ = lt.transfer(element[None], relit_low[None], matte[None], mode="sh", analysis_width=0,
+    want, _, _ = lt.transfer(element[None], relit_low[None], matte[None], mode="sh", analysis_width=0, subsample=4,
                              normals=lt.decode_normals(n * 0.5 + 0.5)[None])
     check(np.allclose(img.numpy(), want, atol=1e-6), "node = module (sh, encoded normals)")
     check(gain.shape == img.shape and json.loads(info)["mode"] == "sh", "node gives gain and info")
@@ -257,8 +257,39 @@ def test_node():
                             first_frame=1100, **kw), "shot camera without the frame", "first_frame")
 
 
+def test_fast_guided():
+    """subsample 4 (fast guided filter) against 1 (exact): within a few hundredths of a stop, as close to the
+    truth, faster."""
+    import time
+
+    n, matte, bump, element, truth, relit_low = setup()
+    inner = cv2.erode(matte, np.ones((9, 9), np.uint8)) > 0.5
+    depth = np.where(matte > 0, 3.0, 20.0).astype(np.float32)
+    args = (element[None], relit_low[None], matte[None])
+    kw = dict(analysis_width=0, normals=n[None], depth=depth[None])
+    t0 = time.perf_counter()
+    exact, g1, _ = lt.transfer(*args, subsample=1, **kw)
+    t1 = time.perf_counter()
+    fast, g4, rep = lt.transfer(*args, subsample=4, **kw)
+    t2 = time.perf_counter()
+    d = float(np.sqrt(((g4[0] - g1[0])[inner] ** 2).mean()))
+    check(d < 0.05, "fast guided filter (subsample 4) matches exact", f"{d:.4f} stops rms")
+    check(rep["subsample"] == 4, "subsample reported")
+    e_exact, e_fast = err_stops(exact[0], truth, inner), err_stops(fast[0], truth, inner)
+    check(e_fast < e_exact + 0.02, "fast is as close to the truth as exact", f"{e_fast:.3f} vs {e_exact:.3f} stops")
+    check(t2 - t1 < t1 - t0, "fast is faster (5-channel guide)", f"{t2 - t1:.2f} s vs {t1 - t0:.2f} s")
+    rng = np.random.default_rng(1)
+    I = rng.normal(0, 1, (80, 100, 2)).astype(np.float32)
+    I = cv2.GaussianBlur(I, (0, 0), 3.0)
+    p = (2.0 * I[..., :1] - 0.5 * I[..., 1:2] + 0.3).astype(np.float32)
+    q = lt.guided_filter(I, p, 4, 1e-6, subsample=2)
+    check(float(np.abs(q - p).max()) < 2e-2, "fast guided filter keeps a linear function of a smooth guide",
+          f"{np.abs(q - p).max():.2e}")
+
+
 def main():
     test_guided_filter_identity()
+    test_fast_guided()
     test_quality()
     test_halo()
     test_clamp_temporal_fallback()

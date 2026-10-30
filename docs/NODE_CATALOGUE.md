@@ -648,7 +648,7 @@ Payloads (all plain JSON-safe dicts unless said):
 
 ### 53 Relight Transfer
 `AtlasVFXRelightTransfer` · layers · Atlas VFX/Layers
-- in: element IMAGE, matte MASK, relit IMAGE, encoding linear|srgb, mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, geo_weight FLOAT, min_r2 FLOAT
+- in: element IMAGE, matte MASK, relit IMAGE, encoding linear|srgb, mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT
 - in, optional: normals IMAGE, moge_geometry MOGE_GEOMETRY, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT
 - out: images IMAGE, gain IMAGE, info STRING
 - test: tests/test_relight_transfer.py
@@ -665,4 +665,7 @@ Payloads (all plain JSON-safe dicts unless said):
   world space with a shot camera) and re-shades at the normals' sharpness, plus the guided residual for cast
   shadows; a frame under min_r2 falls back to guided. Synthetic: guided halves the error of a plain upscale (0.22 vs
   0.47 stops), sh is 4x better than guided on fine normal detail (0.13 vs 0.55). Cast shadows stay at the analysis
-  size. For full-res normals run MoGe-3 on the element at its own size, not a 1024 proxy.
+  size. For full-res normals run MoGe-3 on the element at its own size, not a 1024 proxy. subsample is the fast guided
+  filter (He & Sun 2015: coefficients solved at 1/N res, applied with the full-res guide, matte-weighted shrink so
+  the halo fix holds): on a 4K LTX frame with a 5-channel guide, 2 is 2.6x faster than exact and within 0.008 stops
+  rms (p99 0.03); 4 is 4.4x, 0.044 rms (p99 0.17, at edges).

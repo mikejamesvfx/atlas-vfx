@@ -2435,6 +2435,11 @@
     "group": "required"
    },
    {
+    "name": "subsample",
+    "type": "INT",
+    "group": "required"
+   },
+   {
     "name": "geo_weight",
     "type": "FLOAT",
     "group": "required"

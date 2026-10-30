@@ -66,7 +66,7 @@ def graph() -> dict:
             "moge_geometry": ["7", 0], "temporal": 1, "sigma": 1.5, "matte": ["5", 0]}},
         "9": {"class_type": "AtlasVFXRelightTransfer", "inputs": {
             "element": ["1", 0], "matte": ["5", 0], "relit": ["3", 0], "encoding": "linear", "mode": "sh",
-            "analysis_width": 1280, "blur_px": 2.0, "max_stops": 3.0, "temporal": 1, "eps": 0.01,
+            "analysis_width": 1280, "blur_px": 2.0, "max_stops": 3.0, "temporal": 1, "eps": 0.01, "subsample": 2,
             "geo_weight": 0.5, "min_r2": 0.3, "normals": ["8", 0], "moge_geometry": ["7", 0],
             "first_frame": ["1", 1]}},
         "10": exr(["9", 0], "element_relit"),

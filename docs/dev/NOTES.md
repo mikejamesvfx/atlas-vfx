@@ -21,6 +21,11 @@ Running log for whoever works here. Newest at the top. Keep it short: what was d
   (MoGe-3 at element size -> Normals -> Transfer sh -> EXR) ran in 240 s. Against the known gain: 0.0006 stops rms
   (plain upscale 0.14), fine detail kept (high-pass correlation 0.99999 vs 0.86). Guided alone is ~3 s per 4K
   frame. This proves the graph and the maths, not the look: next is a real LTX relight take.
+- Fast guided filter (subsample widget, default 2): the 5-channel guided filter at 4K was ~19 s per frame of a 97-frame
+  run. He & Sun 2015: solve a, b at 1/N res, upsample, apply with the full-res guide. The first version brought the
+  halo back (0.93 stops): shrinking mixed the bright background into edge pixels of the guide. Fixed by a
+  matte-weighted shrink (shrink(I*w)/shrink(w)). Real 4K LTX frame: exact 15.1 s, N=2 5.8 s (0.008 stops rms, p99
+  0.03), N=4 3.4 s (0.044 rms, p99 0.17 at edges). Default 2.
 
 ## 2026-10-29 (Physical Sky: Hosek-Wilkie fallback; branch feat/sky-hosek-fallback)
 
