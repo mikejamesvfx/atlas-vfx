@@ -26,6 +26,19 @@ Running log for whoever works here. Newest at the top. Keep it short: what was d
   halo back (0.93 stops): shrinking mixed the bright background into edge pixels of the guide. Fixed by a
   matte-weighted shrink (shrink(I*w)/shrink(w)). Real 4K LTX frame: exact 15.1 s, N=2 5.8 s (0.008 stops rms, p99
   0.03), N=4 3.4 s (0.044 rms, p99 0.17 at edges). Default 2.
+- First real LTX relight: LTX-2.3 Relight IC-LoRA on the LTX-2.5 distilled int8 base (graph of
+  ltx23_relight/relight_official_ltx25_AB.json, single stage), DSCF3000 1130-1226 (97 frames) centre-cropped to
+  1280:704 through the ACES 2.0 SDR view, ball "the left, low", look "warm golden low side sun". 250 s on V141. The
+  take holds the plate's framing and timing (0 frame lag, < 1 px shift at 640 wide) but invents content (door opened
+  with an interior, a lit support under the steps, a dark border round the doormat). Element = the nearest 45% by
+  Plate Depth (railing + steps), ball patch cleared from the matte. Gain in the matte -1 to +4.3 stops (max_stops 5).
+  Transfer sh at 3928x2160, 4 batches, ~7.5 min per 25 frames (exact filter; the fast one landed after).
+  Against the take shrunk back to 1280 (light) and the element (detail, fine-scale correlation): plain upscale light
+  0.016 stops / detail 0.07; guided 0.19 / 0.96; sh 0.33 / 0.985. So the transfer keeps the plate's own texture where
+  the upscale keeps almost none, at the price of a looser match to LTX's light. Where LTX changed content its gain
+  lands on the real pixels as a soft smudge (the support, the mat border): the next fix is a structure-agreement
+  confidence that drops the gain where the take and the element disagree. Lifting a dusk plate 2-4 stops also lifts
+  its grain.
 
 ## 2026-10-29 (Physical Sky: Hosek-Wilkie fallback; branch feat/sky-hosek-fallback)
 
