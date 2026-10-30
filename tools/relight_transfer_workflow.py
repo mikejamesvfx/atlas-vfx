@@ -68,7 +68,7 @@ def graph() -> dict:
             "element": ["1", 0], "matte": ["5", 0], "relit": ["3", 0], "encoding": "linear", "mode": "sh",
             "analysis_width": 1280, "blur_px": 2.0, "max_stops": 3.0, "temporal": 1, "eps": 0.01, "subsample": 2,
             "geo_weight": 0.5, "min_r2": 0.3, "normals": ["8", 0], "moge_geometry": ["7", 0],
-            "first_frame": ["1", 1], "relit_mirrored": False}},
+            "first_frame": ["1", 1], "relit_mirrored": False, "lift_limit": 3.0, "holdout_grow": 2}},
         "10": exr(["9", 0], "element_relit"),
         "11": exr(["9", 1], "element_relit_gain"),
     }

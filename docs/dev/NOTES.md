@@ -922,3 +922,18 @@ Running log for whoever works here. Newest at the top. Keep it short: what was d
   door at an ASSUMED 2.08 m. Mike still to measure the door, a step riser and the deck rail.
 - Lock check (card on the wall plane) held across S1-S3 by eye.
 - Phase 1 slice: "character on the deck", S2-S3, Nuke frames 1130-1297. The test character is 2.13 m.
+
+### 2026-10-30 Relight Transfer smudges: lift_limit and holdout
+
+- The soft smudges in the first real take were not all invented content. On 1160 the "white support" LTX shows is
+  a post the plate holds in deep shade (luma 0.012, std 0.006, black in the view). LTX lifts it 4.9 stops, so the
+  transfer lifts the plate's noise 30x: a soft grainy blob. Nothing in the plate to keep there.
+- Tried first: a gain-vs-local-median outlier test (weight exp(-(d/tau)^2)). At a 33 px window (LTX size) it missed
+  the 20 px post (the post was the median); at 97 px it caught it but also the sunlit step lips and, on the
+  left-sun take, the real post shadows on the fascia (8-13 % of the matte). Gain alone cannot tell "LTX painted it"
+  from "the sun lit it". Dropped.
+- lift_limit (default 3 stops): above it, fade over one stop to the take's own pixels (upscaled). 1160: the post
+  comes back clean, 2.6 % of the matte swapped, detail 0.959 -> 0.907 (only where swapped); 1210: 0.1 %. At 2.0
+  a third of the element goes, too much.
+- holdout (MASK, optional): a roto over what LTX truly invented; its gain gets no weight and is filled from around
+  it. Synthetic invented patch: sh fills from the normals (0.126 vs clean 0.117 stops), guided halves the error.

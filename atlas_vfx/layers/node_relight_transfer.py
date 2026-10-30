@@ -66,12 +66,22 @@ class AtlasVFXRelightTransfer:
                                                "tooltip": "the relit take was rendered on a left-right flipped "
                                                           "reference (the sun-on-the-left trick): flip it back here. "
                                                           "Leave off for LTX Return output (Return already flips)"}),
+                "holdout": ("MASK", {"tooltip": "roto over what the relight invented rather than lit (an object "
+                                                "that is not in the plate, a border LTX drew): its light is "
+                                                "ignored and filled from around it. Any size, same framing"}),
+                "lift_limit": ("FLOAT", {"default": 3.0, "min": 0.0, "max": 10.0, "step": 0.25,
+                                         "tooltip": "where the relit take lifts the element more than this (stops), "
+                                                    "the plate is too dark to carry it (noise x 2^lift): fade to the "
+                                                    "relit take's own pixels there (soft but clean). 3 keeps the "
+                                                    "plate's texture on a dusk plate lifted 2-3 stops. 0 = off"}),
+                "holdout_grow": ("INT", {"default": 2, "min": 0, "max": 64,
+                                         "tooltip": "grow the holdout by this many analysis px"}),
             },
         }
 
     def run(self, element, matte, relit, encoding, mode, analysis_width, blur_px, max_stops, temporal, eps,
             subsample, geo_weight, min_r2, normals=None, moge_geometry=None, shot_camera=None, first_frame=1001,
-            relit_mirrored=False):
+            relit_mirrored=False, holdout=None, lift_limit=3.0, holdout_grow=2):
         import torch
 
         el = element.float().cpu().numpy()[..., :3]
@@ -103,6 +113,8 @@ class AtlasVFXRelightTransfer:
         out, gain, rep = lt.transfer(el, rel, m, mode=mode, analysis_width=analysis_width, blur_px=blur_px,
                                      max_stops=max_stops, temporal=temporal, eps=eps, subsample=subsample, normals=n, depth=depth,
                                      cam_rotations=rots, geo_weight=geo_weight, min_r2=min_r2,
+                                     holdout=None if holdout is None else holdout.float().cpu().numpy(),
+                                     holdout_grow=holdout_grow, lift_limit=lift_limit,
                                      progress=(lambda t: pbar.update(1)) if pbar else None)
         if encoding == "srgb":
             out = rl.lin_to_srgb(out)

@@ -9,6 +9,15 @@ pixel and moves only the change of light:
   tools/light_transfer.py) and filled outward past the matte so nothing bleeds back in.
 - guided (route A): the gain is upsampled to full res and run through a guided filter (He et al.) whose guide is the
   element's log luminance, plus MoGe depth and normals when given. Gain edges then follow the element's own edges.
+- holdout: a mask (roto) over what the relight model invented rather than lit (a support that is not in the plate, a
+  border round a mat). Its gain gets no weight, so the hole is filled from the light around it and the SH fit ignores
+  it. A gain test cannot tell an invented object from a real light edge (tried 2026-10-30: a gain-vs-local-median
+  outlier test flagged sunlit step edges and real cast shadows before it caught a 20 px invented post), so it is
+  marked by hand.
+- lift_limit: where the take lifts the element by more than this many stops, the element has too little signal to
+  carry it (a post in deep shade at luma 0.012 lifted 4.9 stops comes out as a soft, grainy blob: the plate's noise
+  times 30). There the result fades, over one stop, to the relit take's own pixels (upscaled: soft, but clean). The
+  lift is measured unclamped at the analysis size, luminance only, blurred inside the matte. 0 = off.
 - sh (route B): per frame, 2nd-order spherical harmonics fitted from normal to gain (9 coefficients per channel) at
   the analysis size, with normals turned to world by the shot camera when there is one so the fit holds still while
   the camera moves. Full-res gain = SH(full-res normals) + the guided upsample of what the SH could not explain (cast
@@ -259,18 +268,22 @@ def _guide(element, depth, normals, geo_weight):
 
 def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_px=2.0, max_stops=3.0,
              temporal=0, eps=0.01, radius=0, subsample=2, normals=None, depth=None, cam_rotations=None, geo_weight=0.5,
-             min_r2=0.3, progress=None):
+             min_r2=0.3, holdout=None, holdout_grow=2, lift_limit=3.0, progress=None):
     """element (T, H, W, 3) full res; relit (T, h, w, 3) same framing, any res; matte (T, H', W') any res.
     normals (T, Hn, Wn, 3) unit OpenGL camera space, depth (T, Hd, Wd) metric, any res; cam_rotations (T, 3, 3)
-    cam_to_world. Returns (out (T, H, W, 3), gain (T, H, W, 3) log2, report dict)."""
+    cam_to_world. holdout (T, Hh, Wh) any res: 1 where the relit take's gain is not to be trusted (grown by
+    holdout_grow analysis px). lift_limit (stops, 0 off): above it the relit take's own pixels take over. Returns (out (T, H, W, 3), gain (T, H, W, 3) log2, report dict)."""
     if mode not in MODES:
         raise ValueError(f"mode {mode!r}: one of {MODES}")
     element = np.asarray(element, np.float32)[..., :3]
     relit = np.asarray(relit, np.float32)[..., :3]
     matte = np.asarray(matte, np.float32)
     T, H, W = element.shape[:3]
+    holdout = None if holdout is None else np.asarray(holdout, np.float32)
+    if holdout is not None and holdout.ndim == 2:
+        holdout = holdout[None]
     for name, arr in (("relit", relit), ("matte", matte), ("normals", normals), ("depth", depth),
-                      ("cam_rotations", cam_rotations)):
+                      ("cam_rotations", cam_rotations), ("holdout", holdout)):
         if arr is not None and len(arr) not in (T, 1):
             raise ValueError(f"{name} has {len(arr)} frames, element {T}")
     rh, rw = relit.shape[1:3]
@@ -285,15 +298,29 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
 
     # 1. gain and its weights at the analysis size
     g_low = np.empty((T, ah, aw, 3), np.float32)
+    lift_low = np.zeros((T, ah, aw), np.float32) if lift_limit > 0 else None
+    lifted = []
     w_low = np.empty((T, ah, aw), np.float32)
-    clamp_frac = []
+    clamp_frac, held = [], []
+    grow = np.ones((2 * int(holdout_grow) + 1,) * 2, np.uint8) if holdout_grow > 0 else None
     for t in range(T):
         el = _resize(element[t], aw, ah)
         rl = _resize(pick(relit, t), aw, ah)
         m = np.clip(_resize(pick(matte, t), aw, ah), 0.0, 1.0)
         g, cl = log_gain(el, rl, max_stops)
         w = confidence(el, rl, m)
+        if holdout is not None:
+            h = np.clip(_resize(pick(holdout, t), aw, ah), 0.0, 1.0)  # area: any coverage of a pixel counts
+            h = np.clip(h * 4.0, 0.0, 1.0)
+            if grow is not None:
+                h = cv2.dilate(h, grow)
+            inner = w > 0.5
+            held.append(float((h[inner] > 0.5).mean()) if inner.any() else 0.0)
+            w = w * (1.0 - h)
         g_low[t], w_low[t] = g, w
+        if lift_low is not None:
+            lum = np.log2(np.maximum(rl @ LUMA_AP1, FLOOR)) - np.log2(np.maximum(el @ LUMA_AP1, FLOOR))
+            lift_low[t] = masked_blur(lum, (m >= 0.98).astype(np.float32), blur_px)
         clamp_frac.append(float((cl.any(-1) & (m > 0.5)).sum() / max(1, (m > 0.5).sum())))
     g_low = temporal_smooth(g_low, w_low, int(temporal))
 
@@ -355,7 +382,14 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
         g_full = np.clip(g_full, -max_stops, max_stops)
         mm = m_full[sl][..., None]
         el = element[t][sl]
-        res = el * (1.0 + mm * (np.exp2(g_full) - 1.0))
+        res = el * np.exp2(g_full)
+        if lift_low is not None:
+            s = np.clip(_resize(lift_low[t], W, H, down=False)[sl] - lift_limit, 0.0, 1.0)[..., None]
+            if s.any():
+                own = np.maximum(_resize(pick(relit, t), W, H, down=False)[sl], 0.0)
+                res = res + s * (own - res)
+            lifted.append(float((s[..., 0] > 0.5)[mm[..., 0] > 0.5].mean()) if (mm > 0.5).any() else 0.0)
+        res = el + mm * (res - el)
         out[t][sl] = np.where(mm > 0, res, el)
         gain[t][sl] = g_full * (mm > 0)
         if progress:
@@ -367,7 +401,11 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
            "temporal": temporal, "guides": ["luma"] + (["depth"] if depth is not None else [])
            + (["normals"] if normals is not None else []),
            "camera": "world (shot camera)" if cam_rotations is not None else "camera space",
-           "clamped_fraction_max": round(max(clamp_frac) if clamp_frac else 0.0, 5)}
+           "clamped_fraction_max": round(max(clamp_frac) if clamp_frac else 0.0, 5),
+           "lift_limit": lift_limit,
+           "relit_pixels_fraction_max": round(max(lifted), 5) if lifted else 0.0,
+           "holdout": None if holdout is None else {"grow_px": int(holdout_grow),
+                                                    "matte_fraction_max": round(max(held) if held else 0.0, 5)}}
     if mode == "sh":
         rep.update(sh_r2=[round(x, 4) for x in r2s], sh_frames=int(sum(used_sh)),
                    fallback_frames=[t for t, u in enumerate(used_sh) if not u], min_r2=min_r2)

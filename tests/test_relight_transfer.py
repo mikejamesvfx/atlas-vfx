@@ -291,6 +291,70 @@ def test_fast_guided():
           f"{np.abs(q - p).max():.2e}")
 
 
+def test_holdout():
+    """LTX paints an object the plate does not have: a bright square in the relit take. Without a holdout the transfer
+    lifts the real pixels there (a soft smudge); with the square held out, the light there comes from around it."""
+    n, matte, bump, element, truth, relit_low = setup()
+    smooth = (cv2.erode(matte, np.ones((41, 41), np.uint8)) > 0.5) & ~bump
+    ys, xs = np.nonzero(smooth[::DOWN, ::DOWN])
+    k = len(ys) // 2
+    cy, cx = int(ys[k]), int(xs[k])
+    bad = relit_low.copy()
+    bad[cy - 3:cy + 4, cx - 3:cx + 4] *= 6.0                                     # ~2.6 stops of invented content
+    hold = np.zeros(matte.shape, np.float32)
+    hold[(cy - 3) * DOWN:(cy + 4) * DOWN, (cx - 3) * DOWN:(cx + 4) * DOWN] = 1.0  # roto at full res
+    patch = hold > 0.5
+    ring = (cv2.dilate(hold, np.ones((81, 81), np.uint8)) > 0.5) & ~patch & smooth
+    kw = dict(mode="guided", analysis_width=0)
+    clean, _, _ = lt.transfer(element[None], relit_low[None], matte[None], **kw)
+    raw, _, _ = lt.transfer(element[None], bad[None], matte[None], **kw)
+    fix, _, rep = lt.transfer(element[None], bad[None], matte[None], holdout=hold[None], **kw)
+    e_raw, e_fix, e_clean = (err_stops(o[0], truth, patch) for o in (raw, fix, clean))
+    # guided fills the hole smoothly from its edge; on a small sphere the true light bends inside it, so about half
+    check(e_fix < 0.6 * e_raw, "guided: holdout cuts the invented patch", f"{e_fix:.3f} vs {e_raw:.3f} stops "
+          f"(clean {e_clean:.3f})")
+    d = float(np.abs(fix[0][ring] - raw[0][ring]).max() / truth[ring].mean())
+    check(err_stops(fix[0], truth, ring) <= err_stops(raw[0], truth, ring) + 1e-4,
+          "around the holdout no worse", f"max change {d:.3f}")
+    outside = matte <= 0
+    check(np.array_equal(fix[0][outside], element[outside]), "holdout: outside the matte still bit-exact")
+    check(rep["holdout"]["matte_fraction_max"] > 0, "report gives the held-out fraction", rep["holdout"])
+    kws = dict(mode="sh", analysis_width=0, normals=n[None])
+    sh, _, _ = lt.transfer(element[None], bad[None], matte[None], holdout=hold, **kws)
+    sh_clean, _, _ = lt.transfer(element[None], relit_low[None], matte[None], **kws)
+    e_sh, e_shc = err_stops(sh[0], truth, patch), err_stops(sh_clean[0], truth, patch)
+    check(e_sh < e_shc + 0.05, "sh: under the holdout the normals carry the light (as good as no invention)",
+          f"{e_sh:.3f} vs clean {e_shc:.3f} stops")
+
+
+def test_lift_limit():
+    """A near-black patch of the element that the relit take lifts by ~5 stops: the plate's noise times 30. Above
+    lift_limit the relit take's own pixels take over; below it nothing changes."""
+    n, matte, bump, element, truth, relit_low = setup()
+    rng = np.random.default_rng(3)
+    el = element.copy()
+    smooth = (cv2.erode(matte, np.ones((41, 41), np.uint8)) > 0.5) & ~bump
+    ys, xs = np.nonzero(smooth)
+    cy, cx = int(ys[len(ys) // 2]), int(xs[len(xs) // 2])
+    dark = np.zeros(matte.shape, bool)
+    dark[cy - 24:cy + 24, cx - 24:cx + 24] = True
+    el[dark] = 0.004 + 0.003 * rng.standard_normal((int(dark.sum()), 3)).astype(np.float32).clip(-1, 1)
+    rl = relit_low.copy()
+    lo = cv2.resize(dark.astype(np.float32), (rl.shape[1], rl.shape[0]), interpolation=cv2.INTER_AREA) > 0.99
+    rl[lo] = 0.12                                                                  # lit, flat: ~5 stops up
+    kw = dict(mode="guided", analysis_width=0, max_stops=6.0)
+    off, _, _ = lt.transfer(el[None], rl[None], matte[None], lift_limit=0, **kw)
+    on, _, rep = lt.transfer(el[None], rl[None], matte[None], lift_limit=3.0, **kw)
+    core = np.zeros_like(dark)
+    core[cy - 12:cy + 12, cx - 12:cx + 12] = True
+    noise = lambda o: float((o[0][core] @ lt.LUMA_AP1).std() / (o[0][core] @ lt.LUMA_AP1).mean())
+    check(noise(on) < 0.3 * noise(off), "lift_limit: the lifted plate noise is replaced by the relit take",
+          f"relative noise {noise(on):.3f} vs {noise(off):.3f}")
+    far = smooth & ~(cv2.dilate(dark.astype(np.uint8), np.ones((121, 121), np.uint8)) > 0)
+    check(np.array_equal(on[0][far], off[0][far]), "lift_limit: nothing changes where the lift is small")
+    check(0 < rep["relit_pixels_fraction_max"] < 0.2, "report gives the swapped fraction", rep["relit_pixels_fraction_max"])
+
+
 def main():
     test_guided_filter_identity()
     test_fast_guided()
@@ -298,6 +362,8 @@ def main():
     test_halo()
     test_clamp_temporal_fallback()
     test_guides_and_errors()
+    test_holdout()
+    test_lift_limit()
     test_node()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

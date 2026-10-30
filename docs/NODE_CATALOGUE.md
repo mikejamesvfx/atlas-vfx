@@ -654,7 +654,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 53 Relight Transfer
 `AtlasVFXRelightTransfer` · layers · Atlas VFX/Layers
 - in: element IMAGE, matte MASK, relit IMAGE, encoding linear|srgb, mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT
-- in, optional: normals IMAGE, moge_geometry MOGE_GEOMETRY, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT, relit_mirrored BOOLEAN
+- in, optional: normals IMAGE, moge_geometry MOGE_GEOMETRY, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT, relit_mirrored BOOLEAN, holdout MASK, lift_limit FLOAT, holdout_grow INT
 - out: images IMAGE, gain IMAGE, info STRING
 - test: tests/test_relight_transfer.py
 - proof: synthetic
@@ -675,3 +675,10 @@ Payloads (all plain JSON-safe dicts unless said):
   the halo fix holds): on a 4K LTX frame with a 5-channel guide, 2 is 2.6x faster than exact and within 0.008 stops
   rms (p99 0.03); 4 is 4.4x, 0.044 rms (p99 0.17, at edges). relit_mirrored flips a raw take rendered on a
   mirrored reference back (the sun-on-the-left trick, see 44); LTX Return output is already flipped back.
+  lift_limit (default 3 stops): where the take lifts the element more than that, the plate has too little signal
+  (DSCF3000 1160: a post in shade at luma 0.012 lifted 4.9 stops came out a soft grainy smudge, the plate's noise
+  x30), so it fades over one stop to the take's own pixels. On the real take it swaps 0.1-4 % of the matte. holdout
+  is a roto for what the take invented rather than lit: its gain is ignored and filled from around it (sh fills
+  from the normals and matches a clean take; guided fills smoothly from the edge). A gain-outlier test could not
+  tell invented content from real light edges (it flagged sunlit step lips and real cast shadows first), so it is
+  by hand.

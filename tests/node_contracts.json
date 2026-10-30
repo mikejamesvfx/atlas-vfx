@@ -2478,6 +2478,21 @@
     "name": "relit_mirrored",
     "type": "BOOLEAN",
     "group": "optional"
+   },
+   {
+    "name": "holdout",
+    "type": "MASK",
+    "group": "optional"
+   },
+   {
+    "name": "lift_limit",
+    "type": "FLOAT",
+    "group": "optional"
+   },
+   {
+    "name": "holdout_grow",
+    "type": "INT",
+    "group": "optional"
    }
   ],
   "outputs": [
