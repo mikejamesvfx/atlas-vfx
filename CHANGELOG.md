@@ -3,7 +3,7 @@
 Versions follow `pyproject.toml` (and `atlas_vfx.__version__`). Before 1.0, a minor version can break saved graphs;
 when it does, the entry says so and names the tool that rewrites them.
 
-## 0.1.0 (2026-10-29), first public beta
+## 0.1.0 (2026-10-30), first public beta
 
 The first tagged release of the public repo. 37 nodes in five families (Camera, Layers, Plate Lock, Sensor,
 Deliver); what each is proven on is in the README's Status section and `docs/NODE_CATALOGUE.md`.
