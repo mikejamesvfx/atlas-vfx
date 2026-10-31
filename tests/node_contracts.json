@@ -1,4 +1,102 @@
 {
+ "AtlasVFXAlphaPrep": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "images",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "still_frames",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "max_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "max_height",
+    "type": "INT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "image",
+    "type": "IMAGE"
+   },
+   {
+    "name": "length",
+    "type": "INT"
+   },
+   {
+    "name": "width",
+    "type": "INT"
+   },
+   {
+    "name": "height",
+    "type": "INT"
+   },
+   {
+    "name": "alpha_prep",
+    "type": "ATLAS_VFX_ALPHA_PREP"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXAlphaReturn": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "images",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "alpha_prep",
+    "type": "ATLAS_VFX_ALPHA_PREP",
+    "group": "required"
+   },
+   {
+    "name": "channel",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "red",
+     "green",
+     "blue",
+     "mean"
+    ]
+   },
+   {
+    "name": "still_average",
+    "type": "BOOLEAN",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "mask",
+    "type": "MASK"
+   },
+   {
+    "name": "matte_image",
+    "type": "IMAGE"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
  "AtlasVFXCameraExport": {
   "folder": "camera_side",
   "category": "Atlas VFX/Camera",
@@ -3495,6 +3593,26 @@
    {
     "name": "sun",
     "type": "ATLAS_VFX_SUN"
+   }
+  ]
+ },
+ "AtlasVFXTinyVAE": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "tae_name",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "(put taeltx2_3.safetensors in models/vae_approx)"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "name": "vae",
+    "type": "VAE"
    }
   ]
  },

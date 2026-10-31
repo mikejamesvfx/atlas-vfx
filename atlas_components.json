@@ -326,6 +326,34 @@
       ]
     },
     {
+      "id": "ltx-2.5-ic-lora-alpha-gen",
+      "usage": "model",
+      "note": "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors (D:/models/loras/ltx25; Lightricks LTX-2.5 Alpha-Gen IC-LoRA): a matte (white = foreground, soft edges as real alpha) from any RGB clip, no green screen, no mask or prompt. LTX-2.x Community License Agreement, licence date 2026-08-11, embedded in the file's metadata (model_version 2.5, reference_downscale_factor 1); the same terms as the Day-to-Night entry: entities with annual revenues of at least $10,000,000 need a paid licence beyond a Non-Commercial Purpose. Model-card settings (from the owner's 2026-10-26 graph): distilled base, LoRA 1.0, empty prompt, reference strength 1.0, single stage at native res, <= 1920x1088 padded never stretched, <= 145 frames 8n+1. Used by Alpha Prep / Alpha Return (catalogue 63-64); verified and hashed 2026-10-31.",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors",
+          "bytes": 1308787472,
+          "sha256": "d9e143f979e0756f0c83d772e6a8890f4c6b933db1f7d93fc06e25c179f3fd36",
+          "folder": "loras/ltx25",
+          "hashed": "2026-10-31"
+        }
+      ]
+    },
+    {
+      "id": "taeltx2-3",
+      "usage": "model",
+      "note": "taeltx2_3.safetensors: Tiny AutoEncoder for LTX-2.3 / LTX-2.5 latents (TAEHV family) by Ollin Boer Bohan, github.com/madebyollin/taehv (file safetensors/taeltx2_3.safetensors, last changed in commit e06f53f0b5, 2026-03-06). MIT, 'Copyright (c) 2025 Ollin Boer Bohan', verified 2026-10-31 from the repo's LICENSE. The safetensors file is used, not the .pth (a pickle). Loaded by Atlas VFX Tiny VAE (catalogue 62; core's VAE Loader only lists taeltx_2) for quick previews, and for live sampler previews through atlas_vfx's hook (layers/ltx_live_preview.py, off with ATLAS_VFX_LTX_LIVE_PREVIEW=0). The author notes its decodes are blurry (a _wide variant exists on a branch); preview only, never a delivery decode.",
+      "files": [
+        {
+          "name": "taeltx2_3.safetensors",
+          "bytes": 23531296,
+          "sha256": "f0773b4e3e57318e6aa4dd4a35e1d16213a5f160fbc0376163f06888bbcbe246",
+          "folder": "vae_approx",
+          "hashed": "2026-10-31"
+        }
+      ]
+    },
+    {
       "id": "comfyui-ltxvideo",
       "usage": "runtime",
       "note": "Lightricks ComfyUI-LTXVideo node pack (V141 custom_nodes, commit dbaf9e6 2026-10-08), LICENSE file is the LTX-2 Community License Agreement (license date 2026-01-05), checked 2026-10-19; same terms model as the LTX weights. IC-LoRA loader/guide, inpaint preprocess, mask dilation nodes."

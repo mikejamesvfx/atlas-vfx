@@ -5,6 +5,7 @@ settings an artist changes. Written to subgraphs/ at the repo root; ComfyUI list
   Relight Element 4K   the LTX-2.3 relight with mirror, LTX Return and Relight Transfer Files, from
                        tools/ltx_relight_workflow.graph_4k(): layer, frames, sun, look, seed, transfer mode, name
   LTX Clean Loop       workflows/ltx_element_clean_loop_s2s3.json: plate, layer, first frame, prompt, seeds, name
+  Alpha Matte          tools/alpha_matte_workflow.graph(): image (a still works), still hold, seed, name
                        (121 frames; the frame counts inside are fixed, change the full graph for another length)
 
 Run: <V141 python> tools\\blueprints.py [--api http://127.0.0.1:8188]
@@ -93,12 +94,26 @@ def clean_loop() -> dict:
                         "another length use the full workflow.", expose)
 
 
+def alpha_matte() -> dict:
+    import alpha_matte_workflow as am
+
+    am.register_local()
+    wf = ui_workflow.convert(am.graph(), "")
+    expose = [(1, "image"), (2, "still_frames"), (49, "noise_seed"), (65, "name"), (66, "mode")]
+    return to_blueprint(wf, "Atlas VFX Alpha Matte",
+                        "A matte from any picture or clip with the LTX-2.5 Alpha-Gen IC-LoRA: no green screen, no "
+                        "roto, soft edges kept. Load an image (a single still works: it is held for a few frames and "
+                        "the mattes averaged), queue, and get an RGB + alpha EXR plus the matte as a mask. A tiny-VAE "
+                        "decode shows the matte in a second.", expose)
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--api", default="http://127.0.0.1:8188", help="a running ComfyUI, for the core node definitions")
     ui_workflow.API = ap.parse_args(argv).api
     print("wrote", write(relight_element_4k(), "relight_element_4k.json"))
     print("wrote", write(clean_loop(), "ltx_clean_loop.json"))
+    print("wrote", write(alpha_matte(), "alpha_matte.json"))
     return 0
 
 

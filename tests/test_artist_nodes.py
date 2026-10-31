@@ -189,8 +189,56 @@ def test_notes():
     check(notes("not json") == "not json", "notes: plain text passes through")
 
 
+def test_alpha():
+    import torch
+    from atlas_vfx.layers.node_alpha_prep import AtlasVFXAlphaPrep, plan
+    from atlas_vfx.layers.node_alpha_return import AtlasVFXAlphaReturn
+
+    p = plan(1, 4096, 2160)
+    check(p["held"] == 9 and p["work"] == [1920, 1012] and p["padded"] == [1920, 1024],
+          "alpha prep: a 4K still holds 9 frames, fits 1920 wide, pads to /32", str(p))
+    check(plan(100, 1280, 704)["held"] == 105 and plan(97, 1280, 704)["held"] == 97, "alpha prep: 8n+1 hold")
+    raises(lambda: plan(146, 1280, 704), "alpha prep: over 145 frames refused", "145")
+    still = np.zeros((1, 216, 410, 3), np.float32)
+    still[:, 50:150, 100:300] = 0.8
+    img, n, w, h, prep, info = AtlasVFXAlphaPrep().run(torch.from_numpy(still))
+    check(tuple(img.shape) == (9, 224, 416, 3) and (n, w, h) == (9, 416, 224)
+          and float(img[3, 220, 0, 0]) == 0.5 and float(img[8, 100, 200, 0]) > 0.7,
+          "alpha prep: still held, padded grey, never stretched", f"{tuple(img.shape)} {n} {w}x{h}")
+    # a fake decode: green = the true matte plus per-frame noise that averaging should remove
+    rng = np.random.default_rng(0)
+    truth = np.zeros((224, 416), np.float32)
+    truth[50:150, 100:300] = 1.0
+    dec = np.zeros((9, 224, 416, 3), np.float32)
+    dec[..., 1] = truth + rng.normal(0, 0.15, (9, 224, 416))
+    dec[..., 0] = 0.3
+    mask, mimg, info = AtlasVFXAlphaReturn().run(torch.from_numpy(dec), prep, "green", True)
+    m = mask.numpy()
+    t_src = np.zeros((216, 410), np.float32)
+    t_src[50:150, 100:300] = 1.0
+    single = np.clip(dec[0, :216, :410, 1], 0, 1)
+    err_avg, err_one = float(np.abs(m[0] - t_src).mean()), float(np.abs(single - t_src).mean())
+    check(m.shape == (1, 216, 410) and err_avg < err_one * 0.6 and json.loads(info)["still_averaged"],
+          "alpha return: a still's held mattes average to a cleaner one", f"error {err_avg:.3f} vs one frame {err_one:.3f}")
+    clip = np.zeros((3, 216, 410, 3), np.float32)
+    p3 = AtlasVFXAlphaPrep().run(torch.from_numpy(clip))[4]
+    d3 = np.zeros((9, 224, 416, 3), np.float32)
+    d3[..., 1] = np.arange(9, dtype=np.float32)[:, None, None] / 10
+    m3 = AtlasVFXAlphaReturn().run(torch.from_numpy(d3), p3)[0].numpy()
+    check(m3.shape == (3, 216, 410) and np.allclose(m3[:, 100, 100], [0.0, 0.1, 0.2], atol=1e-5),
+          "alpha return: a clip keeps its own frames, held ones trimmed")
+
+
+def test_tiny_vae_hook():
+    from atlas_vfx.layers import ltx_live_preview as llp
+
+    check(llp.install() == "not inside ComfyUI", "tiny vae: the live-preview hook stays off outside ComfyUI")
+
+
 def main():
     tmp = Path(tempfile.mkdtemp(prefix="artist_"))
+    test_alpha()
+    test_tiny_vae_hook()
     os.environ["ATLAS_VFX_OUT_ROOTS"] = str(tmp)
     test_shot_range()
     test_sun()

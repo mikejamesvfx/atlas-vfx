@@ -93,10 +93,13 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 59 | Grade | layers | atlas-vfx | built | synthetic | Artist nodes | |
 | 60 | Viewer | layers | atlas-vfx | built | synthetic | Artist nodes | |
 | 61 | Notes | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 62 | Tiny VAE | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 63 | Alpha Prep | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 64 | Alpha Return | layers | atlas-vfx | built | synthetic | Artist nodes | |
 
-49 rows are built or deprecated, and those are the 49 nodes that load. Categories: `Atlas VFX/Camera`
+52 rows are built or deprecated, and those are the 52 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
-(layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-61), `Atlas VFX/Deliver`
+(layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-64), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
 
 ## Planned and elsewhere
@@ -148,6 +151,7 @@ Payloads (all plain JSON-safe dicts unless said):
 |---|---|---|
 | `ATLAS_PLATE_SEQ` | 1 Plate Read | 2 Tracking Proxy, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview |
 | `ATLAS_TRACKED_CAMERA` | 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky, 53 Relight Transfer, 54 Relight Transfer Files |
+| `ATLAS_VFX_ALPHA_PREP` | 63 Alpha Prep | 64 Alpha Return |
 | `ATLAS_VFX_CARD` | 15 Foreground Element, 16 Character Insert | 14 Card Project |
 | `ATLAS_VFX_CHUNK_PLAN` | 50 Chunk Plan | 52 Chunk Stitch |
 | `ATLAS_VFX_LIGHT_RIG` | 33 Light From Plate, 48 Physical Sky | 18 Light Probe & Relight |
@@ -788,3 +792,36 @@ Payloads (all plain JSON-safe dicts unless said):
 - needs: nothing beyond the base
 - writes: nothing
 - notes: any node's info / report JSON as readable lines: warnings first (gain clamped on more than 25% of the matte, sh fallback frames, soft take pixels over 10%, IMAGE links over 8 GB), then the known keys by name, then the rest with long lists cut.
+
+### 62 Tiny VAE
+`AtlasVFXTinyVAE` · layers · Atlas VFX/Artist
+- in: tae_name (put taeltx2_3.safetensors in models/vae_approx)
+- out: vae VAE
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: taeltx2_3 (MIT, register id taeltx2-3)
+- needs: nothing beyond the base
+- writes: nothing
+- notes: loads the LTX-2.3 / 2.5 tiny autoencoder taeltx2_3 (madebyollin/taehv, MIT; the safetensors file, never the pickled .pth) from models/vae_approx as a VAE, for a quick-look VAE Decode next to the real one (seconds, blurry, right in framing, motion and light); core's VAE Loader only lists taeltx_2. Checked: a (1, 128, 3, 22, 40) LTX latent decodes to 17 frames at 1280x704. Loading the pack also installs ltx_live_preview: with ComfyUI's live preview method on TAESD, LTX samplers preview the first latent frame through it; any surprise falls back to ComfyUI's own preview, and ATLAS_VFX_LTX_LIVE_PREVIEW=0 turns the hook off.
+
+### 63 Alpha Prep
+`AtlasVFXAlphaPrep` · layers · Atlas VFX/Artist
+- in: images IMAGE, still_frames INT, max_width INT, max_height INT
+- out: image IMAGE, length INT, width INT, height INT, alpha_prep ATLAS_VFX_ALPHA_PREP, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: ltx-2.5-ic-lora-alpha-gen (LTX-2.x Community License, run upstream in the graph)
+- needs: nothing beyond the base
+- writes: nothing
+- notes: gets any image or clip ready for the LTX-2.5 Alpha-Gen IC-LoRA, a single still included: fitted inside 1920x1088, padded with grey to /32 (never stretched), held to 8n+1 frames (a still for still_frames, default 9), at most 145 frames (longer leaks RGB into the matte). Gives the guide image, the latent length / width / height, and the record for Alpha Return. Settings follow the model card (empty prompt, LoRA 1.0, reference strength 1.0, single stage).
+
+### 64 Alpha Return
+`AtlasVFXAlphaReturn` · layers · Atlas VFX/Artist
+- in: images IMAGE, alpha_prep ATLAS_VFX_ALPHA_PREP, channel red|green|blue|mean, still_average BOOLEAN
+- out: mask MASK, matte_image IMAGE, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: the decoded Alpha-Gen output back to a MASK at the source size: padding cropped, the matte channel (green, as the tested graph), held frames trimmed; for a still the held frames are averaged before the clamp (synthetic: a third of the single-frame error). Feeds EXR Write's mask, Relight Transfer's matte / holdout, Grade's mask.

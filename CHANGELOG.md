@@ -44,6 +44,13 @@ when it does, the entry says so and names the tool that rewrites them.
   library as one box each, with only the settings an artist changes (`tools/blueprints.py`). The LTX relight
   starters now use the artist nodes.
 
+- **LTX Alpha-Gen mattes** (catalogue 63-64): Alpha Prep / Alpha Return wrap the LTX-2.5 Alpha-Gen IC-LoRA (a matte
+  from any picture or clip, no green screen, soft edges kept). A single still works: it is held for 9 frames and the
+  mattes are averaged before the clamp. Starter `workflows/alpha_matte.json`, blueprint "Atlas VFX Alpha Matte".
+- **Tiny VAE** (catalogue 62): taeltx2_3 (madebyollin/taehv, MIT, safetensors) for a quick-look decode of any LTX
+  latent in a second. Loading the pack also gives LTX samplers live previews through it when ComfyUI's live preview
+  method is TAESD (`ATLAS_VFX_LTX_LIVE_PREVIEW=0` turns that off; anything unexpected falls back to ComfyUI's preview).
+
 ## 0.1.0 (2026-10-30), first public beta
 
 The first tagged release of the public repo. 37 nodes in five families (Camera, Layers, Plate Lock, Sensor,
