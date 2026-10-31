@@ -55,6 +55,14 @@ when it does, the entry says so and names the tool that rewrites them.
   a layer stack (EXR sequences and recipes), a viewer through the OCIO view with A/B wipe and f-stops, recipes
   (Matte, Relight, Sky) run as Preview with tiny-VAE live previews or Render into versions. New package
   `atlas_vfx/comp` (allowed to import every package; only the root imports it), `app/`, `recipes/`.
+- **Latent Pre-render** (catalogue 65) and **Guide From Latent** (catalogue 66): encode a reference clip once with
+  the VAE at float32, keep it on disk (safetensors + sidecar, reused while the frames hash the same), and add it as
+  the LTX IC-LoRA guide exactly as `LTXAddVideoICLoRAGuide` would. On V141 a relight from the cached latent is
+  bit-identical to the image-guided one. Atlas Comp's Matte and Relight recipes use it.
+- **Atlas Comp render queue**: Render on ws, a home-farm ComfyUI or Comfy Cloud. pre (ws) / generate (target) /
+  post (ws); preflight refuses a target missing a node or model before anything is sent; the frame count is
+  checked after. Targets in the untracked `atlas_comp_targets.local.json`. Cloud jobs wait for Confirm with a rough
+  credit range; the API key comes from `COMFY_CLOUD_API_KEY`.
 
 ## 0.1.0 (2026-10-30), first public beta
 

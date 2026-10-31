@@ -409,6 +409,11 @@
           "hashed": "2026-10-26"
         }
       ]
+    },
+    {
+      "id": "comfy-cloud",
+      "usage": "external",
+      "note": "Comfy Cloud (cloud.comfy.org), Comfy Org's hosted ComfyUI: a paid service on the user's own account, not a library. Atlas Comp's optional comfy_cloud target talks to its HTTP API (docs.comfy.org/development/cloud/api-reference, checked 2026-10-31). Opt-in per job: the artist confirms a credit estimate before any frame is uploaded; the API key comes from COMFY_CLOUD_API_KEY and is never stored. Models it runs are the account's (the LTX-2.5 base and Alpha-Gen from Cloud's catalogue, the LTX-2.3 Relight IC-LoRA only once imported); their licences are the entries already in this register."
     }
   ]
 }

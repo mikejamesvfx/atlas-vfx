@@ -1004,3 +1004,18 @@ Timing: the runs took 275 s and 85 s, but the first also loaded the models, so t
 itself is a small part of a run; the cache's value is that every machine starts from the same numbers, and the file
 that travels is a few MB.
 
+## 2026-10-31 Atlas Comp render queue: preflight live, farm and Cloud runs pending
+
+- **ws:** `/atlas/api/targets` lists ws, render and hub with no addresses.
+- **hub, live from the app:** a relight Preview sent to hub was refused at preflight, with nothing sent and
+  nothing run on ws: "hub is missing nodes: AtlasVFXGuideFromLatent; hub is missing models:
+  ltx-2.5-audio-vae-bf16.safetensors, ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors". render
+  lacks the same. A farm run needs atlas-vfx installed there plus those two files.
+- **Matte on the farm:** the first split left Alpha Prep and Sequence Read in generate (the empty latent took its
+  size from Alpha Prep), and they read EXRs by ws paths. Pre now reports those numbers through core PreviewAny and
+  generate gets them as literals.
+- **Comfy Cloud:** built against the documented API (docs.comfy.org/development/cloud/api-reference, read
+  2026-10-31) and tested with a fake. No live run yet: it needs `COMFY_CLOUD_API_KEY` and spends credits, so it
+  waits for Mike. Cloud's guide is 8-bit PNG frames (no atlas nodes there), the farm's is the float32 latent, so a
+  Cloud take is close to, not bit-identical with, a ws take.
+

@@ -88,6 +88,40 @@ layers/<layer>/preview/            the last Preview
 The routes live in `atlas_vfx/comp/server.py`, the recipes in `recipes/` (written by `tools/comp_recipes.py`), the
 page in `app/`. Design and plan: `docs/superpowers/specs/2026-10-31-atlas-comp-design.md`.
 
+### Rendering on another machine
+
+Beside **Render** sits a **Render on** picker. `ws` (this machine) runs as before. Any other target goes through
+Atlas Comp's queue (the **Queue** button in the top bar) in three stages:
+
+- **pre** on this machine: reads the plate, preps the reference, and encodes it once to a float32 latent
+  (Latent Pre-render, cached under the layer);
+- **generate** on the target: Guide From Latent loads that latent as the IC-LoRA guide, samples, and sends the
+  sampled latent back (a few MB each way, not the frames);
+- **post** on this machine: decode, LTX Return, a new version.
+
+Before anything is sent, the target is checked for every node and model file the job names; one miss and the job
+is refused with the miss named. After the run the frame count must come back or the job fails. One job per target
+at a time; a dead machine fails its own jobs only.
+
+Targets live outside the repo in `~/atlas-vfx-work/atlas_comp_targets.local.json` (they name machines on your LAN):
+
+```json
+{"targets": [
+  {"name": "render", "kind": "comfyui", "url": "http://<address>:8188", "note": "3090 24 GB"},
+  {"name": "cloud", "kind": "comfy_cloud",
+   "models": {"ltx23\ltx-2.3-22b-ic-lora-relight-1.0.safetensors": "<the name your import got>"}}
+]}
+```
+
+A farm machine needs atlas-vfx installed (for Guide From Latent) and the same model files.
+
+**Comfy Cloud** is opt-in. Set `COMFY_CLOUD_API_KEY` (your Comfy account's API key, needs a paid plan) before
+starting ComfyUI; the key is read from the environment and never written down. Cloud has no atlas-vfx nodes, so
+there the reference frames are uploaded (one PNG each) and LTX's own image guide is used. A Cloud job stops at
+**Confirm** in the Queue panel with a rough credit range (Cloud has no estimate endpoint, so it is GPU seconds at
+the published rate) and says what will leave the machine; nothing is uploaded until you confirm. The Relight LoRA is
+not in Cloud's catalogue: import it into your account (Models, Import) and map its name with `models` as above.
+
 ## If you come from Nuke
 
 The `Atlas VFX/Artist` nodes are the familiar tools:
