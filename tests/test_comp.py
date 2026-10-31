@@ -220,10 +220,87 @@ def test_two_renders_two_versions():
           str(outs))
 
 
+def _frames_shot():
+    from atlas_vfx.comp import shot as sh
+
+    if "F" not in sh.list_shots():
+        sh.create_shot("F", "", 1130, 1140)
+        r = pl.WORK_ROOT / "renders"
+        sh.add_layer("F", "grey", "sequence", source=write_seq(r / "fgrey", "g", [1130, 1131], (0.2, 0.2, 0.2)))
+        sh.add_layer("F", "red", "sequence", source=write_seq(r / "fred", "r", [1130], (1.0, 0.0, 0.0), alpha=0.5))
+    return sh
+
+
+def test_blends():
+    from atlas_vfx.comp import frames as fr
+
+    sh = _frames_shot()
+    s = sh.load_shot("F")
+    img, used = fr.composite(s, 1130, width=32)
+    check(used == ["grey", "red"] and np.allclose(img[5, 5, :3], [0.6, 0.1, 0.1], atol=2e-3),
+          "blend: over (half red over grey)", f"{used} {img[5, 5, :3]}")
+    want = {"plus": [0.7, 0.2, 0.2], "screen": [0.6, 0.2, 0.2], "multiply": [0.2, 0.1, 0.1]}
+    for mode, v in want.items():
+        sh.update_layer("F", "red", blend=mode)
+        img, _ = fr.composite(sh.load_shot("F"), 1130, width=32)
+        check(np.allclose(img[5, 5, :3], v, atol=3e-3), f"blend: {mode}", str(img[5, 5, :3]))
+    sh.update_layer("F", "red", blend="over", opacity=0.5)
+    img, _ = fr.composite(sh.load_shot("F"), 1130, width=32)
+    check(np.allclose(img[5, 5, :3], [0.4, 0.15, 0.15], atol=3e-3), "blend: opacity 0.5 halves the layer",
+          str(img[5, 5, :3]))
+    sh.update_layer("F", "red", opacity=1.0, visible=False)
+    _, used = fr.composite(sh.load_shot("F"), 1130, width=32)
+    check(used == ["grey"], "blend: a hidden layer is left out")
+    sh.update_layer("F", "red", visible=True)
+
+
+def test_skips_missing():
+    from atlas_vfx.comp import frames as fr
+
+    sh = _frames_shot()
+    img, used = fr.composite(sh.load_shot("F"), 1131, width=32)
+    check(used == ["grey"] and np.allclose(img[5, 5, :3], 0.2, atol=2e-3), "frames: a layer without the frame is skipped",
+          str(used))
+    img, used = fr.composite(sh.load_shot("F"), 1139, width=32)
+    check(used == [] and img.shape == (16, 32, 4), "frames: nothing at that frame gives an empty frame, no error",
+          f"{used} {img.shape}")
+
+
+def test_jpeg():
+    import cv2
+    from atlas_vfx.comp import frames as fr
+
+    sh = _frames_shot()
+    s = sh.load_shot("F")
+    j = fr.display_jpeg(s, 1130, width=1280)
+    im = cv2.imdecode(np.frombuffer(j, np.uint8), cv2.IMREAD_COLOR)
+    check(j[:2] == bytes([0xFF, 0xD8]) and im.shape[1] == 1280, "jpeg: a JPEG at the asked width", str(im.shape))
+    w = cv2.imdecode(np.frombuffer(fr.display_jpeg(s, 1130, width=1280, a=["grey"], b=["red", "grey"], wipe=0.25),
+                                   np.uint8), cv2.IMREAD_COLOR)
+    check(w[300, 200, 2] < w[300, 500, 2] - 20 and abs(int(w[300, 200, 2]) - int(w[300, 200, 1])) < 4,
+          "jpeg: the wipe shows A left of 25% and B right of it", f"{w[300, 200]} {w[300, 500]}")
+
+
+def test_plate_proxy():
+    from atlas_vfx.comp import frames as fr
+    from atlas_vfx.comp import shot as sh
+
+    fake = pl.WORK_ROOT / "fake_plate.mov"
+    fake.write_bytes(b"not a movie")
+    sh.create_shot("P", str(fake), 1130, 1131)
+    s = sh.load_shot("P")
+    proxy = fr.proxy_dir(s, 32)
+    write_seq(proxy, "plate", [1130, 1131], (0.3, 0.3, 0.3), size=(16, 32))
+    img, used = fr.composite(s, 1130, width=32)
+    check(np.allclose(img[2, 2, :3], 0.3, atol=2e-3) and img[2, 2, 3] == 1.0,
+          "plate: read from the proxy, never the movie, once it exists", str(img[2, 2]))
+
+
 def main():
     for t in (test_shot_roundtrip, test_names_are_safe, test_layers, test_versions, test_beauty_and_preview,
               test_recipes_listed,
-              test_validate, test_fill_render_vs_preview, test_two_renders_two_versions):
+              test_validate, test_fill_render_vs_preview, test_two_renders_two_versions, test_blends,
+              test_skips_missing, test_jpeg, test_plate_proxy):
         t()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0
