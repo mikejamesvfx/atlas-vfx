@@ -100,7 +100,7 @@ def test_prerender_writes_and_reuses():
     lat2, path2, info2 = node.run(imgs, vae, "ref", "")
     check(vae.encodes == 1 and json.loads(info2)["cached"] and torch.equal(lat2["samples"], lat["samples"]),
           "prerender: the same frames again reuse the file, no second encode")
-    node.run(frames(seed=1), vae, "ref", "")
+    lat3, _, _ = node.run(frames(seed=1), vae, "ref", "")
     check(vae.encodes == 2, "prerender: different frames encode again")
     check(d["cached"] is False and len(d["frames_sha256"]) == 64, "prerender: info says encoded, with the frames hash")
     raises(lambda: node.run(imgs, vae, "../evil", ""), "prerender: a hostile name is refused", "name")
@@ -109,7 +109,7 @@ def test_prerender_writes_and_reuses():
     check(set(t) == {"latent_tensor", "latent_format_version_0"} and t["latent_tensor"].dtype == torch.float32,
           "prerender: the file is plain safetensors: the float32 latent plus ComfyUI's format marker")
     lat_loaded = t["latent_tensor"].float() * (1.0 if "latent_format_version_0" in t else 1.0 / 0.18215)
-    check(torch.equal(lat_loaded, lat["samples"]),
+    check(torch.equal(lat_loaded, lat3["samples"]),                  # the file now holds the last frames encoded
           "prerender: ComfyUI's Load Latent reads it back unscaled (as a farm machine will)")
 
 
