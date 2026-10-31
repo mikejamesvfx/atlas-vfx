@@ -536,7 +536,7 @@ const ACTIVE = (j) => !["done", "failed", "cancelled"].includes(j.status);
 async function pollQueue() {
   clearTimeout(S.qTimer);
   let jobs;
-  try { jobs = (await api.jobs()).jobs; } catch (e) { status(`queue: ${e.message}`, true); return; }
+  try { jobs = (await api.jobs()).jobs; } catch (e) { status(`queue: ${e.message}`, true); S.qTimer = setTimeout(pollQueue, 5000); return; }
   const was = Object.fromEntries(S.qjobs.map((j) => [j.id, j.status]));
   const ended = jobs.filter((j) => was[j.id] && ACTIVE({ status: was[j.id] }) && !ACTIVE(j));
   S.qjobs = jobs;

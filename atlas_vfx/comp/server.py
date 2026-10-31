@@ -160,10 +160,23 @@ def _client_for(name: str):
     return qu.HttpClient(t["url"])
 
 
+def _comfy_port() -> int:
+    """This ComfyUI's own port, never one taken from a request's Host header."""
+    try:
+        from server import PromptServer
+        return int(PromptServer.instance.port)
+    except Exception:  # noqa: BLE001 (outside ComfyUI: tests)
+        try:
+            from comfy.cli_args import args
+            return int(args.port)
+        except Exception:  # noqa: BLE001
+            return 8188
+
+
 def _queue(request):
     global _QUEUE
     if _QUEUE is None:
-        port = request.url.port or 8188
+        port = _comfy_port()
         _QUEUE = qu.Queue(local_client=qu.HttpClient(f"http://127.0.0.1:{port}"), client_for=_client_for,
                           on_done=finish_job)
     return _QUEUE

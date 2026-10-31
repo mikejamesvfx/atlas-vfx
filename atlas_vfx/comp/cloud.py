@@ -68,6 +68,7 @@ def cloud_graphs(graph: dict, recipe: dict, frame_names: list[str], result_name:
     pre_node = graph[str(stages["pre"])]["inputs"]
     pre[REF_SAVE] = {"class_type": "SaveImage", "inputs": {
         "images": pre_node["images"], "filename_prefix": f"atlas_comp/{Path(result_name).stem}_ref"}}
+    pre = {k: pre[k] for k in qu.ancestors(pre, [REF_SAVE, *leaks])}     # Cloud takes frames: no latent encode
     gen = copy.deepcopy(gen)
     gen.pop("9000", None)
     loads = []
@@ -119,6 +120,7 @@ def run_cloud_job(job: dict, graph: dict, recipe: dict, local, cloud, model_map:
                 raise ValueError("not confirmed: nothing sent")
             time.sleep(0.05)
         job["status"] = "running"
+        t0 = time.time() - 1
         qu._log(job, "pre", "ws")
         pre, _, post, leaks = cloud_graphs(graph, recipe, ["probe.png"], result, model_map)
         outs = local.wait(local.submit(pre), cancelled).get("outputs", {})
@@ -141,7 +143,7 @@ def run_cloud_job(job: dict, graph: dict, recipe: dict, local, cloud, model_map:
         qu._log(job, "post", "ws")
         local.wait(local.submit(post), cancelled)
         qu._log(job, "check", f"{job['expected']} frames expected")
-        job["frames_back"] = qu._count_frames(job["out_dir"])
+        job["frames_back"] = qu._count_frames(job["out_dir"], t0)
         if job["frames_back"] < job["expected"]:
             raise ValueError(f"{job['frames_back']} of {job['expected']} frames came back")
         job["status"], job["message"] = "done", f"{job['frames_back']} frames"

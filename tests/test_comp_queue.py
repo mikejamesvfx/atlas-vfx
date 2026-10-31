@@ -6,6 +6,7 @@ Run: <V141 python> tests\\test_comp_queue.py
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -83,6 +84,81 @@ def test_split():
           and links_ok(post), "split: post decodes the returned latent and runs Return, no sampling",
           str(sorted(kinds(post)))[:160])
     check(leaks == {}, "split: relight's generate needs no value from ws's own nodes", str(leaks))
+    outs = sorted(tuple(n["inputs"]["source"]) for n in pre.values() if n["class_type"] == "PreviewAny")
+    check(outs == [("90", 1), ("90", 2)], "split: pre always has outputs (the Pre-render's path and info), so "
+          "ComfyUI accepts it", str(outs))
+
+
+def test_review_fixes():
+    from atlas_vfx.comp import queue as qu
+
+    # the guide file changed between pre and upload (another job's pre on the same layer): fail, never sample it
+    r, g = relight_graph(TMP / "out_t")
+    local, remote = FakeClient("ws", tamper=True), FakeClient("render", info=all_info())
+    job = qu.new_job("S", "rl", "preview", "render", expected=17, out_dir=str(TMP / "out_t"))
+    qu.run_job(job, g, r, local, remote, remote_is_local=False)
+    check(job["status"] == "failed" and "changed" in job["message"] and not remote.submitted,
+          "guide: a guide that changed after pre is refused, not sampled", job["message"][:100])
+    # frames from an earlier run in the same folder never count for this one
+    out = TMP / "out_stale"
+    out.mkdir()
+    for i in range(17):
+        f = out / f"rl.{1130 + i}.exr"
+        f.write_bytes(b"old")
+        os.utime(f, (time.time() - 3600, time.time() - 3600))
+    r, g = relight_graph(out)
+    local, remote = FakeClient("ws", frames=0), FakeClient("render", info=all_info())
+    job = qu.new_job("S", "rl", "preview", "render", expected=17, out_dir=str(out))
+    qu.run_job(job, g, r, local, remote, remote_is_local=False)
+    check(job["status"] == "failed" and "0 of 17" in job["message"], "check: an earlier run's frames don't count",
+          job["message"])
+    # cancel removes our own prompt and interrupts only it
+    import urllib.request
+    sent = []
+    real = urllib.request.urlopen
+
+    def fake(req, timeout=0):
+        sent.append((req.full_url, json.loads(req.data or b"null")))
+        raise OSError("stop here")
+    urllib.request.urlopen = fake
+    try:
+        qu.HttpClient("http://farm.example:8188").wait("p7", cancelled=lambda: True)
+    except (OSError, ValueError):
+        pass
+    finally:
+        urllib.request.urlopen = real
+    check(sent[:1] == [("http://farm.example:8188/queue", {"delete": ["p7"]})],
+          "cancel: our prompt is deleted from the target's queue first", str(sent))
+    urllib.request.urlopen = lambda req, timeout=0: (sent.append((req.full_url, json.loads(req.data or b"null"))),
+                                                     _Resp())[1]
+    sent.clear()
+    try:
+        qu.HttpClient("http://farm.example:8188").wait("p7", cancelled=lambda: True)
+    except ValueError:
+        pass
+    finally:
+        urllib.request.urlopen = real
+    check(sent == [("http://farm.example:8188/queue", {"delete": ["p7"]}),
+                   ("http://farm.example:8188/interrupt", {"prompt_id": "p7"})],
+          "cancel: then only our prompt is interrupted, not whatever else runs there", str(sent))
+    # a worker that just finished never swallows the next job
+    local = FakeClient("ws")
+    q = qu.Queue(local_client=local, client_for=lambda n: FakeClient("hub", info=all_info()))
+    ok = True
+    for i in range(6):
+        r, g = relight_graph(TMP / f"out_w{i}")
+        j = q.add(qu.new_job("S", "rl", "preview", "hub", expected=17, out_dir=str(TMP / f"out_w{i}")), g, r)
+        t = time.time()
+        while time.time() - t < 5 and j["status"] in ("queued", "running"):
+            time.sleep(0.01)
+        ok = ok and j["status"] == "done"
+    check(ok, "queue: back-to-back jobs on one target all run")
+
+
+class _Resp:
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def read(self): return b"{}"
 
 
 def test_split_leaks():
@@ -95,7 +171,7 @@ def test_split_leaks():
     atlas = sorted({n["class_type"] for n in gen.values() if n["class_type"].startswith("AtlasVFX")})
     check(atlas == ["AtlasVFXGuideFromLatent"] and links_ok(gen),
           "leaks: matte's generate holds no ws-only node (Alpha Prep, Sequence Read)", str(atlas))
-    probes = {k: n["inputs"]["source"] for k, n in pre.items() if n["class_type"] == "PreviewAny"}
+    probes = {k: n["inputs"]["source"] for k, n in pre.items() if n["class_type"] == "PreviewAny" and k in leaks}
     check(sorted(map(tuple, probes.values())) == [("2", 1), ("2", 2), ("2", 3)] and set(probes) == set(leaks),
           "leaks: pre reports Alpha Prep's length, width and height", str(probes))
     hist = {k: {"text": [{1: "9", 2: "1920", 3: "1088"}[v[1]]]} for k, v in probes.items()}
@@ -113,8 +189,8 @@ def test_split_leaks():
 class FakeClient:
     """A ComfyUI that runs nothing but remembers what it was given, and writes frames on a post graph."""
 
-    def __init__(self, name, info=None, frames=17, down=False):
-        self.name, self.info, self.frames, self.down = name, info, frames, down
+    def __init__(self, name, info=None, frames=17, down=False, tamper=False):
+        self.name, self.info, self.frames, self.down, self.tamper = name, info, frames, down, tamper
         self.submitted, self.uploads = [], []
 
     def object_info(self):
@@ -151,9 +227,21 @@ class FakeClient:
         outs = {}
         for nid, node in g.items():
             if node["class_type"] == "PreviewAny":
-                outs[nid] = {"text": [{1: "9", 2: "1920", 3: "1088"}.get(node["inputs"]["source"][1], "0")]}
+                src, slot = node["inputs"]["source"]
+                if g.get(src, {}).get("class_type") == "AtlasVFXLatentPrerender":
+                    pin = g[src]["inputs"]
+                    lat = Path(pin["out_dir"]) / f"{pin['name']}.latent"
+                    import hashlib
+                    info = {"latent_sha256": hashlib.sha256(lat.read_bytes()).hexdigest() if lat.is_file() else ""}
+                    outs[nid] = {"text": [str(lat) if slot == 1 else json.dumps(info)]}
+                else:
+                    outs[nid] = {"text": [{1: "9", 2: "1920", 3: "1088"}.get(slot, "0")]}
             if node["class_type"] == "SaveLatent":
                 outs[nid] = {"latents": [{"filename": "atlas_00001_.latent", "subfolder": "atlas_comp", "type": "output"}]}
+        if self.tamper:          # another job's pre rewrites the shared guide after this one reported it
+            for node in g.values():
+                if node["class_type"] == "AtlasVFXLatentPrerender":
+                    (Path(node["inputs"]["out_dir"]) / f"{node['inputs']['name']}.latent").write_bytes(b"other")
         return {"outputs": outs}
 
     def download(self, info):
@@ -225,7 +313,7 @@ def test_queue_survives_dead_target():
 
 
 def main():
-    for f in (test_split, test_split_leaks, test_remote_job, test_refused_and_failed, test_queue_survives_dead_target):
+    for f in (test_split, test_review_fixes, test_split_leaks, test_remote_job, test_refused_and_failed, test_queue_survives_dead_target):
         f()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

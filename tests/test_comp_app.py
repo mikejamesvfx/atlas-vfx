@@ -100,6 +100,8 @@ def main():
     check('j.status === "confirm"' in main and "j.estimate" in main and "api.confirmJob(" in main
           and "confirmJob:" in text["api.js"] and "leave this machine" in main,
           "cloud: a Cloud job shows its credit estimate and what leaves the machine, and waits for Confirm")
+    check(re.search(r"catch \(e\) \{ status\(`queue: \$\{e\.message\}`, true\); S\.qTimer = setTimeout\(pollQueue", main)
+          is not None, "queue: a failed poll (a network blip) tries again instead of stopping for good")
     check("pollQueue" in main and "setTimeout(pollQueue" in main,
           "queue: the panel polls while a job runs, and a finished job reloads the shot")
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")

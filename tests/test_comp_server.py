@@ -148,6 +148,12 @@ async def run():
         r = await c.post(f"/atlas/api/queue/{job['id']}/confirm")
         check(r.status == 400 and "confirm" in (await r.json())["error"],
               "queue: only a job waiting for its yes can be confirmed", r.status)
+        srv.set_queue(None)
+        r = await c.get("/atlas/api/queue", headers={"Host": "127.0.0.1:5000"})
+        check(r.status == 200 and srv._QUEUE.local.url.endswith(f":{srv._comfy_port()}")
+              and not srv._QUEUE.local.url.endswith(":5000"),
+              "queue: ws's address is ComfyUI's own port, never the request's Host header", srv._QUEUE.local.url)
+        srv.set_queue(qu.Queue(local_client=Local(), client_for=lambda n: Local(), on_done=srv.finish_job))
         (pl.WORK_ROOT / "atlas_comp_targets.local.json").write_text(json.dumps({"targets": [
             {"name": "cloud", "kind": "comfy_cloud", "models": {"a.safetensors": "b.safetensors"}}]}))
         os.environ.pop("COMFY_CLOUD_API_KEY", None)

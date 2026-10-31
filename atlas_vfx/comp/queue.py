@@ -13,6 +13,7 @@ expected frames must be on disk, or the job fails and the layer is left as it wa
 from __future__ import annotations
 
 import copy
+import hashlib
 import itertools
 import json
 import threading
@@ -21,6 +22,8 @@ import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
+
+from atlas_vfx.camera_side import plate as pl
 
 from . import targets as tg
 
@@ -35,6 +38,7 @@ def new_job(shot: str, layer: str, mode: str, target: str, expected: int, out_di
 
 
 def public(job: dict) -> dict:
+    job = dict(job)          # one C-level copy: a worker adding a key can't break the listing
     return {k: v for k, v in job.items() if k not in ("cancel", "out_dir", "confirmed")} | {"log": [list(x) for x in job["log"]]}
 
 
@@ -96,6 +100,7 @@ def _resolve_pure(g: dict) -> dict:
 
 
 PROBE = 9100      # PreviewAny ids in pre, one per value generate needs from a ws-only node
+PRE_PATH, PRE_INFO = "9098", "9099"   # PreviewAny on the Pre-render's path and info: pre always has outputs
 
 
 def split_graph(graph: dict, stages: dict, guide_name: str, result_name: str):
@@ -106,6 +111,8 @@ def split_graph(graph: dict, stages: dict, guide_name: str, result_name: str):
     a node that reads ws's files."""
     pre_id, (gen_id, gen_slot) = str(stages["pre"]), (str(stages["gen_out"][0]), int(stages["gen_out"][1]))
     pre = {k: copy.deepcopy(graph[k]) for k in ancestors(graph, [pre_id])}
+    pre[PRE_PATH] = {"class_type": "PreviewAny", "inputs": {"source": [pre_id, 1]}}
+    pre[PRE_INFO] = {"class_type": "PreviewAny", "inputs": {"source": [pre_id, 2]}}
 
     gen = copy.deepcopy(graph)
     gen["9000"] = {"class_type": "LoadLatent", "inputs": {"latent": guide_name}}
@@ -155,12 +162,13 @@ def fill_leaks(gen: dict, leaks: dict, outputs: dict) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------- running
-def _count_frames(out_dir: str) -> int:
+def _count_frames(out_dir: str, since: float = 0.0) -> int:
+    """EXRs this run wrote (modified at or after `since`): an earlier run's frames in a reused folder never count."""
     d = Path(out_dir)
     if not d.is_dir():
         return 0
     for sub in ("", "beauty"):
-        n = len(list((d / sub if sub else d).glob("*.exr")))
+        n = len([f for f in (d / sub if sub else d).glob("*.exr") if f.stat().st_mtime >= since])
         if n:
             return n
     return 0
@@ -176,6 +184,7 @@ def run_job(job: dict, graph: dict, recipe: dict, local, remote, remote_is_local
     -> id, wait(id, cancelled) -> history record, download(file info) -> bytes."""
     cancelled = (lambda: job["cancel"])
     job["status"] = "running"
+    t0 = time.time() - 1
     try:
         if remote_is_local:
             _log(job, "generate", "the whole graph on ws")
@@ -189,9 +198,9 @@ def run_job(job: dict, graph: dict, recipe: dict, local, remote, remote_is_local
             if not check["ok"]:
                 raise ValueError("; ".join(check["notes"]) + ": not sent")
             _log(job, "pre", "ws")
-            fill_leaks(gen, leaks, local.wait(local.submit(pre), cancelled).get("outputs", {}))
-            pre_node = graph[str(recipe["stages"]["pre"])]["inputs"]
-            data = (Path(pre_node["out_dir"]) / f"{pre_node['name']}.latent").read_bytes()
+            outs = local.wait(local.submit(pre), cancelled).get("outputs", {})
+            fill_leaks(gen, leaks, outs)
+            data = read_guide(outs)
             _log(job, "upload", f"{len(data)} bytes")
             gen["9000"]["inputs"]["latent"] = remote.upload(guide, data)
             _log(job, "generate", job["target"])
@@ -205,7 +214,7 @@ def run_job(job: dict, graph: dict, recipe: dict, local, remote, remote_is_local
             _log(job, "post", "ws")
             local.wait(local.submit(post), cancelled)
         _log(job, "check", f"{job['expected']} frames expected")
-        job["frames_back"] = _count_frames(job["out_dir"])
+        job["frames_back"] = _count_frames(job["out_dir"], t0)
         if job["frames_back"] < job["expected"]:
             raise ValueError(f"{job['frames_back']} of {job['expected']} frames came back")
         job["status"], job["message"] = "done", f"{job['frames_back']} frames"
@@ -213,6 +222,21 @@ def run_job(job: dict, graph: dict, recipe: dict, local, remote, remote_is_local
         job["status"] = "cancelled" if job["cancel"] else "failed"
         job["message"] = f"{job['target']}: {e}" if isinstance(e, OSError) else str(e)
     return job
+
+
+def read_guide(outs: dict) -> bytes:
+    """The guide latent pre wrote, read where the Pre-render says it is and checked against the hash it reported:
+    if another job's pre on the same layer rewrote the file in between, refuse rather than sample its light."""
+    try:
+        path = Path(outs[PRE_PATH]["text"][0])
+        want = json.loads(outs[PRE_INFO]["text"][0]).get("latent_sha256", "")
+    except (KeyError, IndexError, ValueError) as e:
+        raise ValueError(f"pre did not report its guide latent ({e})") from e
+    pl.resolve_out_dir(str(path.parent), path.parent)          # only a folder ws may write to
+    data = path.read_bytes()
+    if not want or hashlib.sha256(data).hexdigest() != want:
+        raise ValueError("the guide latent changed after pre (another job on this layer?): run it again")
+    return data
 
 
 class Queue:
@@ -229,8 +253,7 @@ class Queue:
         with self._lock:
             self.jobs.append(job)
             self._pending.setdefault(job["target"], []).append((job, graph, recipe))
-            w = self._workers.get(job["target"])
-            if w is None or not w.is_alive():
+            if job["target"] not in self._workers:
                 w = threading.Thread(target=self._work, args=(job["target"],), daemon=True,
                                      name=f"atlas-comp-queue-{job['target']}")
                 self._workers[job["target"]] = w
@@ -242,6 +265,7 @@ class Queue:
             with self._lock:
                 todo = self._pending.get(target) or []
                 if not todo:
+                    self._workers.pop(target, None)     # under the lock: add() starts a fresh worker after this
                     return
                 job, graph, recipe = todo.pop(0)
             if job["cancel"]:
@@ -322,8 +346,10 @@ class HttpClient:
 
     def wait(self, pid: str, cancelled=lambda: False) -> dict:
         while True:
-            if cancelled():
-                urllib.request.urlopen(urllib.request.Request(self.url + "/interrupt", b"", method="POST"), timeout=10)
+            if cancelled():          # our prompt only: never whatever else runs on that machine
+                for path, body in (("/queue", {"delete": [pid]}), ("/interrupt", {"prompt_id": pid})):
+                    urllib.request.urlopen(urllib.request.Request(
+                        self.url + path, json.dumps(body).encode(), {"Content-Type": "application/json"}), timeout=10)
                 raise ValueError("cancelled")
             h = json.loads(self._get(f"/history/{pid}"))
             if pid in h:
