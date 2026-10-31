@@ -53,6 +53,10 @@ class FakeVAE:
     def __init__(self):
         self.encodes = 0
 
+    def vae_output_dtype(self):
+        import torch
+        return torch.float32                      # what LTXVVAEForceFloat32 gives the real VAE
+
     def encode(self, pixels):
         import torch
 
@@ -63,7 +67,7 @@ class FakeVAE:
         idx = torch.arange(0, n, 8)[:t]
         base = pooled[idx, 0]                                                    # (t, h/32, w/32)
         ch = torch.linspace(0.5, 1.5, 128).view(128, 1, 1, 1)
-        return (base.unsqueeze(0) * ch).unsqueeze(0).to(torch.bfloat16)          # (1, 128, t, h/32, w/32)
+        return (base.unsqueeze(0) * ch).unsqueeze(0).float()                     # (1, 128, t, h/32, w/32)
 
 
 def frames(n=10, h=64, w=96, seed=0):
@@ -106,8 +110,79 @@ def test_prerender_writes_and_reuses():
           "prerender: the file is plain safetensors with one float32 tensor")
 
 
+def comfy_root():
+    """ComfyUI's folder when these tests run with its venv python (<ComfyUI>/venv/Scripts/python.exe), else None."""
+    for up in Path(sys.executable).resolve().parents:
+        if (up / "comfy" / "sd.py").is_file() and (up / "custom_nodes").is_dir():
+            return up
+    return None
+
+
+def ltx_pack():
+    """ComfyUI-LTXVideo's iclora module, imported the way ComfyUI does (needs ComfyUI's root on sys.path)."""
+    import importlib
+
+    root = comfy_root()
+    if root is None or not (root / "custom_nodes" / "ComfyUI-LTXVideo" / "iclora.py").is_file():
+        return None
+    for p in (str(root), str(root / "custom_nodes")):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+    if "--cpu" not in sys.argv:
+        sys.argv.append("--cpu")
+    import comfy.options
+    comfy.options.enable_args_parsing()
+    return importlib.import_module("ComfyUI-LTXVideo.iclora")
+
+
+def cond():
+    import torch
+    return [[torch.zeros(1, 4, 8), {}]]
+
+
+def test_guide_matches_image_guide():
+    import torch
+
+    icl = ltx_pack()
+    if icl is None:
+        print("skip guide: ComfyUI-LTXVideo not found next to this python (run with the V141 venv)")
+        return
+    from atlas_vfx.layers.node_guide_from_latent import AtlasVFXGuideFromLatent
+    from atlas_vfx.layers.node_latent_prerender import AtlasVFXLatentPrerender
+
+    imgs = frames(n=9, h=64, w=96, seed=3)
+    empty = {"samples": torch.zeros(1, 128, 4, 2, 3)}
+    vae = FakeVAE()
+    out = icl.LTXAddVideoICLoRAGuide.execute(cond(), cond(), vae, empty, imgs, 0, 0.8, 1.0, "disabled", False, 256, 64)
+    ref = getattr(out, "args", None) or getattr(out, "result", None)
+    guide, _, _ = AtlasVFXLatentPrerender().run(imgs, FakeVAE(), "g", "")
+    mine = AtlasVFXGuideFromLatent().run(cond(), cond(), vae, empty, guide, 0.8, 1.0)
+    same = True
+    detail = []
+    for a, b, label in ((ref[0], mine[0], "positive"), (ref[1], mine[1], "negative")):
+        da, db = a[0][1], b[0][1]
+        if set(da) != set(db):
+            same = False
+            detail.append(f"{label} keys {sorted(da)} vs {sorted(db)}")
+            continue
+        for k in da:
+            va, vb = da[k], db[k]
+            eq = torch.equal(va, vb) if torch.is_tensor(va) else (repr(va) == repr(vb))
+            if not eq:
+                same = False
+                detail.append(f"{label}.{k}")
+    check(same, "guide: the same conditioning as LTX's image guide", "; ".join(detail) or "keyframes and attention entries")
+    check(torch.equal(ref[2]["samples"], mine[2]["samples"]) and torch.equal(ref[2]["noise_mask"], mine[2]["noise_mask"]),
+          "guide: the same latent and noise mask as LTX's image guide", str(tuple(mine[2]["samples"].shape)))
+    small = {"samples": torch.zeros(1, 128, 1, 1, 3)}
+    raises(lambda: AtlasVFXGuideFromLatent().run(cond(), cond(), vae, empty, small, 1.0, 1.0),
+           "guide: a cached latent of another size is refused", "size")
+    raises(lambda: AtlasVFXGuideFromLatent().run(cond(), cond(), vae, empty, guide, 1.0, 2.0),
+           "guide: downscale other than 1 is refused", "downscale")
+
+
 def main():
-    for t in (test_prerender_writes_and_reuses,):
+    for t in (test_prerender_writes_and_reuses, test_guide_matches_image_guide):
         t()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

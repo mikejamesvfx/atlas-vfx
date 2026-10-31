@@ -991,3 +991,16 @@ the element is a dark comp lifted hard by the take. Worth a look in Nuke before 
 - Bugs found live and fixed with tests: a reused frame URL never reloaded and left the request lock set; `[hidden]`
   lost to the label display rule; a frame request could start a second proxy build.
 
+## 2026-10-31 Guide From Latent: live, bit-identical
+
+The relight recipe's preview (DSCF3000 1130, 17 frames, sun from the right, low, seed 42) was run twice on V141.
+- **Image guide:** LTX's Add Video IC-LoRA Guide, as shipped.
+- **Latent guide:** Latent Pre-render then Guide From Latent in its place.
+
+LTX Return's 17 EXRs match exactly: max abs difference 0.0 on every frame. The cache file holds 17 frames at
+1280x704, latent (1, 128, 3, 22, 40).
+
+Timing: the runs took 275 s and 85 s, but the first also loaded the models, so this is no speed measure. The encode
+itself is a small part of a run; the cache's value is that every machine starts from the same numbers, and the file
+that travels is a few MB.
+

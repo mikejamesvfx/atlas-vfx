@@ -97,10 +97,11 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 63 | Alpha Prep | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
 | 64 | Alpha Return | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
 | 65 | Latent Pre-render | layers | atlas-vfx | built | synthetic | Render queue | |
+| 66 | Guide From Latent | layers | atlas-vfx | built | synthetic; plate V141 | Render queue | |
 
-53 rows are built or deprecated, and those are the 53 nodes that load. Categories: `Atlas VFX/Camera`
+54 rows are built or deprecated, and those are the 54 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
-(layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-65), `Atlas VFX/Deliver`
+(layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-66), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
 
 ## Planned and elsewhere
@@ -837,4 +838,15 @@ Payloads (all plain JSON-safe dicts unless said):
 - needs: nothing beyond the base
 - writes: <out>/<name>.latent (safetensors, one float32 tensor `latent_tensor`) and <name>.json (frames sha256, count, size, the VAE's downscale layout, the file's sha256); default out is <work>/latent_cache
 - notes: encodes a reference clip once with the VAE (through LTXVVAEForceFloat32 for a float32 encode) and keeps the latent; the same frames again (16-bit hash) load the file instead of encoding. Frames are trimmed to LTX's 8k+1 as its guide node does. What Guide From Latent (66) adds as the IC-LoRA guide, and what a farm or cloud job sends (a few MB instead of the frames). Read back with safetensors only, never pickle.
+
+### 66 Guide From Latent
+`AtlasVFXGuideFromLatent` · layers · Atlas VFX/Artist
+- in: positive CONDITIONING, negative CONDITIONING, vae VAE, latent LATENT, guide LATENT, strength FLOAT, latent_downscale_factor FLOAT
+- out: positive CONDITIONING, negative CONDITIONING, latent LATENT
+- test: tests/test_latent_guide.py
+- proof: synthetic; plate V141
+- licences: none beyond the base (calls ComfyUI-LTXVideo's own guide code at run time; LTX-2 Community License, already required by every LTX graph)
+- needs: ComfyUI-LTXVideo loaded (found at run time, so atlas-vfx loads without it)
+- writes: nothing
+- notes: LTX's "Add Video IC-LoRA Guide" for a reference already encoded by Latent Pre-render (65): it skips the encode and runs LTX's own resolve_frame_idx, LTXVAddGuide.append_keyframe and append_guide_attention_entry from the loaded pack, so the conditioning is the same by construction. Synthetic test against LTX's node on the same frames: identical keyframe tensors, attention entries, latent and noise mask. Live on V141 (DSCF3000 relight preview, 17 frames, seed 42): LTX Return's EXRs bit-identical to the image-guided run. Whole clip from frame 0 and latent_downscale_factor 1 only (the Relight and Alpha-Gen LoRAs declare 1); a guide whose latent size differs from the job's is refused. The guide goes in at the VAE's output dtype, as the image path would.
 

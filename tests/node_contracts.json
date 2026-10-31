@@ -1039,6 +1039,61 @@
    }
   ]
  },
+ "AtlasVFXGuideFromLatent": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "positive",
+    "type": "CONDITIONING",
+    "group": "required"
+   },
+   {
+    "name": "negative",
+    "type": "CONDITIONING",
+    "group": "required"
+   },
+   {
+    "name": "vae",
+    "type": "VAE",
+    "group": "required"
+   },
+   {
+    "name": "latent",
+    "type": "LATENT",
+    "group": "required"
+   },
+   {
+    "name": "guide",
+    "type": "LATENT",
+    "group": "required"
+   },
+   {
+    "name": "strength",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "latent_downscale_factor",
+    "type": "FLOAT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "positive",
+    "type": "CONDITIONING"
+   },
+   {
+    "name": "negative",
+    "type": "CONDITIONING"
+   },
+   {
+    "name": "latent",
+    "type": "LATENT"
+   }
+  ]
+ },
  "AtlasVFXLTXPrep": {
   "folder": "layers",
   "category": "Atlas VFX/Layers",
