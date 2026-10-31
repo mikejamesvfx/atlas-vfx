@@ -28,6 +28,11 @@ SRGB = "sRGB Encoded Rec.709 (sRGB)"
 TINY = {"class_type": "AtlasVFXTinyVAE", "inputs": {"tae_name": "taeltx2_3.safetensors"}}
 
 
+# Where a job splits for another machine (atlas_vfx/comp/queue.py): pre ends at the cached guide latent (node 90),
+# generate ends at the sampled video latent (LTXVCropGuides, node 52, output 2); the rest runs locally after.
+STAGES = {"pre": "90", "gen_out": ["52", 2]}
+
+
 def latent_guide(g: dict, guide: str = "43", pre: str = "90") -> None:
     """Swap LTX's image guide for Latent Pre-render -> Guide From Latent (same conditioning, bit-identical output on
     V141): the reference is encoded once at float32 into the layer's cache folder and reused while its frames are
@@ -68,6 +73,7 @@ def matte() -> dict:
                        seed_field("49")],
             "context": {"first_frame": [["1", "start"]], "length": [["1", "length"]], "cache_dir": [["90", "out_dir"]]},
             "outputs": [["65", "out_dir", ""]], "names": [["65", "name"]],
+            "stages": STAGES,
             "preview": {"frames": 9,
                         "nodes": {"53": {"class_type": "VAEDecode", "inputs": {"samples": ["52", 2],
                                                                               "vae": ["61", 0]}}},
@@ -99,6 +105,7 @@ def relight() -> dict:
                         "frame_offset": [["70", "frame_offset"], ["1", "frame_offset"]],
                         "cache_dir": [["90", "out_dir"]]},
             "outputs": [["54", "out_dir", "ltx"], ["57", "out_dir", "beauty"]],
+            "stages": STAGES,
             "names": [["54", "name"], ["57", "name"]],
             "preview": {"frames": 17,
                         "nodes": {"61": TINY,

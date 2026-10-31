@@ -116,6 +116,34 @@ async def run():
                                                               "params": {**right_low["params"], "element": "el"}})
         check(r.status == 200 and (await r.json())["params"]["direction"] == "the right",
               "presets: a card adds a relight layer with its settings", r.status)
+        r = await c.get("/atlas/api/targets")
+        ts = (await r.json())["targets"]
+        check(r.status == 200 and ts[0]["name"] == "ws" and all("url" not in t for t in ts),
+              "queue: targets listed without their addresses", str(ts))
+        r = await c.post("/atlas/api/queue", json={"shot": "S1", "layer": "rl", "mode": "preview", "target": "nope"})
+        check(r.status == 400 and "nope" in (await r.json())["error"], "queue: an unknown target is a 400", r.status)
+        from atlas_vfx.comp import queue as qu
+
+        class Local:
+            def object_info(self): return {}
+            def upload(self, name, data): return name
+            def submit(self, g): return "p1"
+            def wait(self, pid, cancelled=lambda: False): return {"outputs": {}}
+            def download(self, info): return b""
+        srv.set_queue(qu.Queue(local_client=Local(), client_for=lambda n: Local(), on_done=srv.finish_job))
+        r = await c.post("/atlas/api/queue", json={"shot": "S1", "layer": "rl", "mode": "preview", "target": "ws"})
+        job = await r.json()
+        check(r.status == 200 and job["target"] == "ws" and job["expected"] == 17, "queue: a job is queued",
+              str({k: job.get(k) for k in ("target", "expected", "status")}))
+        for _ in range(50):
+            await asyncio.sleep(0.05)
+            js = (await (await c.get("/atlas/api/queue")).json())["jobs"]
+            if js and js[-1]["status"] in ("done", "failed"):
+                break
+        check(js[-1]["status"] == "failed" and "0 of 17" in js[-1]["message"] and "out_dir" not in js[-1],
+              "queue: a job whose frames never arrive fails, listed without paths", js[-1]["message"])
+        r = await c.post(f"/atlas/api/queue/{job['id']}/cancel")
+        check(r.status == 200, "queue: cancel answers", r.status)
         r = await c.get("/atlas/api/views")
         check(r.status == 200 and len((await r.json())["views"]) > 3, "views: listed")
         bad = pl.WORK_ROOT / "bad.mov"

@@ -17,8 +17,10 @@ from pathlib import Path
 from atlas_vfx.camera_side import plate as pl
 
 from . import frames as fr
+from . import queue as qu
 from . import recipes as rc
 from . import shot as sh
+from . import targets as tg
 
 log = logging.getLogger("atlas_vfx.comp")
 APP = Path(__file__).resolve().parents[2] / "app"
@@ -100,6 +102,66 @@ def _names(q, key: str):
     if v is None or v == "":
         return None
     return [pl.safe_name(x, key) if x != "plate" else x for x in v.split(",") if x]
+
+
+def _job_graph(name: str, layer: str, mode: str, extra_params=None) -> dict:
+    """A recipe layer's filled graph for one run: Render takes the next version, Preview the preview folder.
+    Params are validated before any folder is made."""
+    s = sh.load_shot(name)
+    lay = [x for x in s["layers"] if x["name"] == layer]
+    if not lay or lay[0]["kind"] != "recipe":
+        raise ValueError(f"{layer!r} is not a recipe layer")
+    lay = lay[0]
+    recipe = rc.load_recipe(lay["recipe"])
+    params = rc.validate(recipe, {**lay.get("params", {}), **(extra_params or {})})
+    ctx = rc.context_for(s, lay)
+    if mode == "preview":
+        rc.fill(recipe, params, ctx, str(sh.preview_dir(name, layer)), mode)
+        version, out = sh.PREVIEW, sh.preview_dir(name, layer)
+        out.mkdir(parents=True, exist_ok=True)
+    else:
+        rc.fill(recipe, params, ctx, str(sh.layer_dir(name, layer) / "v000"), mode)
+        version = sh.next_version(name, layer)
+        out = sh.layer_dir(name, layer) / version
+    frames = recipe.get("preview", {}).get("frames")
+    expected = min(int(frames), ctx["length"]) if (mode == "preview" and frames) else ctx["length"]
+    return {"shot": s["name"], "layer": layer, "graph": rc.fill(recipe, params, ctx, str(out), mode),
+            "version": version, "out": out, "recipe": recipe, "expected": expected}
+
+
+_QUEUE = None
+
+
+def set_queue(q) -> None:
+    global _QUEUE
+    _QUEUE = q
+
+
+def finish_job(job: dict) -> None:
+    """A finished job switches its layer to what it wrote; a failed one leaves the layer alone."""
+    if job["status"] == "done" and job.get("version"):
+        try:
+            sh.update_layer(job["shot"], job["layer"], version=job["version"])
+        except ValueError as e:
+            job["message"] += f" (layer not switched: {e})"
+
+
+def _client_for(name: str):
+    t = next((t for t in tg.load_targets() if t["name"] == name), None)
+    if t is None:
+        raise ValueError(f"no target {name!r}")
+    if t["kind"] != "comfyui":
+        raise ValueError(f"{name}: Comfy Cloud jobs are not built yet")
+    return qu.HttpClient(t["url"])
+
+
+def _queue(request):
+    global _QUEUE
+    if _QUEUE is None:
+        port = request.url.port or 8188
+        _QUEUE = qu.Queue(local_client=qu.HttpClient(f"http://127.0.0.1:{port}"), client_for=_client_for,
+                          on_done=finish_job)
+    return _QUEUE
 
 
 def build_routes():
@@ -213,26 +275,37 @@ def build_routes():
     @guard
     async def graph(request):
         d = await body(request)
+        job = _job_graph(request.match_info["shot"], request.match_info["layer"], d.get("mode", "render"),
+                         d.get("params"))
+        return web.json_response({"prompt": job["graph"], "version": job["version"], "out_dir": str(job["out"])})
+
+    @routes.get("/atlas/api/targets")
+    @guard
+    async def targets(request):
+        return web.json_response({"targets": [tg.public(t) for t in tg.load_targets()]})
+
+    @routes.get("/atlas/api/queue")
+    @guard
+    async def queue_list(request):
+        return web.json_response({"jobs": [qu.public(j) for j in _queue(request).list()]})
+
+    @routes.post("/atlas/api/queue")
+    @guard
+    async def queue_add(request):
+        d = await body(request)
+        target = str(d.get("target", "ws"))
+        if target not in [t["name"] for t in tg.load_targets()]:
+            raise ValueError(f"target {target!r}: not one of the targets")
         mode = d.get("mode", "render")
-        name, layer = request.match_info["shot"], request.match_info["layer"]
-        s = sh.load_shot(name)
-        lay = [x for x in s["layers"] if x["name"] == layer]
-        if not lay or lay[0]["kind"] != "recipe":
-            raise ValueError(f"{layer!r} is not a recipe layer")
-        lay = lay[0]
-        recipe = rc.load_recipe(lay["recipe"])
-        params = rc.validate(recipe, {**lay.get("params", {}), **(d.get("params") or {})})
-        ctx = rc.context_for(s, lay)
-        if mode == "preview":
-            rc.fill(recipe, params, ctx, str(sh.preview_dir(name, layer)), mode)     # validate before any folder
-            version, out = sh.PREVIEW, sh.preview_dir(name, layer)
-            out.mkdir(parents=True, exist_ok=True)
-        else:
-            rc.fill(recipe, params, ctx, str(sh.layer_dir(name, layer) / "v000"), mode)
-            version = sh.next_version(name, layer)
-            out = sh.layer_dir(name, layer) / version
-        g = rc.fill(recipe, params, ctx, str(out), mode)
-        return web.json_response({"prompt": g, "version": version, "out_dir": str(out)})
+        jg = _job_graph(d.get("shot", ""), d.get("layer", ""), mode, d.get("params"))
+        job = qu.new_job(jg["shot"], jg["layer"], mode, target, jg["expected"], str(jg["out"]), jg["version"])
+        _queue(request).add(job, jg["graph"], jg["recipe"])
+        return web.json_response(qu.public(job))
+
+    @routes.post("/atlas/api/queue/{job}/cancel")
+    @guard
+    async def queue_cancel(request):
+        return web.json_response(qu.public(_queue(request).cancel(request.match_info["job"])))
 
     @routes.get("/atlas/api/shots/{shot}/frame")
     @guard

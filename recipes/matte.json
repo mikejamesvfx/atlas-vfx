@@ -486,6 +486,13 @@
    "name"
   ]
  ],
+ "stages": {
+  "pre": "90",
+  "gen_out": [
+   "52",
+   2
+  ]
+ },
  "preview": {
   "frames": 9,
   "nodes": {
