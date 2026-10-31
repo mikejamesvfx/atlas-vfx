@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-PACKAGES = ("contracts", "camera_side", "platelock", "sensor", "layers", "deliver")
+PACKAGES = ("contracts", "camera_side", "platelock", "sensor", "layers", "deliver", "comp")
 # The import graph AGENTS.md allows ("Shape of the repo"): package -> the atlas_vfx packages it may import.
 # `_atlas_camera` is the Atlas Camera adapter; `registry` is the root's and nobody else's. `from atlas_vfx import
 # __version__` is not an edge (the root package itself; absent after the split, callers guard it).
@@ -29,6 +29,8 @@ ALLOWED: dict[str, set[str]] = {
     "sensor": {"contracts", "camera_side", "platelock"},
     "layers": {"contracts", "camera_side", "sensor", "_atlas_scene"},
     "deliver": {"contracts", "camera_side", "platelock", "sensor", "layers", "_atlas_camera"},
+    # Atlas Comp's server (2026-10-31): reads everything, imported only by the root __init__.
+    "comp": {"contracts", "camera_side", "platelock", "sensor", "layers", "deliver", "_atlas_camera"},
 }
 # `_atlas_scene` is the Atlas Scene adapter (Prague sky, 2026-10-28): only layers (Physical Sky) uses it.
 ROOT_MODULES = ("_atlas_camera", "_atlas_scene", "registry")
@@ -97,7 +99,7 @@ def check_scanner() -> None:
 
 
 def check_graph() -> tuple[int, dict[str, set[str]]]:
-    """Every .py under the six packages imports only what ALLOWED says. Returns (files scanned, edges seen)."""
+    """Every .py under the seven packages imports only what ALLOWED says. Returns (files scanned, edges seen)."""
     seen: dict[str, set[str]] = {p: set() for p in PACKAGES}
     bad, n = [], 0
     for pkg in PACKAGES:
