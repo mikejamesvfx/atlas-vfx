@@ -33,6 +33,11 @@ export const api = {
   graph: (shot, layer, mode, params) =>
     call("POST", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}/graph`, { mode, params }),
   views: () => call("GET", "/atlas/api/views"),
+  // Atlas Comp's own queue: pre on ws, generate on the target, post on ws (the server runs it, not this page)
+  targets: () => call("GET", "/atlas/api/targets"),
+  jobs: () => call("GET", "/atlas/api/queue"),
+  queueJob: (d) => call("POST", "/atlas/api/queue", d),
+  cancelJob: (id) => call("POST", `/atlas/api/queue/${enc(id)}/cancel`),
   // ComfyUI's own queue
   // preview_method: ComfyUI previews nothing unless asked; taesd uses the tiny VAE (atlas_vfx ltx_live_preview)
   queue: (prompt) => call("POST", "/prompt", { prompt, client_id: clientId, extra_data: { preview_method: "taesd" } }),

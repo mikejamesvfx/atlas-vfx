@@ -17,6 +17,7 @@
     <label>Shot <select id="shot-pick"></select></label>
     <button id="new-shot" type="button">New shot</button>
     <button id="presets-btn" type="button">Presets</button>
+    <button id="queue-btn" type="button" title="Jobs sent to the farm or the cloud">Queue <span id="queue-count" class="num"></span></button>
     <span id="proxy" class="muted"></span>
     <span class="grow"></span>
     <label>View <select id="view-pick"></select></label>
@@ -79,6 +80,17 @@
     </div>
     <div id="preset-grid" class="preset-grid"></div>
     <p class="error" id="preset-error"></p>
+    <form method="dialog"><menu><button value="close">Close</button></menu></form>
+  </dialog>
+
+  <dialog id="queue-dialog" aria-labelledby="queue-title">
+    <div class="presets-head">
+      <span class="eyebrow accent">Queue — pre on ws, generate on the target, post on ws</span>
+      <h2 id="queue-title">Jobs on other machines</h2>
+      <p class="muted">A target is checked for every node and model before anything is sent. A job that comes back
+        short fails and leaves the layer as it was.</p>
+    </div>
+    <ol id="queue-list" class="queue-list"></ol>
     <form method="dialog"><menu><button value="close">Close</button></menu></form>
   </dialog>
 

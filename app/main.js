@@ -20,12 +20,13 @@ const S = {
   shots: [], shot: null, recipes: [], views: [], view: "", frame: 1001, exposure: 0, a: "", b: "", wipe: 0.5,
   selected: null, jobs: {}, frameBusy: false, frameAgain: false, nonce: 0, playing: false,
   presets: [], presetGroup: "Right sun",
+  targets: [], target: "ws", qjobs: [], qTimer: null,
 };
 
 function status(msg, bad = false) {
   const s = $("status");
   s.textContent = msg || "";
-  s.style.color = bad ? "var(--bad)" : "";
+  s.style.color = bad ? "var(--red)" : "";
 }
 
 // ---------------------------------------------------------------------------------------------------- loading
@@ -300,7 +301,9 @@ function renderInspector() {
     disabled: !!job, onclick: () => run(l, "render", params) });
   const graphLink = el("a", { href: "/", target: "_blank", rel: "noopener", text: "Open ComfyUI" });
   const mixBox = lightMix(l);
-  body.replaceChildren(head, ...(mixBox ? [mixBox] : []), ...fields, el("div", { class: "runs" }, preview, renderBtn),
+  const pick = targetPick();
+  body.replaceChildren(head, ...(mixBox ? [mixBox] : []), ...fields,
+    el("div", { class: "runs" }, preview, renderBtn, ...(pick ? [pick] : [])),
     el("div", { class: "muted" }, document.createTextNode("Advanced: "), graphLink));
   renderJob(l.name);
 }
@@ -356,7 +359,28 @@ function renderJob(layerName) {
   if (job.thumb) $("job-thumb").src = job.thumb;
 }
 
+// Render on: ws runs the graph here (live previews on ComfyUI's socket); any other target goes through Atlas Comp's
+// queue, which checks the target first and sends only the cached latent.
+function targetPick() {
+  if (S.targets.length < 2) return null;
+  const sel = el("select", { id: "target-pick", "aria-label": "Render on", title: "Which machine samples the job" },
+    ...S.targets.map((t) => el("option", { value: t.name, text: t.note ? `${t.name} (${t.note})` : t.name })));
+  sel.value = S.targets.some((t) => t.name === S.target) ? S.target : "ws";
+  sel.addEventListener("change", () => { S.target = sel.value; localSet("target", S.target); });
+  return el("label", { class: "target" }, document.createTextNode("on "), sel);
+}
+
 async function run(l, mode, params) {
+  if (S.target !== "ws" && S.targets.some((t) => t.name === S.target)) {
+    try {
+      const j = await api.queueJob({ shot: S.shot.name, layer: l.name, mode, target: S.target, params });
+      status(`${l.name}: ${mode} queued on ${j.target}. Open Queue to follow it.`);
+      pollQueue();
+    } catch (e) {
+      status(`${l.name}: ${e.message}`, true);
+    }
+    return;
+  }
   try {
     status(`${mode}: filling the graph...`);
     const g = await api.graph(S.shot.name, l.name, mode, params);
@@ -506,6 +530,45 @@ async function addPreset(p) {
   } catch (e) { $("preset-error").textContent = e.message; }
 }
 
+// ---------------------------------------------------------------------------------------------------- queue
+const ACTIVE = (j) => !["done", "failed", "cancelled"].includes(j.status);
+
+async function pollQueue() {
+  clearTimeout(S.qTimer);
+  let jobs;
+  try { jobs = (await api.jobs()).jobs; } catch (e) { status(`queue: ${e.message}`, true); return; }
+  const was = Object.fromEntries(S.qjobs.map((j) => [j.id, j.status]));
+  const ended = jobs.filter((j) => was[j.id] && ACTIVE({ status: was[j.id] }) && !ACTIVE(j));
+  S.qjobs = jobs;
+  renderQueue();
+  for (const j of ended) status(`${j.layer}: ${j.mode} on ${j.target} ${j.status}${j.message ? ` (${j.message})` : ""}`,
+    j.status !== "done");
+  if (ended.length) await reloadShot();
+  if (jobs.some(ACTIVE)) S.qTimer = setTimeout(pollQueue, 2000);
+}
+
+function renderQueue() {
+  const active = S.qjobs.filter(ACTIVE).length;
+  $("queue-count").textContent = active ? String(active) : "";
+  const rows = S.qjobs.slice().reverse().map((j) => el("li", { class: `qjob ${j.status}` },
+    el("span", { class: "num", text: `${j.shot} · ${j.layer}` }),
+    el("span", { text: `${j.mode} on ${j.target}` }),
+    el("span", { class: "muted", text: j.stage }),
+    el("span", { class: "num", text: `${j.frames_back}/${j.expected}` }),
+    el("span", { class: j.status === "failed" ? "error" : "", text: j.message || j.status }),
+    ACTIVE(j) ? el("button", { type: "button", text: "Cancel", onclick: async () => {
+      try { await api.cancelJob(j.id); pollQueue(); } catch (e) { status(e.message, true); }
+    } }) : el("span")));
+  $("queue-list").replaceChildren(...(rows.length ? rows
+    : [el("li", { class: "muted", text: "Nothing queued. Pick a farm machine beside Render to send a job there." })]));
+}
+
+function openQueue() {
+  renderQueue();
+  $("queue-dialog").showModal();
+  pollQueue();
+}
+
 function openPresets() {
   if (!S.shot) return;
   $("preset-error").textContent = "";
@@ -531,6 +594,7 @@ function wire() {
   $("shot-pick").addEventListener("change", (e) => openShot(e.target.value));
   $("new-shot").addEventListener("click", openShotDialog);
   $("presets-btn").addEventListener("click", openPresets);
+  $("queue-btn").addEventListener("click", openQueue);
   $("add-layer").addEventListener("click", openLayerDialog);
   $("layer-what").addEventListener("change", (e) => { $("source-wrap").hidden = e.target.value !== "sequence"; });
   $("view-pick").addEventListener("change", (e) => { S.view = e.target.value; localSet("view", S.view); refreshFrame(); });
@@ -594,6 +658,14 @@ async function start() {
     await loadShots();
   } catch (e) {
     status(`Atlas Comp could not start: ${e.message}`, true);
+  }
+  try {
+    S.targets = (await api.targets()).targets;
+    S.target = localGet("target") || "ws";
+    if (S.shot) renderInspector();
+    pollQueue();
+  } catch (e) {
+    status(`targets: ${e.message}`, true);       // a bad targets file never stops the app; ws still renders
   }
 }
 

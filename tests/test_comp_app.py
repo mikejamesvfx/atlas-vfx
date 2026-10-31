@@ -89,6 +89,16 @@ def main():
           "design: a preset runs on an EXR element by default, not on another recipe's render")
     check("/prompt" in text["api.js"] and "/ws?clientId=" in text["api.js"],
           "app: queues on ComfyUI's /prompt and listens on its websocket")
+    check("target-pick" in main, "queue: a Render-on target picker beside Render")
+    check("api.targets()" in main and "targets:" in text["api.js"], "queue: the picker lists the server's targets")
+    check("api.queueJob(" in main and "queueJob:" in text["api.js"],
+          "queue: a job for another machine goes through Atlas Comp's queue, not straight to ComfyUI")
+    check('id="queue-btn"' in html and 'id="queue-dialog"' in html and "renderQueue" in main,
+          "queue: a Queue panel opens from the top bar")
+    check(all(k in main for k in ("j.target", "j.stage", "j.frames_back", "j.expected")) and "api.cancelJob(" in main,
+          "queue: each job shows target, stage, frames back and a cancel")
+    check("pollQueue" in main and "setTimeout(pollQueue" in main,
+          "queue: the panel polls while a job runs, and a finished job reloads the shot")
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0
 
