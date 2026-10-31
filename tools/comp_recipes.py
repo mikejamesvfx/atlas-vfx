@@ -28,6 +28,18 @@ SRGB = "sRGB Encoded Rec.709 (sRGB)"
 TINY = {"class_type": "AtlasVFXTinyVAE", "inputs": {"tae_name": "taeltx2_3.safetensors"}}
 
 
+def latent_guide(g: dict, guide: str = "43", pre: str = "90") -> None:
+    """Swap LTX's image guide for Latent Pre-render -> Guide From Latent (same conditioning, bit-identical output on
+    V141): the reference is encoded once at float32 into the layer's cache folder and reused while its frames are
+    unchanged. Wire the VAE through LTXVVAEForceFloat32 (both recipes already do)."""
+    old = g[guide]["inputs"]
+    g[pre] = {"class_type": "AtlasVFXLatentPrerender", "inputs": {
+        "images": old["image"], "vae": old["vae"], "name": "reference", "out_dir": ""}}
+    g[guide] = {"class_type": "AtlasVFXGuideFromLatent", "inputs": {
+        "positive": old["positive"], "negative": old["negative"], "vae": old["vae"], "latent": old["latent"],
+        "guide": [pre, 0], "strength": old["strength"], "latent_downscale_factor": old["latent_downscale_factor"]}}
+
+
 def seed_field(node: str) -> dict:
     return {"key": "seed", "label": "Seed", "type": "int", "default": 42, "min": 0, "max": 2 ** 31 - 1,
             "targets": [[node, "noise_seed"]]}
@@ -45,6 +57,7 @@ def matte() -> dict:
         "path": "", "start": 1001, "length": 9, "numbering": "frame", "width": 0, "input_colorspace": "ACEScg",
         "colorspace": SRGB, "ocio_config": ""}}
     g["65"]["inputs"]["first_frame"] = ["1", 1]
+    latent_guide(g)
     return {"name": "matte", "label": "Matte (Alpha-Gen)",
             "description": "A matte for the element layer from LTX Alpha-Gen: no green screen, soft edges kept. "
                            "Writes RGB + alpha EXRs.",
@@ -53,7 +66,7 @@ def matte() -> dict:
                        {"key": "still_frames", "label": "Hold a still for (frames)", "type": "choice", "default": 9,
                         "choices": [9, 17, 25], "targets": [["2", "still_frames"]]},
                        seed_field("49")],
-            "context": {"first_frame": [["1", "start"]], "length": [["1", "length"]]},
+            "context": {"first_frame": [["1", "start"]], "length": [["1", "length"]], "cache_dir": [["90", "out_dir"]]},
             "outputs": [["65", "out_dir", ""]], "names": [["65", "name"]],
             "preview": {"frames": 9,
                         "nodes": {"53": {"class_type": "VAEDecode", "inputs": {"samples": ["52", 2],
@@ -66,6 +79,7 @@ def relight() -> dict:
 
     g = lr.graph_4k()
     del g["71"]                                                     # Layer Picker: the element layer comes instead
+    latent_guide(g)
     return {"name": "relight", "label": "Relight (LTX-2.3 + 4K transfer)",
             "description": "Relights the element layer with the LTX-2.3 Relight IC-LoRA from the sun you pick, then "
                            "carries the light onto the full-res element. A sun on the left is done mirrored.",
@@ -82,7 +96,8 @@ def relight() -> dict:
                         "choices": ["sh", "guided"], "targets": [["57", "mode"]]},
                        seed_field("49")],
             "context": {"plate": [["1", "path"]], "first": [["70", "first"]], "last": [["70", "last"]],
-                        "frame_offset": [["70", "frame_offset"], ["1", "frame_offset"]]},
+                        "frame_offset": [["70", "frame_offset"], ["1", "frame_offset"]],
+                        "cache_dir": [["90", "out_dir"]]},
             "outputs": [["54", "out_dir", "ltx"], ["57", "out_dir", "beauty"]],
             "names": [["54", "name"], ["57", "name"]],
             "preview": {"frames": 17,

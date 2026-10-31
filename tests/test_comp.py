@@ -409,13 +409,32 @@ def test_presets():
     check(len({p["id"] for p in ps}) == len(ps), "presets: ids are unique")
 
 
+def test_recipes_use_cached_latent():
+    rc, sh, s, lay = _relight_context()
+    for name in ("relight", "matte"):
+        r = rc.load_recipe(name)
+        ctx = rc.context_for(s, lay)
+        for mode in ("render", "preview"):
+            g = rc.fill(r, rc.validate(r, {"element": "el"} if name != "sky" else {}), ctx, "X:/out", mode)
+            kinds = [n["class_type"] for n in g.values()]
+            pre = [n for n in g.values() if n["class_type"] == "AtlasVFXLatentPrerender"]
+            check("AtlasVFXGuideFromLatent" in kinds and "LTXAddVideoICLoRAGuide" not in kinds and len(pre) == 1
+                  and _links_ok(g), f"recipes: {name} {mode} guides from the cached latent")
+            check(pre and pre[0]["inputs"]["out_dir"] == ctx["cache_dir"],
+                  f"recipes: {name} {mode} caches the latent in the layer's cache folder",
+                  pre[0]["inputs"]["out_dir"] if pre else "")
+    check(Path(ctx["cache_dir"]).name == "cache" and "cache" not in sh.versions("S2S3", lay["name"]),
+          "recipes: the cache folder is never a version")
+
+
 def main():
     for t in (test_shot_roundtrip, test_names_are_safe, test_layers, test_versions, test_beauty_and_preview,
               test_recipes_listed,
               test_validate, test_fill_render_vs_preview, test_two_renders_two_versions, test_blends,
               test_skips_missing, test_jpeg, test_plate_proxy,
               test_no_second_proxy_build, test_proxy_failure_and_partial,
-              test_latest_skips_empty_versions, test_light_mix, test_presets):
+              test_latest_skips_empty_versions, test_light_mix, test_presets,
+              test_recipes_use_cached_latent):
         t()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

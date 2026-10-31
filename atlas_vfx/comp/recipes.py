@@ -22,7 +22,8 @@ from atlas_vfx.camera_side import plate as pl
 
 RECIPES = Path(__file__).resolve().parents[2] / "recipes"
 TYPES = ("choice", "text", "int", "float", "bool", "layer")
-CONTEXT_KEYS = ("plate", "first", "last", "frame_offset", "first_frame", "length", "plate_first", "plate_last")
+CONTEXT_KEYS = ("plate", "first", "last", "frame_offset", "first_frame", "length", "plate_first", "plate_last",
+                "cache_dir")
 TEXT_MAX = 2000
 
 
@@ -101,12 +102,13 @@ def context_for(shot: dict, layer: dict) -> dict:
     the layer's name and every other layer's files."""
     from atlas_vfx.layers.node_shot_range import snap_length
 
-    from .shot import layer_pattern
+    from .shot import layer_dir, layer_pattern
 
     first, off = int(shot["first"]), int(shot["frame_offset"])
     n = snap_length(int(shot["last"]) - first + 1, "8k+1 shorter")
     return {"plate": shot["plate"], "first": first, "last": first + n - 1, "frame_offset": off, "first_frame": first,
             "length": n, "plate_first": first - off, "plate_last": first + n - 1 - off, "layer": layer["name"],
+            "cache_dir": str(layer_dir(shot["name"], layer["name"]) / "cache"),
             "layer_patterns": {x["name"]: layer_pattern(shot, x) for x in shot["layers"] if x["name"] != layer["name"]}}
 
 

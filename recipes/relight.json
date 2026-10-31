@@ -191,7 +191,7 @@
    }
   },
   "43": {
-   "class_type": "LTXAddVideoICLoRAGuide",
+   "class_type": "AtlasVFXGuideFromLatent",
    "inputs": {
     "positive": [
      "41",
@@ -209,23 +209,13 @@
      "42",
      0
     ],
-    "image": [
-     "5",
+    "guide": [
+     "90",
      0
     ],
-    "frame_idx": 0,
     "strength": 1.0,
     "latent_downscale_factor": [
      "17",
-     1
-    ],
-    "crop": "disabled",
-    "use_tiled_encode": false,
-    "tile_size": 256,
-    "tile_overlap": 64,
-    "use_streaming": false,
-    "tile_frames": [
-     "70",
      1
     ]
    }
@@ -476,6 +466,21 @@
     "zoom_to_alpha": true,
     "width": 1280
    }
+  },
+  "90": {
+   "class_type": "AtlasVFXLatentPrerender",
+   "inputs": {
+    "images": [
+     "5",
+     0
+    ],
+    "vae": [
+     "15",
+     0
+    ],
+    "name": "reference",
+    "out_dir": ""
+   }
   }
  },
  "fields": [
@@ -611,6 +616,12 @@
    [
     "1",
     "frame_offset"
+   ]
+  ],
+  "cache_dir": [
+   [
+    "90",
+    "out_dir"
    ]
   ]
  },
