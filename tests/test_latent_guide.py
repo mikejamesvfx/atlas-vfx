@@ -106,8 +106,11 @@ def test_prerender_writes_and_reuses():
     raises(lambda: node.run(imgs, vae, "../evil", ""), "prerender: a hostile name is refused", "name")
     from safetensors.torch import load_file
     t = load_file(str(p))
-    check(set(t) == {"latent_tensor"} and t["latent_tensor"].dtype == torch.float32,
-          "prerender: the file is plain safetensors with one float32 tensor")
+    check(set(t) == {"latent_tensor", "latent_format_version_0"} and t["latent_tensor"].dtype == torch.float32,
+          "prerender: the file is plain safetensors: the float32 latent plus ComfyUI's format marker")
+    lat_loaded = t["latent_tensor"].float() * (1.0 if "latent_format_version_0" in t else 1.0 / 0.18215)
+    check(torch.equal(lat_loaded, lat["samples"]),
+          "prerender: ComfyUI's Load Latent reads it back unscaled (as a farm machine will)")
 
 
 def comfy_root():

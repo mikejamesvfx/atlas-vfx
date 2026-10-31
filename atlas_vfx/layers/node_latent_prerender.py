@@ -2,7 +2,8 @@
 
 The cached latent is what Guide From Latent (catalogue 66) adds as the LTX IC-LoRA guide, so every run on every
 machine starts from the same numbers, and a farm or cloud job sends a few MB instead of the frames. The file is plain
-safetensors ({"latent_tensor": float32}), beside a JSON sidecar: the frames' hash, count and size, the VAE's layout,
+safetensors ({"latent_tensor": float32} plus ComfyUI's latent_format_version_0 marker, so its Load Latent reads it
+back unscaled on any machine), beside a JSON sidecar: the frames' hash, count and size, the VAE's layout,
 and the file's own hash. The same frames again reuse the file; nothing is encoded twice.
 
 Wire the VAE through LTXVVAEForceFloat32 first for a true float32 encode (the latent is stored as float32 either
@@ -82,7 +83,8 @@ class AtlasVFXLatentPrerender:
                 lat = load_file(str(path))["latent_tensor"].float()
                 return ({"samples": lat}, str(path), json.dumps({**meta, "cached": True}))
         lat = vae.encode(clip).float().cpu().contiguous()
-        save_file({"latent_tensor": lat}, str(path))
+        # latent_format_version_0: ComfyUI's Save Latent marker; without it Load Latent divides by 0.18215
+        save_file({"latent_tensor": lat, "latent_format_version_0": torch.tensor([])}, str(path))
         meta = {"frames_sha256": fhash, "frames": int(len(clip)), "size": [int(clip.shape[2]), int(clip.shape[1])],
                 "downscale_index_formula": [int(x) for x in vae.downscale_index_formula], "dtype": "float32",
                 "latent_shape": [int(x) for x in lat.shape], "latent_sha256": _sha256(path)}
