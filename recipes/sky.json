@@ -1,0 +1,156 @@
+{
+ "name": "sky",
+ "label": "Sky (physical)",
+ "description": "A physically based sky and sun for a place and time, as an ACEScg lat-long EXR.",
+ "graph": {
+  "1": {
+   "class_type": "AtlasVFXPhysicalSky",
+   "inputs": {
+    "latitude": -34.1906,
+    "longitude": 151.0425,
+    "altitude_m": 5.0,
+    "capture_utc": "2025-12-25T07:39:25Z",
+    "time_offset_h": 0.0,
+    "heading_deg": 180.0,
+    "fov_x": 69.5,
+    "tilt_deg": 0.0,
+    "visibility_km": 40.0,
+    "ground_albedo": 0.25,
+    "exposure_ev": 0.0,
+    "sun_mode": "metadata",
+    "sun_azimuth_offset": 0.0,
+    "sun_elevation_offset": 0.0,
+    "sun_azimuth": 250.0,
+    "sun_elevation": 15.0,
+    "width": 2048,
+    "latlong_centre": "north",
+    "name": "sky",
+    "out_dir": "",
+    "dataset": "",
+    "ocio_config": "",
+    "display": "sRGB - Display",
+    "view": "ACES 2.0 - SDR 100 nits (Rec.709)",
+    "sky_model": "auto"
+   }
+  },
+  "2": {
+   "class_type": "PreviewImage",
+   "inputs": {
+    "images": [
+     "1",
+     2
+    ]
+   }
+  }
+ },
+ "fields": [
+  {
+   "key": "latitude",
+   "label": "Latitude",
+   "type": "float",
+   "default": -34.1906,
+   "min": -90.0,
+   "max": 90.0,
+   "targets": [
+    [
+     "1",
+     "latitude"
+    ]
+   ]
+  },
+  {
+   "key": "longitude",
+   "label": "Longitude",
+   "type": "float",
+   "default": 151.0425,
+   "min": -180.0,
+   "max": 180.0,
+   "targets": [
+    [
+     "1",
+     "longitude"
+    ]
+   ]
+  },
+  {
+   "key": "capture_utc",
+   "label": "Time (UTC)",
+   "type": "text",
+   "default": "2025-12-25T07:39:25Z",
+   "targets": [
+    [
+     "1",
+     "capture_utc"
+    ]
+   ]
+  },
+  {
+   "key": "heading_deg",
+   "label": "Camera heading",
+   "type": "float",
+   "default": 180.0,
+   "min": -360.0,
+   "max": 360.0,
+   "targets": [
+    [
+     "1",
+     "heading_deg"
+    ]
+   ]
+  },
+  {
+   "key": "fov_x",
+   "label": "Lens field of view",
+   "type": "float",
+   "default": 69.5,
+   "min": 1.0,
+   "max": 179.0,
+   "targets": [
+    [
+     "1",
+     "fov_x"
+    ]
+   ]
+  },
+  {
+   "key": "width",
+   "label": "Width",
+   "type": "choice",
+   "default": 2048,
+   "targets": [
+    [
+     "1",
+     "width"
+    ]
+   ],
+   "choices": [
+    1024,
+    2048,
+    4096
+   ]
+  }
+ ],
+ "context": {},
+ "outputs": [
+  [
+   "1",
+   "out_dir",
+   ""
+  ]
+ ],
+ "names": [
+  [
+   "1",
+   "name"
+  ]
+ ],
+ "preview": {
+  "set": [
+   [
+    "1",
+    "width",
+    512
+   ]
+  ]
+ }
+}

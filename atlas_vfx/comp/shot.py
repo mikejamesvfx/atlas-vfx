@@ -15,6 +15,8 @@ from pathlib import Path
 from atlas_vfx.camera_side import plate as pl
 
 COMP = "comp"
+PREVIEW = "preview"
+SHOW_FIRST = ("", "beauty")        # a render shows the EXRs at the version root, else in beauty/ (Relight Transfer)
 KINDS = ("sequence", "recipe")
 BLENDS = ("over", "plus", "multiply", "screen")
 CHANGEABLE = ("visible", "opacity", "blend", "version", "params", "order")
@@ -34,12 +36,18 @@ def layer_dir(name: str, layer: str) -> Path:
     return shot_dir(name) / "layers" / pl.safe_name(layer, "layer name")
 
 
+def preview_dir(name: str, layer: str) -> Path:
+    """Where Preview writes: one folder per layer, overwritten by the next preview, never a version."""
+    return layer_dir(name, layer) / PREVIEW
+
+
 def _file(name: str) -> Path:
     return shot_dir(name) / "shot.json"
 
 
 def save_shot(shot: dict) -> None:
-    clean = {**shot, "layers": [{k: v for k, v in lay.items() if k != "versions"} for lay in shot["layers"]]}
+    clean = {**shot, "layers": [{k: v for k, v in lay.items() if k not in ("versions", "has_preview")}
+                                for lay in shot["layers"]]}
     p = _file(shot["name"])
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".json.tmp")
@@ -85,6 +93,7 @@ def load_shot(name: str) -> dict:
     shot = json.loads(p.read_text(encoding="utf-8"))
     for lay in shot["layers"]:
         lay["versions"] = versions(shot["name"], lay["name"])
+        lay["has_preview"] = _pattern_in(preview_dir(shot["name"], lay["name"])) is not None
     return shot
 
 
@@ -136,7 +145,9 @@ def update_layer(name: str, layer: str, **changes) -> dict:
                 raise ValueError(f"opacity {v}: 0 to 1")
         elif k == "blend" and v not in BLENDS:
             raise ValueError(f"blend {v!r}: one of {BLENDS}")
-        elif k == "version" and v is not None and v not in lay["versions"]:
+        elif k == "version" and v == PREVIEW and not lay["has_preview"]:
+            raise ValueError("version 'preview': no preview yet")
+        elif k == "version" and v not in (None, PREVIEW) and v not in lay["versions"]:
             raise ValueError(f"version {v!r}: not rendered ({', '.join(lay['versions']) or 'none yet'})")
         elif k == "params" and not isinstance(v, dict):
             raise ValueError("params: a JSON object")
@@ -156,10 +167,14 @@ def next_version(name: str, layer: str) -> str:
 
 
 def _pattern_in(folder: Path) -> str | None:
-    for f in sorted(folder.rglob("*.exr")):
-        m = _FRAME.match(f.name)
-        if m:
-            return str(f.parent / f"{m.group(1)}{'#' * len(m.group(2))}{m.group(3)}")
+    if not folder.is_dir():
+        return None
+    for sub in SHOW_FIRST:
+        d = folder / sub if sub else folder
+        for f in sorted(d.glob("*.exr")) if d.is_dir() else []:
+            m = _FRAME.match(f.name)
+            if m:
+                return str(f.parent / f"{m.group(1)}{'#' * len(m.group(2))}{m.group(3)}")
     return None
 
 
@@ -172,4 +187,6 @@ def layer_pattern(shot: dict, layer: dict) -> str | None:
     v = layer.get("version") or (vs[-1] if vs else None)
     if not v:
         return None
+    if v == PREVIEW:
+        return _pattern_in(preview_dir(shot["name"], layer["name"]))
     return _pattern_in(layer_dir(shot["name"], layer["name"]) / v)

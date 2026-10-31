@@ -115,8 +115,115 @@ def test_versions():
     raises(lambda: sh.update_layer("S2S3", "matte", version="v999"), "versions: unknown version refused", "v999")
 
 
+def test_beauty_and_preview():
+    from atlas_vfx.comp import shot as sh
+
+    sh.add_layer("S2S3", "rl", "recipe", recipe="relight")
+    v = sh.next_version("S2S3", "rl")
+    d = sh.layer_dir("S2S3", "rl") / v
+    write_seq(d / "beauty_gain", "rl_gain", [1130])
+    write_seq(d / "ltx", "rl", [1130])
+    write_seq(d / "beauty", "rl", [1130])
+    pat = sh.layer_pattern(sh.load_shot("S2S3"), [x for x in sh.load_shot("S2S3")["layers"] if x["name"] == "rl"][0])
+    check(pat is not None and Path(pat).parent.name == "beauty", "versions: a relight shows its beauty folder", str(pat))
+    raises(lambda: sh.update_layer("S2S3", "rl", version="preview"), "preview: none yet", "preview")
+    write_seq(sh.preview_dir("S2S3", "rl"), "rl", [1130])
+    s = sh.load_shot("S2S3")
+    lay = [x for x in s["layers"] if x["name"] == "rl"][0]
+    check(lay["has_preview"] and lay["versions"] == ["v001"], "preview: flagged, not counted as a version")
+    lay = sh.update_layer("S2S3", "rl", version="preview")
+    check("preview" in sh.layer_pattern(sh.load_shot("S2S3"), lay), "preview: the layer can show its preview")
+
+
+def _links_ok(graph: dict) -> bool:
+    for node in graph.values():
+        for v in node["inputs"].values():
+            if isinstance(v, list) and len(v) == 2 and isinstance(v[1], int) and str(v[0]) not in graph:
+                return False
+    return True
+
+
+def test_recipes_listed():
+    from atlas_vfx.comp import recipes as rc
+
+    names = {r["name"] for r in rc.list_recipes()}
+    check(names == {"matte", "relight", "sky"}, "recipes: matte, relight, sky", str(names))
+    check(all("graph" not in r for r in rc.list_recipes()), "recipes: the list leaves the graphs out")
+    bad = []
+    for n in names:
+        r = rc.load_recipe(n)
+        targets = [t for f in r["fields"] for t in f["targets"]] + [t for ts in r["context"].values() for t in ts]
+        targets += r["outputs"] + r.get("names", [])
+        bad += [(n, t) for t in targets if str(t[0]) not in r["graph"] or t[1] not in r["graph"][str(t[0])]["inputs"]]
+    check(not bad, "recipes: every target is a real node input", str(bad[:3]))
+    raises(lambda: rc.load_recipe("../shot"), "recipes: an unknown name", "recipe")
+
+
+def test_validate():
+    from atlas_vfx.comp import recipes as rc
+
+    r = rc.load_recipe("relight")
+    raises(lambda: rc.validate(r, {"direction": "../x"}), "validate: a choice outside the list", "direction")
+    raises(lambda: rc.validate(r, {"seed": "abc"}), "validate: a seed that is not a number", "seed")
+    raises(lambda: rc.validate(r, {"zzz": 1}), "validate: an unknown field", "zzz")
+    d = rc.validate(r, {})
+    check(d["direction"] == "the left" and d["height"] == "low", "validate: defaults filled in", str(d)[:80])
+
+
+def _relight_context():
+    from atlas_vfx.comp import recipes as rc
+    from atlas_vfx.comp import shot as sh
+
+    pat = write_seq(pl.WORK_ROOT / "renders" / "el", "el", [1130])
+    if "el" not in [x["name"] for x in sh.load_shot("S2S3")["layers"]]:
+        sh.add_layer("S2S3", "el", "sequence", source=pat)
+        sh.add_layer("S2S3", "relit", "recipe", recipe="relight", params={"element": "el"})
+    s = sh.load_shot("S2S3")
+    lay = [x for x in s["layers"] if x["name"] == "relit"][0]
+    return rc, sh, s, lay
+
+
+def test_fill_render_vs_preview():
+    rc, sh, s, lay = _relight_context()
+    r = rc.load_recipe("relight")
+    params = rc.validate(r, {"element": "el"})
+    ctx = rc.context_for(s, lay)
+    check(ctx["first_frame"] == 1130 and ctx["length"] == 97 and ctx["plate_first"] == 129, "context: shot range",
+          str({k: ctx[k] for k in ("first_frame", "length", "plate_first")}))
+    out = str(sh.layer_dir("S2S3", "relit") / "v009")
+    g = rc.fill(r, params, ctx, out, "render")
+    outs = [g[str(n)]["inputs"][i] for n, i, _ in r["outputs"]]
+    check(all(o.startswith(out) for o in outs), "fill: render writes into the version folder", str(outs))
+    check(any(n["class_type"] == "AtlasVFXRelightTransferFiles" for n in g.values()) and _links_ok(g),
+          "fill: render keeps the 4K transfer, links intact")
+    el_targets = [g[str(t[0])]["inputs"][t[1]] for f in r["fields"] if f["key"] == "element" for t in f["targets"]]
+    check(el_targets and all("el" in str(v) for v in el_targets), "fill: the element layer resolves to its files",
+          str(el_targets)[:120])
+    p = rc.fill(r, params, ctx, out, "preview")
+    check(not any(n["class_type"] == "AtlasVFXRelightTransferFiles" for n in p.values()) and _links_ok(p),
+          "fill: preview drops the 4K transfer, links intact")
+    check(p["54"]["inputs"]["out_dir"] == out, "fill: a relight preview writes LTX Return's layer at the folder root",
+          p["54"]["inputs"]["out_dir"])
+    check(r["graph"] != g and "57" in r["graph"], "fill: the recipe itself is not changed")
+
+
+def test_two_renders_two_versions():
+    rc, sh, s, lay = _relight_context()
+    r = rc.load_recipe("relight")
+    params = rc.validate(r, {"element": "el"})
+    outs = []
+    for _ in range(2):
+        v = sh.next_version("S2S3", "relit")
+        g = rc.fill(r, params, rc.context_for(s, lay), str(sh.layer_dir("S2S3", "relit") / v), "render")
+        outs.append(g[str(r["outputs"][0][0])]["inputs"][r["outputs"][0][1]])
+    check(outs[0] != outs[1] and "v001" in outs[0] and "v002" in outs[1], "versions: two renders, two folders",
+          str(outs))
+
+
 def main():
-    for t in (test_shot_roundtrip, test_names_are_safe, test_layers, test_versions):
+    for t in (test_shot_roundtrip, test_names_are_safe, test_layers, test_versions, test_beauty_and_preview,
+              test_recipes_listed,
+              test_validate, test_fill_render_vs_preview, test_two_renders_two_versions):
         t()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0
