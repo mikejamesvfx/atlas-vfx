@@ -3,8 +3,10 @@
   Plate Read -> LTX Prep (reference = comp, mirror on, 1280x704, 97 frames) -> light ball top-right -> LTX-2.3 Relight
   IC-LoRA (LTX-2.5 distilled base, single stage) -> LTX Return (flips the take back, ACEScg layer at plate res)
 
-The relit layer LTX Return writes is the `relit` input of workflows/relight_transfer_element.json (Relight Transfer,
-catalogue 53), which puts the light back on the full-res element.
+Also writes workflows/ltx_relight_mirror_4k.json, the whole job in one graph: the same LTX pass, then LTX Return's
+folder straight into Relight Transfer Files (catalogue 54, MoGe-3 run per frame inside it), which puts the light on
+the full-res element and writes the 4K EXRs one frame at a time. The element is the Card Project layer LTX Prep
+comps in (its alpha is the matte).
 
 Why mirror: on DSCF3000 the Relight LoRA kept the sun on frame right whatever the ball or prompt said (left, front-left,
 back-left, strength 1.5 all tried, 2026-10-30). Prep flips what LTX sees, the ball and prompt ask for the right, and
@@ -36,9 +38,11 @@ from physical_sky_workflow import local_info  # noqa: E402
 from atlas_vfx.camera_side.node_plate_read import AtlasVFXPlateRead  # noqa: E402
 from atlas_vfx.layers.node_ltx_prep import AtlasVFXLTXPrep  # noqa: E402
 from atlas_vfx.layers.node_ltx_return import AtlasVFXLTXReturn  # noqa: E402
+from atlas_vfx.layers.node_relight_transfer_files import AtlasVFXRelightTransferFiles  # noqa: E402
 
 PLATE = "~/Videos/atlas-vfx_footage/DSCF3000.MOV"
 LAYER = "~/atlas-vfx-work/DSCF3000/layers/showcase_abc_showcase_element"
+ELEMENT = LAYER + "/showcase_element.####.exr"
 BALL = "the right__low.png"
 PROMPT = ("relight the video to match the light-direction ball. hard warm golden sunset sunlight entering from frame "
           "right, long shadows falling to the left from the right, low sun")
@@ -111,15 +115,34 @@ def graph() -> dict:
     }
 
 
+def graph_4k() -> dict:
+    """graph() plus the 4K transfer: LTX Return's folder is the relit take of Relight Transfer Files."""
+    g = graph()
+    g["56"] = {"class_type": "LoadMoGeModel", "inputs": {"model_name": "moge_3_vitl_fp16.safetensors"}}
+    g["57"] = {"class_type": "AtlasVFXRelightTransferFiles", "inputs": {
+        "element_path": ELEMENT, "relit_path": ["54", 0], "matte_path": "", "first_frame": 1130, "length": N,
+        "relit_numbering": "frame", "relit_encoding": "linear", "mode": "sh", "analysis_width": W, "blur_px": 2.0,
+        "max_stops": 3.0, "temporal": 1, "eps": 0.01, "subsample": 2, "geo_weight": 0.5, "min_r2": 0.3,
+        "lift_limit": 3.0, "name": "element_relit_4k", "out_dir": "", "moge_model": ["56", 0],
+        "resolution_level": 9, "refine_steps": 3, "normals_temporal": 1, "normals_sigma": 1.5, "depth_guide": True,
+        "relit_mirrored": False, "holdout_path": "", "holdout_grow": 2, "ocio_config": ""}}
+    return g
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--api", default="http://127.0.0.1:8188", help="a running ComfyUI, for the core node definitions")
     ui_workflow.API = ap.parse_args(argv).api
-    for cls in (AtlasVFXPlateRead, AtlasVFXLTXPrep, AtlasVFXLTXReturn):
+    for cls in (AtlasVFXPlateRead, AtlasVFXLTXPrep, AtlasVFXLTXReturn, AtlasVFXRelightTransferFiles):
         ui_workflow._INFO[cls.__name__] = local_info(cls)
     wf = ui_workflow.convert(graph(), "LTX-2.3 Relight with mirror: sun on frame left on DSCF3000, then Relight "
                                       "Transfer")
     path = ui_workflow.REPO / "ltx_relight_mirror.json"
+    path.write_text(ui_workflow.portable(json.dumps(wf, indent=1)), encoding="utf-8")
+    print("wrote", path)
+    wf = ui_workflow.convert(graph_4k(), "LTX-2.3 Relight with mirror, then Relight Transfer Files: the relit "
+                                         "element at 4K in one graph")
+    path = ui_workflow.REPO / "ltx_relight_mirror_4k.json"
     path.write_text(ui_workflow.portable(json.dumps(wf, indent=1)), encoding="utf-8")
     print("wrote", path)
     return 0
