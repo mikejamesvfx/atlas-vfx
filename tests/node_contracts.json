@@ -844,6 +844,103 @@
    }
   ]
  },
+ "AtlasVFXGrade": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "image",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "blackpoint",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "whitepoint",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "lift",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "gain",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "multiply",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "offset",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "gamma",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "exposure",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "tint_r",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "tint_g",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "tint_b",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "reverse",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "clamp_black",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "clamp_white",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "mix",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "mask",
+    "type": "MASK",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "image",
+    "type": "IMAGE"
+   }
+  ]
+ },
  "AtlasVFXLTXPrep": {
   "folder": "layers",
   "category": "Atlas VFX/Layers",
@@ -1029,6 +1126,61 @@
    },
    {
     "name": "preview",
+    "type": "IMAGE"
+   }
+  ]
+ },
+ "AtlasVFXLayerPicker": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "layer",
+    "type": "COMBO",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "folder",
+    "type": "STRING"
+   },
+   {
+    "name": "pattern",
+    "type": "STRING"
+   },
+   {
+    "name": "first",
+    "type": "INT"
+   },
+   {
+    "name": "last",
+    "type": "INT"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXLightBall": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "image",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "sun",
+    "type": "ATLAS_VFX_SUN",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "image",
     "type": "IMAGE"
    }
   ]
@@ -1272,6 +1424,23 @@
    },
    {
     "name": "report",
+    "type": "STRING"
+   }
+  ]
+ },
+ "AtlasVFXNotes": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "info",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "text",
     "type": "STRING"
    }
   ]
@@ -3175,6 +3344,73 @@
    }
   ]
  },
+ "AtlasVFXShotRange": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "first",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "ltx_length",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "as is",
+     "8k+1 shorter",
+     "8k+1 longer"
+    ]
+   },
+   {
+    "name": "frame_offset",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "height",
+    "type": "INT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "first_frame",
+    "type": "INT"
+   },
+   {
+    "name": "length",
+    "type": "INT"
+   },
+   {
+    "name": "last_frame",
+    "type": "INT"
+   },
+   {
+    "name": "plate_first",
+    "type": "INT"
+   },
+   {
+    "name": "plate_last",
+    "type": "INT"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
  "AtlasVFXSolveCompare": {
   "folder": "camera_side",
   "category": "Atlas VFX/Camera",
@@ -3210,6 +3446,55 @@
    {
     "name": "scale_b_per_a",
     "type": "FLOAT"
+   }
+  ]
+ },
+ "AtlasVFXSunDirection": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "direction",
+    "type": "COMBO",
+    "group": "required"
+   },
+   {
+    "name": "height",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "low",
+     "mid",
+     "high"
+    ]
+   },
+   {
+    "name": "look",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "mirror_trick",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "auto",
+     "off"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "name": "mirror",
+    "type": "BOOLEAN"
+   },
+   {
+    "name": "prompt",
+    "type": "STRING"
+   },
+   {
+    "name": "sun",
+    "type": "ATLAS_VFX_SUN"
    }
   ]
  },
@@ -3251,6 +3536,92 @@
    {
     "name": "preview",
     "type": "IMAGE"
+   }
+  ]
+ },
+ "AtlasVFXViewer": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "a_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "b_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "mode",
+    "type": "COMBO",
+    "group": "required"
+   },
+   {
+    "name": "wipe",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "exposure",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "gamma",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "view",
+    "type": "COMBO",
+    "group": "required"
+   },
+   {
+    "name": "zoom_to_alpha",
+    "type": "BOOLEAN",
+    "group": "required"
+   },
+   {
+    "name": "width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "a_image",
+    "type": "IMAGE",
+    "group": "optional"
+   },
+   {
+    "name": "b_image",
+    "type": "IMAGE",
+    "group": "optional"
+   },
+   {
+    "name": "image_index",
+    "type": "INT",
+    "group": "optional"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "image",
+    "type": "IMAGE"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
    }
   ]
  }

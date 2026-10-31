@@ -20,12 +20,12 @@ Start with AGENTS.md (rules, layout, import graph) and SECURITY.md (threat model
 
 ![The main wiring by family: Plate Read and Camera Import feed Card Project and Foreground Element, Chart Calibrate feeds Sensor RS Maps and Sensor Apply, Physical Sky feeds Relight, and the layer folders go to Nuke Builder](docs/images/node_map.png)
 
-Ten of the 42 nodes and the sockets that tie them. Plate Lock's nine nodes run their own chain. The full list, with
+Ten of the 49 nodes and the sockets that tie them. Plate Lock's nine nodes run their own chain. The full list, with
 every input and output, is `docs/NODE_CATALOGUE.md`.
 
 ## Status (0.1.0, beta)
 
-42 nodes ship and load; the catalogue's other 12 entries are planned or live elsewhere. How far each node is
+49 nodes ship and load; the catalogue's other 12 entries are planned or live elsewhere. How far each node is
 proven:
 
 - **Accepted in Nuke** (3): EXR Write, Nuke Builder, Camera Export.

@@ -43,3 +43,4 @@ out/
 # agent settings stay local (CLAUDE.md is the owner's machine notes; the shared rules are AGENTS.md)
 .claude/
 CLAUDE.md
+!assets/relight_balls/*.png

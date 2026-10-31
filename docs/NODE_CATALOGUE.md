@@ -86,10 +86,17 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 52 | Chunk Stitch | layers | atlas-vfx | built | synthetic | Frame chunks | |
 | 53 | Relight Transfer | layers | atlas-vfx | built | synthetic | with 18 | tools/light_transfer.py (Gaussian ratio, superseded) |
 | 54 | Relight Transfer Files | layers | atlas-vfx | built | synthetic; plate V141 | with 18 | |
+| 55 | Shot Range | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 56 | Sun Direction | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 57 | Light Ball | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 58 | Layer Picker | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 59 | Grade | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 60 | Viewer | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 61 | Notes | layers | atlas-vfx | built | synthetic | Artist nodes | |
 
-42 rows are built or deprecated, and those are the 42 nodes that load. Categories: `Atlas VFX/Camera`
+49 rows are built or deprecated, and those are the 49 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
-(layers), `Atlas VFX/Deliver`
+(layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-61), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
 
 ## Planned and elsewhere
@@ -149,6 +156,7 @@ Payloads (all plain JSON-safe dicts unless said):
 | `ATLAS_VFX_PLATELOCK_RESULT` | 40 Plate Lock | 41 Plate Lock Layer, 42 Plate Lock Write |
 | `ATLAS_VFX_PLATELOCK_TRACK` | 37 Plate Lock Camera | 40 Plate Lock |
 | `ATLAS_VFX_SENSOR_LENS` | 29 Sensor Lens Maps | 30 Sensor RS Maps |
+| `ATLAS_VFX_SUN` | 56 Sun Direction | 57 Light Ball |
 | `MOGE_GEOMETRY` | - | 32 Normals, 34 Depth Holdout (element), 53 Relight Transfer |
 | `MOGE_MODEL` | - | 9 Plate Depth, 54 Relight Transfer Files |
 <!-- types:end -->
@@ -701,3 +709,82 @@ Payloads (all plain JSON-safe dicts unless said):
   100 frames and ran out of 64 GB on 97 frames of DSCF3000; this node holds a few full-res frames whatever the
   length. Synthetic: matches 53 on the same half-float frames within 0.0011 stops, one MoGe run per frame, peak RAM
   47 MB for 4 frames and 52 MB for 20.
+
+### 55 Shot Range
+`AtlasVFXShotRange` · layers · Atlas VFX/Artist
+- in: first INT, last INT, ltx_length as is|8k+1 shorter|8k+1 longer, frame_offset INT, width INT, height INT
+- out: first_frame INT, length INT, last_frame INT, plate_first INT, plate_last INT, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: the frame range set once, in Nuke frames. length snaps to LTX's 8k+1 (shorter or longer), plate_first / plate_last are the 0-based plate index Plate Read takes (1130 is index 129 at offset 1001), and info says in words what one IMAGE link of that range holds in RAM (97 frames at 4K: 9.6 GB), pointing at Relight Transfer Files or Chunk Plan when it is a lot.
+
+### 56 Sun Direction
+`AtlasVFXSunDirection` · layers · Atlas VFX/Artist
+- in: direction COMBO, height low|mid|high, look STRING, mirror_trick auto|off
+- out: mirror BOOLEAN, prompt STRING, sun ATLAS_VFX_SUN
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: the sun for the LTX-2.3 Relight IC-LoRA, in words: one of the 8 directions the LoRA knows (as seen in the finished shot), low / mid / high, and the look. Gives the prompt, the ball to paste (sun, for Light Ball) and LTX Prep's mirror. mirror_trick auto renders a sun with "left" in it mirrored and asks for the right, because on DSCF3000 the LoRA only ever lit from frame right; for the left sun it gives exactly the prompt of the 2026-10-30 take that worked.
+
+### 57 Light Ball
+`AtlasVFXLightBall` · layers · Atlas VFX/Artist
+- in: image IMAGE, sun ATLAS_VFX_SUN
+- out: image IMAGE
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: assets/relight_balls (MIT, register id relight-light-balls)
+- needs: nothing beyond the base
+- writes: nothing
+- notes: pastes the light-direction ball on every frame of LTX Prep's reference, at 143/1280 of the width, 22/1280 in from the top-right corner (the training layout), so it is right at any work size. The 24 balls ship in assets/relight_balls (MIT, register id relight-light-balls); direction and height come from Sun Direction's lists, never a path.
+
+### 58 Layer Picker
+`AtlasVFXLayerPicker` · layers · Atlas VFX/Artist
+- in: layer COMBO
+- out: folder STRING, pattern STRING, first INT, last INT, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: a list of the folders under the work root holding an EXR sequence and a sidecar (what Card Project, LTX Return, EXR Write and Relight Transfer Files write), shown relative to the work root so a saved graph carries no user folder. Gives the folder, the #### pattern, the frame range and the size / channels / colourspace of the first frame. A value that resolves outside the work root is refused. The list is read when ComfyUI loads node definitions.
+
+### 59 Grade
+`AtlasVFXGrade` · layers · Atlas VFX/Artist
+- in: image IMAGE, blackpoint FLOAT, whitepoint FLOAT, lift FLOAT, gain FLOAT, multiply FLOAT, offset FLOAT, gamma FLOAT, exposure FLOAT, tint_r FLOAT, tint_g FLOAT, tint_b FLOAT, reverse BOOLEAN, clamp_black BOOLEAN, clamp_white BOOLEAN, mix FLOAT
+- in, optional: mask MASK
+- out: image IMAGE
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: Nuke's Grade on linear RGB, same maths (A = multiply * (gain - lift) / (whitepoint - blackpoint), B = offset + lift - A * blackpoint, gamma above 0, black clamp on by default), plus exposure in stops on the input and an r/g/b tint on gain. reverse undoes the grade; mask and mix blend as Nuke's do; alpha passes through.
+
+### 60 Viewer
+`AtlasVFXViewer` · layers · Atlas VFX/Artist
+- in: a_path STRING, b_path STRING, frame INT, mode COMBO, wipe FLOAT, exposure FLOAT, gamma FLOAT, view COMBO, zoom_to_alpha BOOLEAN, width INT
+- in, optional: a_image IMAGE, b_image IMAGE, image_index INT, ocio_config STRING
+- out: image IMAGE, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: a preview PNG in ComfyUI's temp folder (as Preview Image does)
+- notes: one frame as Nuke's viewer shows it: A and B from EXR sequences (pattern, folder or file) or IMAGE inputs; wipe, side by side, difference; exposure (f-stops) and gamma for the view only; any display / view of the shipped OCIO config; zoom to A's alpha; gain false colour for Relight Transfer's log2 gain EXRs (blue darker, white 0, orange brighter, saturated at +-3 stops, with a legend). Reads one frame per input. info gives the luminance and gain stats inside A's alpha.
+
+### 61 Notes
+`AtlasVFXNotes` · layers · Atlas VFX/Artist
+- in: info STRING
+- out: text STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: any node's info / report JSON as readable lines: warnings first (gain clamped on more than 25% of the matte, sh fallback frames, soft take pixels over 10%, IMAGE links over 8 GB), then the known keys by name, then the rest with long lists cut.
