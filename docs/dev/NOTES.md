@@ -965,3 +965,15 @@ half-float frames, peak 47 MB at 4 frames vs 52 MB at 20.
 On this take 48 of 97 frames fell back from sh to guided (R^2 under 0.3) and the clamp hit up to half the matte:
 the element is a dark comp lifted hard by the take. Worth a look in Nuke before trusting the sh path on it.
 
+## 2026-10-31 Artist nodes, blueprints, Tiny VAE, Alpha-Gen
+
+- Artist starter (Shot Range, Layer Picker, Sun Direction "the left" + auto, Light Ball, Notes, Viewer) ran end to
+  end on V141: 97 frames, 28 min, sun on frame left as the hand-built take; Notes flagged what we saw by hand
+  (clamp on 49% of the matte, 50 sh fallbacks, 39% soft take pixels).
+- Tiny VAE: taeltx2_3 safetensors decodes LTX-2.5 latents (17 frames at 1280x704 from 3 latent frames). ComfyUI core
+  (here and on master) lists taeltx_2 but never hooks a tiny VAE to LTX live previews; layers/ltx_live_preview.py
+  wraps get_previewer (safe fallback, ATLAS_VFX_LTX_LIVE_PREVIEW=0 off). Live: 8 previews during an Alpha-Gen run.
+- Alpha-Gen on a single still (held 9 frames, mattes averaged): IoU 0.962 against the true alpha of the showcase
+  element over DSCF3000 1130, 30 s. On a frame with no clear foreground (an empty deck) the model returns a grey copy
+  of the scene: it needs a subject.
+

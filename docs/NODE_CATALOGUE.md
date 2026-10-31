@@ -93,9 +93,9 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 59 | Grade | layers | atlas-vfx | built | synthetic | Artist nodes | |
 | 60 | Viewer | layers | atlas-vfx | built | synthetic | Artist nodes | |
 | 61 | Notes | layers | atlas-vfx | built | synthetic | Artist nodes | |
-| 62 | Tiny VAE | layers | atlas-vfx | built | synthetic | Artist nodes | |
-| 63 | Alpha Prep | layers | atlas-vfx | built | synthetic | Artist nodes | |
-| 64 | Alpha Return | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 62 | Tiny VAE | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
+| 63 | Alpha Prep | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
+| 64 | Alpha Return | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
 
 52 rows are built or deprecated, and those are the 52 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
@@ -798,18 +798,18 @@ Payloads (all plain JSON-safe dicts unless said):
 - in: tae_name (put taeltx2_3.safetensors in models/vae_approx)
 - out: vae VAE
 - test: tests/test_artist_nodes.py
-- proof: synthetic
+- proof: synthetic; plate V141
 - licences: taeltx2_3 (MIT, register id taeltx2-3)
 - needs: nothing beyond the base
 - writes: nothing
-- notes: loads the LTX-2.3 / 2.5 tiny autoencoder taeltx2_3 (madebyollin/taehv, MIT; the safetensors file, never the pickled .pth) from models/vae_approx as a VAE, for a quick-look VAE Decode next to the real one (seconds, blurry, right in framing, motion and light); core's VAE Loader only lists taeltx_2. Checked: a (1, 128, 3, 22, 40) LTX latent decodes to 17 frames at 1280x704. Loading the pack also installs ltx_live_preview: with ComfyUI's live preview method on TAESD, LTX samplers preview the first latent frame through it; any surprise falls back to ComfyUI's own preview, and ATLAS_VFX_LTX_LIVE_PREVIEW=0 turns the hook off.
+- notes: loads the LTX-2.3 / 2.5 tiny autoencoder taeltx2_3 (madebyollin/taehv, MIT; the safetensors file, never the pickled .pth) from models/vae_approx as a VAE, for a quick-look VAE Decode next to the real one (seconds, blurry, right in framing, motion and light); core's VAE Loader only lists taeltx_2. Checked: a (1, 128, 3, 22, 40) LTX latent decodes to 17 frames at 1280x704; live on V141 the Alpha-Gen sampler sent 8 tiny-VAE previews (TAESD method). Loading the pack also installs ltx_live_preview: with ComfyUI's live preview method on TAESD, LTX samplers preview the first latent frame through it; any surprise falls back to ComfyUI's own preview, and ATLAS_VFX_LTX_LIVE_PREVIEW=0 turns the hook off.
 
 ### 63 Alpha Prep
 `AtlasVFXAlphaPrep` · layers · Atlas VFX/Artist
 - in: images IMAGE, still_frames INT, max_width INT, max_height INT
 - out: image IMAGE, length INT, width INT, height INT, alpha_prep ATLAS_VFX_ALPHA_PREP, info STRING
 - test: tests/test_artist_nodes.py
-- proof: synthetic
+- proof: synthetic; plate V141
 - licences: ltx-2.5-ic-lora-alpha-gen (LTX-2.x Community License, run upstream in the graph)
 - needs: nothing beyond the base
 - writes: nothing
@@ -820,8 +820,8 @@ Payloads (all plain JSON-safe dicts unless said):
 - in: images IMAGE, alpha_prep ATLAS_VFX_ALPHA_PREP, channel red|green|blue|mean, still_average BOOLEAN
 - out: mask MASK, matte_image IMAGE, info STRING
 - test: tests/test_artist_nodes.py
-- proof: synthetic
+- proof: synthetic; plate V141
 - licences: none beyond the base
 - needs: nothing beyond the base
 - writes: nothing
-- notes: the decoded Alpha-Gen output back to a MASK at the source size: padding cropped, the matte channel (green, as the tested graph), held frames trimmed; for a still the held frames are averaged before the clamp (synthetic: a third of the single-frame error). Feeds EXR Write's mask, Relight Transfer's matte / holdout, Grade's mask.
+- notes: the decoded Alpha-Gen output back to a MASK at the source size: padding cropped, the matte channel (green, as the tested graph), held frames trimmed; for a still the held frames are averaged before the clamp (synthetic: a third of the single-frame error). Live, one still of DSCF3000 1130 with the showcase element comped in: IoU 0.962 against the element's own alpha, mean error 0.0015, 30 s end to end on the 5090. Feeds EXR Write's mask, Relight Transfer's matte / holdout, Grade's mask.
