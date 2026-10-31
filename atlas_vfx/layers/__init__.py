@@ -4,4 +4,4 @@
 NODE_MODULES: tuple = ("node_set_proxy", "node_foreground_element", "node_card_project", "node_character_insert", "node_ltx_prep", "node_ltx_return",
                        "node_normals", "node_light_from_plate", "node_relight", "node_depth_holdout",
                        "node_physical_sky", "node_chunk_plan", "node_sequence_read_chunk", "node_chunk_stitch",
-                       "node_relight_transfer")
+                       "node_relight_transfer", "node_relight_transfer_files")

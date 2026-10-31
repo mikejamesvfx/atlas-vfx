@@ -2510,6 +2510,188 @@
    }
   ]
  },
+ "AtlasVFXRelightTransferFiles": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "element_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "relit_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "matte_path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "first_frame",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "length",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "relit_numbering",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "frame",
+     "sequential"
+    ]
+   },
+   {
+    "name": "relit_encoding",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "linear",
+     "srgb"
+    ]
+   },
+   {
+    "name": "mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "guided",
+     "sh"
+    ]
+   },
+   {
+    "name": "analysis_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "blur_px",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "max_stops",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "temporal",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "eps",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "subsample",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "geo_weight",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "min_r2",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "lift_limit",
+    "type": "FLOAT",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "moge_model",
+    "type": "MOGE_MODEL",
+    "group": "optional"
+   },
+   {
+    "name": "resolution_level",
+    "type": "INT",
+    "group": "optional"
+   },
+   {
+    "name": "refine_steps",
+    "type": "INT",
+    "group": "optional"
+   },
+   {
+    "name": "normals_temporal",
+    "type": "INT",
+    "group": "optional"
+   },
+   {
+    "name": "normals_sigma",
+    "type": "FLOAT",
+    "group": "optional"
+   },
+   {
+    "name": "depth_guide",
+    "type": "BOOLEAN",
+    "group": "optional"
+   },
+   {
+    "name": "shot_camera",
+    "type": "ATLAS_TRACKED_CAMERA",
+    "group": "optional"
+   },
+   {
+    "name": "relit_mirrored",
+    "type": "BOOLEAN",
+    "group": "optional"
+   },
+   {
+    "name": "holdout_path",
+    "type": "STRING",
+    "group": "optional"
+   },
+   {
+    "name": "holdout_grow",
+    "type": "INT",
+    "group": "optional"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "optional"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "images",
+    "type": "STRING"
+   },
+   {
+    "name": "gain",
+    "type": "STRING"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
  "AtlasVFXSensorApply": {
   "folder": "sensor",
   "category": "Atlas VFX/Sensor",

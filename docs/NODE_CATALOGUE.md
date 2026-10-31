@@ -85,8 +85,9 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 51 | Sequence Read Chunk | layers | atlas-vfx | built | synthetic | Frame chunks | |
 | 52 | Chunk Stitch | layers | atlas-vfx | built | synthetic | Frame chunks | |
 | 53 | Relight Transfer | layers | atlas-vfx | built | synthetic | with 18 | tools/light_transfer.py (Gaussian ratio, superseded) |
+| 54 | Relight Transfer Files | layers | atlas-vfx | built | synthetic; plate V141 | with 18 | |
 
-41 rows are built or deprecated, and those are the 41 nodes that load. Categories: `Atlas VFX/Camera`
+42 rows are built or deprecated, and those are the 42 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
 (layers), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
@@ -139,7 +140,7 @@ Payloads (all plain JSON-safe dicts unless said):
 | Type | Made by | Read by |
 |---|---|---|
 | `ATLAS_PLATE_SEQ` | 1 Plate Read | 2 Tracking Proxy, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview |
-| `ATLAS_TRACKED_CAMERA` | 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky, 53 Relight Transfer |
+| `ATLAS_TRACKED_CAMERA` | 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky, 53 Relight Transfer, 54 Relight Transfer Files |
 | `ATLAS_VFX_CARD` | 15 Foreground Element, 16 Character Insert | 14 Card Project |
 | `ATLAS_VFX_CHUNK_PLAN` | 50 Chunk Plan | 52 Chunk Stitch |
 | `ATLAS_VFX_LIGHT_RIG` | 33 Light From Plate, 48 Physical Sky | 18 Light Probe & Relight |
@@ -149,7 +150,7 @@ Payloads (all plain JSON-safe dicts unless said):
 | `ATLAS_VFX_PLATELOCK_TRACK` | 37 Plate Lock Camera | 40 Plate Lock |
 | `ATLAS_VFX_SENSOR_LENS` | 29 Sensor Lens Maps | 30 Sensor RS Maps |
 | `MOGE_GEOMETRY` | - | 32 Normals, 34 Depth Holdout (element), 53 Relight Transfer |
-| `MOGE_MODEL` | - | 9 Plate Depth |
+| `MOGE_MODEL` | - | 9 Plate Depth, 54 Relight Transfer Files |
 <!-- types:end -->
 
 ## Contracts
@@ -682,3 +683,21 @@ Payloads (all plain JSON-safe dicts unless said):
   from the normals and matches a clean take; guided fills smoothly from the edge). A gain-outlier test could not
   tell invented content from real light edges (it flagged sunlit step lips and real cast shadows first), so it is
   by hand.
+
+### 54 Relight Transfer Files
+`AtlasVFXRelightTransferFiles` · layers · Atlas VFX/Layers
+- in: element_path STRING, relit_path STRING, matte_path STRING, first_frame INT, length INT, relit_numbering frame|sequential, relit_encoding linear|srgb, mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT, lift_limit FLOAT, name STRING, out_dir STRING
+- in, optional: moge_model MOGE_MODEL, resolution_level INT, refine_steps INT, normals_temporal INT, normals_sigma FLOAT, depth_guide BOOLEAN, shot_camera ATLAS_TRACKED_CAMERA, relit_mirrored BOOLEAN, holdout_path STRING, holdout_grow INT, ocio_config STRING
+- out: images STRING, gain STRING, info STRING
+- test: tests/test_relight_transfer.py
+- proof: synthetic; plate V141
+- licences: none beyond the base (MoGe-3 is in the register)
+- needs: nothing beyond the base
+- writes: <name>.<frame>.exr (ACEScg, alpha = matte), <name>_gain/<name>_gain.<frame>.exr (log2, Raw), a sidecar
+- notes: 53 for long or 4K shots. Same maths (light_transfer.transfer on frame sources and an EXR sink), but the
+  element, matte (blank = the element's alpha), relit take and holdout are paths read one frame at a time, and MoGe
+  runs per frame inside the node, its smoothed normals and depth cached on disk as .npy (no pickle) and deleted at
+  the end, so one MoGe run serves the SH fit and the full-res pass. The IMAGE graph holds ~10 GB per 4K link per
+  100 frames and ran out of 64 GB on 97 frames of DSCF3000; this node holds a few full-res frames whatever the
+  length. Synthetic: matches 53 on the same half-float frames within 0.0011 stops, one MoGe run per frame, peak RAM
+  47 MB for 4 frames and 52 MB for 20.

@@ -13,6 +13,10 @@ graph() is the API graph. Uses tools/ui_workflow.py's convert + portable with th
 the atlas-vfx nodes and a running ComfyUI's /object_info for the core ones (MoGe, ImageToMask). Writes only the repo
 copy.
 
+Also writes workflows/relight_transfer_files.json: the same transfer as one node, Relight Transfer Files (54), that
+reads the sequences from disk and writes the EXRs one frame at a time with MoGe-3 run inside it. Use it for 4K or
+long shots: the IMAGE graph holds ~10 GB per 4K link per 100 frames.
+
 Run: <V141 python> tools\\relight_transfer_workflow.py [--api http://127.0.0.1:8188]
 """
 from __future__ import annotations
@@ -31,6 +35,7 @@ from physical_sky_workflow import local_info  # noqa: E402
 from atlas_vfx.camera_side.node_exr_write import AtlasVFXEXRWrite  # noqa: E402
 from atlas_vfx.layers.node_normals import AtlasVFXNormals  # noqa: E402
 from atlas_vfx.layers.node_relight_transfer import AtlasVFXRelightTransfer  # noqa: E402
+from atlas_vfx.layers.node_relight_transfer_files import AtlasVFXRelightTransferFiles  # noqa: E402
 from atlas_vfx.layers.node_sequence_read_chunk import AtlasVFXSequenceReadChunk  # noqa: E402
 
 ELEMENT = "~/atlas-vfx-work/element/element.####.exr"
@@ -74,15 +79,34 @@ def graph() -> dict:
     }
 
 
+def graph_files() -> dict:
+    return {
+        "1": {"class_type": "LoadMoGeModel", "inputs": {"model_name": "moge_3_vitl_fp16.safetensors"}},
+        "2": {"class_type": "AtlasVFXRelightTransferFiles", "inputs": {
+            "element_path": ELEMENT, "relit_path": RELIT, "matte_path": MATTE, "first_frame": 1001, "length": 121,
+            "relit_numbering": "frame", "relit_encoding": "linear", "mode": "sh", "analysis_width": 1280,
+            "blur_px": 2.0, "max_stops": 3.0, "temporal": 1, "eps": 0.01, "subsample": 2, "geo_weight": 0.5,
+            "min_r2": 0.3, "lift_limit": 3.0, "name": "element_relit", "out_dir": "", "moge_model": ["1", 0],
+            "resolution_level": 9, "refine_steps": 3, "normals_temporal": 1, "normals_sigma": 1.5,
+            "depth_guide": True, "relit_mirrored": False, "holdout_path": "", "holdout_grow": 2, "ocio_config": ""}},
+    }
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--api", default="http://127.0.0.1:8188", help="a running ComfyUI, for the core node definitions")
     ui_workflow.API = ap.parse_args(argv).api
-    for cls in (AtlasVFXSequenceReadChunk, AtlasVFXNormals, AtlasVFXRelightTransfer, AtlasVFXEXRWrite):
+    for cls in (AtlasVFXSequenceReadChunk, AtlasVFXNormals, AtlasVFXRelightTransfer, AtlasVFXEXRWrite,
+                AtlasVFXRelightTransferFiles):
         ui_workflow._INFO[cls.__name__] = local_info(cls)
     wf = ui_workflow.convert(graph(), "Relight Transfer: LTX relit take (low res) onto the full-res element, "
                                       "MoGe-3 normals")
     path = ui_workflow.REPO / "relight_transfer_element.json"
+    path.write_text(ui_workflow.portable(json.dumps(wf, indent=1)), encoding="utf-8")
+    print("wrote", path)
+    wf = ui_workflow.convert(graph_files(), "Relight Transfer Files: the same transfer streamed from disk, one frame "
+                                            "at a time (4K, long shots)")
+    path = ui_workflow.REPO / "relight_transfer_files.json"
     path.write_text(ui_workflow.portable(json.dumps(wf, indent=1)), encoding="utf-8")
     print("wrote", path)
     return 0

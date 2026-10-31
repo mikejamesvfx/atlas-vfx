@@ -245,6 +245,14 @@ def to_world(n, R_c2w):
 
 
 # ----------------------------------------------------------------------------------------------- the transfer
+def _src(x, channels=None):
+    """An array (any float type) or a frame source (len, [t], .shape) as a frame source; arrays keep `channels`."""
+    if isinstance(x, np.ndarray) or not hasattr(x, "shape"):
+        x = np.asarray(x, np.float32)
+        return x[..., :channels] if channels else x
+    return x
+
+
 def _bbox(m, pad):
     ys, xs = np.nonzero(m > 1e-4)
     if len(ys) == 0:
@@ -268,19 +276,22 @@ def _guide(element, depth, normals, geo_weight):
 
 def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_px=2.0, max_stops=3.0,
              temporal=0, eps=0.01, radius=0, subsample=2, normals=None, depth=None, cam_rotations=None, geo_weight=0.5,
-             min_r2=0.3, holdout=None, holdout_grow=2, lift_limit=3.0, progress=None):
+             min_r2=0.3, holdout=None, holdout_grow=2, lift_limit=3.0, progress=None, sink=None):
     """element (T, H, W, 3) full res; relit (T, h, w, 3) same framing, any res; matte (T, H', W') any res.
     normals (T, Hn, Wn, 3) unit OpenGL camera space, depth (T, Hd, Wd) metric, any res; cam_rotations (T, 3, 3)
     cam_to_world. holdout (T, Hh, Wh) any res: 1 where the relit take's gain is not to be trusted (grown by
-    holdout_grow analysis px). lift_limit (stops, 0 off): above it the relit take's own pixels take over. Returns (out (T, H, W, 3), gain (T, H, W, 3) log2, report dict)."""
+    holdout_grow analysis px). lift_limit (stops, 0 off): above it the relit take's own pixels take over. Returns (out (T, H, W, 3), gain (T, H, W, 3) log2, report dict).
+
+    Any of the per-frame inputs may also be a frame source instead of an array: an object with len(), [t] giving
+    one frame and .shape (T, H, W[, C]), read on demand (light_transfer_files.py streams EXRs this way). With sink,
+    each finished frame goes to sink(t, out_t, gain_t) and out and gain come back as None, so nothing at full res
+    is held for the whole clip."""
     if mode not in MODES:
         raise ValueError(f"mode {mode!r}: one of {MODES}")
-    element = np.asarray(element, np.float32)[..., :3]
-    relit = np.asarray(relit, np.float32)[..., :3]
-    matte = np.asarray(matte, np.float32)
+    element, relit, matte = _src(element, 3), _src(relit, 3), _src(matte)
     T, H, W = element.shape[:3]
-    holdout = None if holdout is None else np.asarray(holdout, np.float32)
-    if holdout is not None and holdout.ndim == 2:
+    holdout = None if holdout is None else _src(holdout)
+    if holdout is not None and len(holdout.shape) == 2:
         holdout = holdout[None]
     for name, arr in (("relit", relit), ("matte", matte), ("normals", normals), ("depth", depth),
                       ("cam_rotations", cam_rotations), ("holdout", holdout)):
@@ -291,7 +302,7 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
         raise ValueError(f"relit is {rw}x{rh}, element {W}x{H}: the framing must match (aspect differs)")
     if mode == "sh" and normals is None:
         raise ValueError("mode sh needs normals (Atlas VFX Normals from MoGe)")
-    pick = (lambda a, t: None if a is None else a[t if len(a) > 1 else 0])
+    pick = (lambda a, t: None if a is None else _f32(a[t if len(a) > 1 else 0]))
     aw, ah = analysis_size(W, H, analysis_width, rw)
     scale = W / aw
     r = int(radius) if radius > 0 else max(2, round(2 * scale))
@@ -304,7 +315,7 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
     clamp_frac, held = [], []
     grow = np.ones((2 * int(holdout_grow) + 1,) * 2, np.uint8) if holdout_grow > 0 else None
     for t in range(T):
-        el = _resize(element[t], aw, ah)
+        el = _resize(_f32(element[t]), aw, ah)
         rl = _resize(pick(relit, t), aw, ah)
         m = np.clip(_resize(pick(matte, t), aw, ah), 0.0, 1.0)
         g, cl = log_gain(el, rl, max_stops)
@@ -347,14 +358,27 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
         used_sh = [r >= min_r2 for r in r2s]
 
     # 3. full res, per frame
-    out = element.copy()
-    gain = np.zeros_like(element)
+    out = gain = None
+    if sink is None:
+        out = np.empty((T, H, W, 3), np.float32)
+        gain = np.zeros((T, H, W, 3), np.float32)
+
+    def emit(t, o, g):
+        if sink is None:
+            out[t] = o
+            if g is not None:
+                gain[t] = g
+        else:
+            sink(t, o, g if g is not None else np.zeros_like(o))
+        if progress:
+            progress(t)
+
     for t in range(T):
+        el_t = _f32(element[t])
         m_full = np.clip(_resize(pick(matte, t), W, H, down=False), 0.0, 1.0)
         box = _bbox(m_full, pad=4 * r + 2)
         if box is None:
-            if progress:
-                progress(t)
+            emit(t, el_t, None)
             continue
         y0, y1, x0, x1 = box
         sl = (slice(y0, y1), slice(x0, x1))
@@ -375,13 +399,13 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
             sh_full = sh_basis(nw) @ coefs[t]
         g_t = masked_blur(g_t, w_low[t], blur_px)
         g_up = _resize(g_t, W, H, down=False)[sl]
-        guide = _guide(element[t][sl], d_full, n_full, geo_weight)
+        guide = _guide(el_t[sl], d_full, n_full, geo_weight)
         g_full = guided_filter(guide, g_up, r, eps, weight=np.maximum(m_full[sl], 1e-3), subsample=subsample)
         if sh_full is not None:
             g_full = g_full + sh_full
         g_full = np.clip(g_full, -max_stops, max_stops)
         mm = m_full[sl][..., None]
-        el = element[t][sl]
+        el = el_t[sl]
         res = el * np.exp2(g_full)
         if lift_low is not None:
             s = np.clip(_resize(lift_low[t], W, H, down=False)[sl] - lift_limit, 0.0, 1.0)[..., None]
@@ -390,10 +414,11 @@ def transfer(element, relit, matte, *, mode="guided", analysis_width=1280, blur_
                 res = res + s * (own - res)
             lifted.append(float((s[..., 0] > 0.5)[mm[..., 0] > 0.5].mean()) if (mm > 0.5).any() else 0.0)
         res = el + mm * (res - el)
-        out[t][sl] = np.where(mm > 0, res, el)
-        gain[t][sl] = g_full * (mm > 0)
-        if progress:
-            progress(t)
+        o = el_t.copy()
+        o[sl] = np.where(mm > 0, res, el)
+        g = np.zeros_like(el_t)
+        g[sl] = g_full * (mm > 0)
+        emit(t, o, g)
 
     rep = {"mode": mode, "frames": T, "size": [W, H], "analysis_size": [aw, ah], "relit_size": [rw, rh],
            "scale": round(scale, 4), "radius_px": r, "subsample": int(subsample), "eps": eps, "blur_px": blur_px,

@@ -948,3 +948,20 @@ back soft and drawn over; `mode crop` gives it more pixels, and Relight Transfer
 V141 started with `--enable-triton-backend` breaks the LTX-2.5 VAE decode: comfy_kitchen's Triton `rms_rope_` in
 `na_diffusion_decoder.py` fails with `Triton Error [CUDA]: invalid argument`, on any length and on a graph that
 had worked. Without the flag the Triton backend is disabled and the decode runs. Start V141 without it for LTX work.
+
+## 2026-10-31 Relight Transfer Files (54): streaming, and why
+
+The IMAGE graph for Relight Transfer holds every link as a float32 clip: 9.6 GB per 4K RGB link per 97 frames, and
+the graph has about ten (four reads, MoGe points and normals, Normals, both transfer outputs). 97 frames of DSCF3000
+ran out of 64 GB three times; four 25-frame chunks worked but popped at the joins (frames 1154/1155, 1204/1205
+differ from the streamed render by a median 0.07-0.09 stops, p99 up to 1 stop: the temporal smoothing and the SH
+fit stop at each chunk edge). Relight Transfer Files reads frames on demand (light_transfer.transfer now takes
+frame sources and a sink; the array path is unchanged, its tests give the same numbers), runs MoGe per frame and
+caches the smoothed normals and depth as float16 .npy so the SH fit and the full-res pass share one MoGe run.
+Live: 97 frames in one prompt, 700 s, V141 peak private memory 13.4 GB (MoGe and ComfyUI included), mid-chunk
+frames identical to the chunked render. Synthetic: within 0.0011 stops of the in-memory transfer on the same
+half-float frames, peak 47 MB at 4 frames vs 52 MB at 20.
+
+On this take 48 of 97 frames fell back from sh to guided (R^2 under 0.3) and the clamp hit up to half the matte:
+the element is a dark comp lifted hard by the take. Worth a look in Nuke before trusting the sh path on it.
+

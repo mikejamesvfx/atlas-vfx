@@ -28,6 +28,13 @@ when it does, the entry says so and names the tool that rewrites them.
   LTX-2.5 distilled base, LTX Return. Its layer is the `relit` input of the Relight Transfer starter. Put the ball
   PNG (`the right__low.png`) in ComfyUI's input folder.
 
+- **Relight Transfer Files** (catalogue 54, `Atlas VFX/Layers`): Relight Transfer for 4K and long shots. It takes
+  the element, matte (blank = the element's alpha), relit take and holdout as sequence paths, reads them one frame
+  at a time, runs MoGe-3 per frame inside the node (normals cached on disk, removed at the end) and writes the EXRs
+  and gain EXRs as it goes. Same maths as 53. 97 frames of DSCF3000 at 4K in one prompt peaked at 13.4 GB of RAM;
+  the IMAGE graph ran out of 64 GB and had to be cut into chunks, which popped up to a stop at the joins. Starter:
+  `workflows/relight_transfer_files.json`.
+
 ## 0.1.0 (2026-10-30), first public beta
 
 The first tagged release of the public repo. 37 nodes in five families (Camera, Layers, Plate Lock, Sensor,

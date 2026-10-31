@@ -355,7 +355,96 @@ def test_lift_limit():
     check(0 < rep["relit_pixels_fraction_max"] < 0.2, "report gives the swapped fraction", rep["relit_pixels_fraction_max"])
 
 
+class FakeMoGe:
+    """Stands in for ComfyUI's MOGE_MODEL: returns the scene's true normals (OpenCV, as MoGe does) and a depth."""
+
+    def __init__(self, n, depth):
+        self.n, self.depth, self.calls = n, depth, 0
+
+    def infer(self, x, **kw):
+        import torch
+
+        self.calls += 1
+        assert x.shape == (1, 3, H, W), x.shape
+        return {"normal": torch.from_numpy(rl.opencv_to_opengl(self.n)[None].copy()),     # its own inverse
+                "depth": torch.from_numpy(self.depth[None].copy())}
+
+
+def test_files():
+    """Relight Transfer Files streams EXRs from disk and gives what the in-memory transfer gives on the same
+    (half-float) frames, runs MoGe once per frame, and its RAM does not grow with the number of frames."""
+    import os
+    import tempfile
+    import tracemalloc
+
+    from atlas_vfx.camera_side import exr_io
+    from atlas_vfx.layers.node_relight_transfer_files import AtlasVFXRelightTransferFiles
+
+    n, matte, bump, element, truth, relit_low = setup()
+    tmp = Path(tempfile.mkdtemp(prefix="rtf_"))
+    os.environ["ATLAS_VFX_OUT_ROOTS"] = str(tmp)
+    T, F0 = 5, 1001
+    for t in range(T):
+        k = 1.0 + 0.05 * t                                                      # the light changes a little
+        exr_io.write_rgba(tmp / "el" / f"el.{F0 + t}.exr", np.dstack([element, matte]))
+        rgba = np.dstack([relit_low * k, np.ones(relit_low.shape[:2], np.float32)])
+        exr_io.write_rgba(tmp / "rl" / f"rl.{F0 + t}.exr", rgba)
+        exr_io.write_rgba(tmp / "rlm" / f"rlm.{F0 + t}.exr", np.ascontiguousarray(rgba[:, ::-1]))
+    yy = np.mgrid[0:H, 0:W][0].astype(np.float32)
+    depth = (2.0 + yy / H).astype(np.float32)
+    moge = FakeMoGe(n, depth)
+    node = AtlasVFXRelightTransferFiles()
+    kw = dict(element_path=str(tmp / "el" / "el.####.exr"), relit_path=str(tmp / "rl" / "rl.####.exr"),
+              matte_path="", first_frame=F0, length=T, relit_numbering="frame", relit_encoding="linear", mode="sh",
+              analysis_width=0, blur_px=2.0, max_stops=3.0, temporal=1, eps=0.01, subsample=2, geo_weight=0.5,
+              min_r2=0.3, lift_limit=3.0, name="rt", out_dir=str(tmp / "out"))
+    res = node.run(**kw, moge_model=moge, normals_temporal=1, normals_sigma=1.5)
+    pattern, gpattern, info = res["result"]
+    rep = json.loads(info)
+    check(moge.calls == T and rep["moge"]["runs"] == T, "files: MoGe runs once per frame (normals cached on disk)",
+          f"{moge.calls} runs for {T} frames")
+    check(not (tmp / "out" / ".normals_cache").exists(), "files: the normals cache is deleted at the end")
+
+    read = (lambda p: exr_io.read_rgba(p)[0])
+    el = np.stack([read(tmp / "el" / f"el.{F0 + t}.exr") for t in range(T)])
+    rel = np.stack([read(tmp / "rl" / f"rl.{F0 + t}.exr")[..., :3] for t in range(T)])
+    m = el[..., 3]
+    ns = rl.smooth_normals(np.repeat(n[None], T, 0), m, 0, 1.5).astype(np.float16).astype(np.float32)
+    want, wgain, _ = lt.transfer(el[..., :3], rel, m, mode="sh", analysis_width=0, temporal=1, subsample=2,
+                                 normals=ns, depth=np.repeat(depth[None], T, 0))
+    got = np.stack([read(pattern % (F0 + t)) for t in range(T)])
+    inside = m > 0.5
+    d = np.abs(np.log2(np.maximum(got[..., :3], 1e-4)) - np.log2(np.maximum(want, 1e-4)))[inside]
+    check(float(d.max()) < 0.01 and float(d.mean()) < 1e-3, "files = in-memory transfer (sh, MoGe normals, depth)",
+          f"max {d.max():.4f} mean {d.mean():.5f} stops")
+    check(np.array_equal(got[..., :3][m == 0], el[..., :3][m == 0]), "files: outside the matte bit-exact")
+    check(np.allclose(got[..., 3], m), "files: alpha is the matte")
+    g = read(gpattern % F0)
+    check(np.abs(g[..., :3] - wgain[0]).max() < 0.01, "files: gain EXR written")
+    check(rep["streamed"] and rep["frames_range"] == [F0, F0 + T - 1], "files: report")
+
+    mir = node.run(**{**kw, "relit_path": str(tmp / "rlm" / "rlm.####.exr"), "out_dir": str(tmp / "outm")},
+                   moge_model=FakeMoGe(n, depth), relit_mirrored=True)["result"][0]
+    check(np.array_equal(read(mir % F0), got[0]), "files: relit_mirrored flips a mirrored take back")
+    raises(lambda: node.run(**kw), "files: sh without a MoGe model", "moge_model")
+
+    def peak(frames):
+        tracemalloc.start()
+        node.run(**{**kw, "mode": "guided", "length": frames, "out_dir": str(tmp / f"mem{frames}")})
+        p = tracemalloc.get_traced_memory()[1]
+        tracemalloc.stop()
+        return p
+    for t in range(T, 20):
+        exr_io.write_rgba(tmp / "el" / f"el.{F0 + t}.exr", np.dstack([element, matte]))
+        exr_io.write_rgba(tmp / "rl" / f"rl.{F0 + t}.exr",
+                          np.dstack([relit_low, np.ones(relit_low.shape[:2], np.float32)]))
+    p4, p20 = peak(4), peak(20)
+    check(p20 < 1.3 * p4, "files: RAM does not grow with the length", f"peak {p4 / 2**20:.0f} MB for 4 frames, "
+          f"{p20 / 2**20:.0f} MB for 20 (one full frame {element.nbytes / 2**20:.1f} MB)")
+
+
 def main():
+    test_files()
     test_guided_filter_identity()
     test_fast_guided()
     test_quality()
