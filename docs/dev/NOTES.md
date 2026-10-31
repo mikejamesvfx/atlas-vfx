@@ -1019,3 +1019,19 @@ that travels is a few MB.
   waits for Mike. Cloud's guide is 8-bit PNG frames (no atlas nodes there), the farm's is the float32 latent, so a
   Cloud take is close to, not bit-identical with, a ws take.
 
+## 2026-10-31 Render queue, live end to end on ws (a "loop" target pointing back at 127.0.0.1)
+
+A temporary target named loop made ws act as a farm machine, so every stage ran for real: pre on ws, the guide
+latent uploaded, generate, the sampled latent downloaded, post on ws.
+
+- **First try failed:** ComfyUI refused the pre graph, "Prompt has no outputs" (Latent Pre-render is not an output
+  node). Pre now always reports the Pre-render's path and info through PreviewAny, and the guide is checked
+  against the reported sha256 before upload.
+- **Matte preview, 9 frames:** done, 9 of 9 back, 1.97 MB guide. Against the same preview run straight on ws:
+  bit-identical, max difference 0.0 over all 9 frames at 4096x2160 RGBA.
+- **Relight preview, 17 frames:** done, 17 of 17 back, 1.35 MB guide. Against the straight run: bit-identical,
+  max difference 0.0 over 17 files.
+- **Cancel during pre of a 97-frame render:** the job showed cancelled at once and the layer kept its version
+  (preview). The target deleted and interrupted that prompt only, but ComfyUI checks interrupts between nodes,
+  so it stopped 4 min 17 s later, when the long 4K read finished. The new v003 folder stayed empty.
+
