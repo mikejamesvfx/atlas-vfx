@@ -8,24 +8,31 @@
 </head>
 <body>
   <header id="bar">
-    <span class="brand">Atlas Comp</span>
+    <span class="brand">ATLAS</span>
+    <nav id="rooms" aria-label="Rooms">
+      <button type="button" disabled title="The Camera room comes with the desktop app (Phase 1.5)">01 CAMERA</button>
+      <button type="button" disabled title="The Scene room comes with the desktop app (Phase 1.5)">02 SCENE</button>
+      <button type="button" aria-current="page">03 COMP</button>
+    </nav>
     <label>Shot <select id="shot-pick"></select></label>
     <button id="new-shot" type="button">New shot</button>
     <span id="proxy" class="muted"></span>
     <span class="grow"></span>
     <label>View <select id="view-pick"></select></label>
-    <a class="muted" href="/" target="_blank" rel="noopener">ComfyUI</a>
+    <a href="/" target="_blank" rel="noopener">ComfyUI</a>
   </header>
 
   <main id="room">
     <section id="layers" aria-label="Layers">
-      <div class="pane-head">Layers <button id="add-layer" type="button" title="Add a layer">+ Layer</button></div>
+      <div class="pane-head"><span class="eyebrow accent">01 — Layers</span>
+        <button id="add-layer" type="button" title="Add a layer">+ Layer</button></div>
       <ol id="layer-list"></ol>
     </section>
 
     <section id="viewer" aria-label="Viewer">
+      <div id="viewer-head"><span class="eyebrow">02 — Viewer</span><span id="readout"></span></div>
       <div id="stage">
-        <img id="frame-img" alt="">
+        <img id="frame-img" alt="The composited frame">
         <img id="live-img" alt="" hidden>
         <div id="empty" hidden></div>
       </div>
@@ -40,20 +47,26 @@
     </section>
 
     <section id="inspector" aria-label="Inspector">
-      <div class="pane-head">Inspector</div>
+      <div class="pane-head"><span class="eyebrow" id="inspector-eyebrow">03 — Inspector</span></div>
       <div id="inspector-body" class="muted">Pick a layer.</div>
+      <div class="jobbox" id="jobbox" hidden style="margin: 0 16px 16px;">
+        <img id="job-thumb" alt="Live preview while the job samples">
+        <div class="job" id="job-line"></div>
+      </div>
     </section>
   </main>
 
   <footer id="timeline" aria-label="Timeline">
     <div id="time-row">
-      <button id="prev" type="button" title="Previous frame (left arrow)">&lsaquo;</button>
-      <input id="scrub" type="range" min="1001" max="1001" value="1001">
-      <button id="next" type="button" title="Next frame (right arrow)">&rsaquo;</button>
+      <button id="prev" type="button" aria-label="Previous frame" title="Previous frame (left arrow)">&lsaquo;</button>
+      <button id="play" type="button" aria-label="Play" title="Play at proxy size (space). Frame-accurate playback: DJV.">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg></button>
+      <button id="next" type="button" aria-label="Next frame" title="Next frame (right arrow)">&rsaquo;</button>
+      <input id="scrub" type="range" min="1001" max="1001" value="1001" aria-label="Frame">
       <output id="frame-out">1001</output>
     </div>
     <div id="bars"></div>
-    <div id="status" class="muted"></div>
+    <div id="status"></div>
   </footer>
 
   <dialog id="shot-dialog">

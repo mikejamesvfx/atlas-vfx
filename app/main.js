@@ -18,7 +18,7 @@ const el = (tag, props = {}, ...kids) => {
 
 const S = {
   shots: [], shot: null, recipes: [], views: [], view: "", frame: 1001, exposure: 0, a: "", b: "", wipe: 0.5,
-  selected: null, jobs: {}, frameBusy: false, frameAgain: false, nonce: 0,
+  selected: null, jobs: {}, frameBusy: false, frameAgain: false, nonce: 0, playing: false,
 };
 
 function status(msg, bad = false) {
@@ -97,6 +97,7 @@ function render() {
 
 function renderEmpty() {
   $("empty").replaceChildren(
+    el("span", { class: "eyebrow accent", text: "00 — Start" }),
     el("h2", { text: "Make your first shot" }),
     el("p", { text: "A shot is a plate (any movie file) and a frame range in Nuke numbers. Layers stack on top of it: " +
       "EXR sequences you already have, or recipes (matte, relight, sky) that ComfyUI renders for you." }),
@@ -130,7 +131,7 @@ function layerRow(l) {
 
 function renderLayers() {
   const rows = [...S.shot.layers].sort((x, y) => (y.order ?? 0) - (x.order ?? 0)).map(layerRow);   // top of stack first
-  if (S.shot.plate) rows.push(el("li", {}, el("div", { class: "lrow" }, el("span", { class: "lname muted", text: "plate" }))));
+  if (S.shot.plate) rows.push(el("li", { class: "plate-row" }, document.createTextNode("plate · from the movie, through its proxy")));
   $("layer-list").replaceChildren(...rows);
 }
 
@@ -162,9 +163,12 @@ function refreshFrame() {
   // changed on disk) and never fires load, which would leave frameBusy stuck.
   const url = frameURL(S.shot.name, { f: S.frame, w, exposure: S.exposure, view: S.view, a: abList(S.a),
     b: abList(S.b), wipe: S.b ? S.wipe : "", n: ++S.nonce });
+  $("readout").textContent = `${S.frame} · A ${S.a || "everything"}${S.b ? ` │ B ${S.b}` : ""} · ` +
+    `${S.exposure > 0 ? "+" : ""}${S.exposure.toFixed(2)} EV · ${S.view}`;
   const done = () => {
     S.frameBusy = false;
-    if (S.frameAgain) { S.frameAgain = false; refreshFrame(); }
+    if (S.frameAgain) { S.frameAgain = false; refreshFrame(); return; }
+    if (S.playing) requestAnimationFrame(() => setFrame(S.frame >= S.shot.last ? S.shot.first : S.frame + 1));
   };
   img.onload = done;
   img.onerror = () => { status("could not draw this frame", true); done(); };
@@ -195,8 +199,49 @@ function renderBars() {
 // ---------------------------------------------------------------------------------------------------- inspector
 function recipeOf(l) { return S.recipes.find((r) => r.name === l.recipe); }
 
+// The 8 sun directions as seen in the shot, laid out like a compass: behind the subject at the top, the camera's
+// side at the bottom.
+const COMPASS = [["the back-left", "behind", "the back-right"], ["the left", null, "the right"],
+  ["the front-left", "the front", "the front-right"]];
+
+function compassField(f, value, onchange) {
+  const cells = COMPASS.flat().map((dir) => {
+    if (dir === null) {
+      return el("span", { class: "centre", "aria-hidden": "true" }, sunIcon());
+    }
+    return el("button", { type: "button", "aria-pressed": String(dir === value), text: dir.replace(/^the /, ""),
+      onclick: () => onchange(dir) });
+  });
+  return el("fieldset", { class: "field" }, el("legend", { text: f.label }), el("div", { class: "compass" }, ...cells));
+}
+
+function segmentedField(f, value, onchange) {
+  const buttons = f.choices.map((c) => el("button", { type: "button", "aria-pressed": String(c === value),
+    text: String(c), onclick: () => onchange(c) }));
+  return el("fieldset", { class: "field" }, el("legend", { text: f.label }), el("div", { class: "segmented" }, ...buttons));
+}
+
+function sunIcon() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  for (const [k, v] of [["width", "22"], ["height", "22"], ["viewBox", "0 0 24 24"], ["fill", "none"],
+    ["stroke", "currentColor"], ["stroke-width", "1.2"]]) svg.setAttribute(k, v);
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", "M12 2v5M12 17v5M2 12h5M17 12h5");
+  const c = document.createElementNS(ns, "circle");
+  c.setAttribute("cx", "12"); c.setAttribute("cy", "12"); c.setAttribute("r", "6");
+  svg.append(path, c);
+  return svg;
+}
+
 function fieldInput(f, value, layerNames, onchange) {
   let input;
+  if (f.type === "choice" && f.key === "direction" && f.choices.length === 8) {
+    return compassField(f, value, onchange);
+  }
+  if (f.type === "choice" && f.choices.length <= 4) {
+    return segmentedField(f, value, onchange);
+  }
   if (f.type === "choice") {
     input = el("select", {}, ...f.choices.map((c) => el("option", { value: String(c), text: String(c) })));
     input.value = String(value);
@@ -225,9 +270,16 @@ function fieldInput(f, value, layerNames, onchange) {
 function renderInspector() {
   const body = $("inspector-body");
   const l = S.shot.layers.find((x) => x.name === S.selected);
-  if (!l) { body.replaceChildren(document.createTextNode("Pick a layer.")); return; }
-  const head = el("div", {}, el("strong", { text: l.name }), el("div", { class: "muted",
-    text: l.kind === "recipe" ? (recipeOf(l)?.description || l.recipe) : l.source }));
+  if (!l) {
+    $("inspector-eyebrow").textContent = "03 — Inspector";
+    $("jobbox").hidden = true;
+    body.replaceChildren(document.createTextNode("Pick a layer."));
+    return;
+  }
+  $("inspector-eyebrow").textContent = `03 — ${l.kind === "recipe" ? l.recipe : "EXR"} · ${l.name}`;
+  const head = el("div", { style: "display: grid; gap: 6px;" },
+    el("h2", { text: l.kind === "recipe" ? (recipeOf(l)?.label || l.recipe) : l.name }),
+    el("div", { class: "muted", text: l.kind === "recipe" ? (recipeOf(l)?.description || "") : l.source }));
   if (l.kind !== "recipe") { body.replaceChildren(head); return; }
   const r = recipeOf(l);
   if (!r) { body.replaceChildren(head, el("p", { class: "error", text: `unknown recipe ${l.recipe}` })); return; }
@@ -237,16 +289,28 @@ function renderInspector() {
     params[f.key] = v;
     try { await api.patchLayer(S.shot.name, l.name, { params }); l.params = { ...params }; status(""); }
     catch (e) { status(e.message, true); }
+    renderInspector();
   }));
   const job = Object.values(S.jobs).find((j) => j.layer === l.name && !j.done);
   const preview = el("button", { type: "button", text: "Preview", title: "A few frames, quick decode", disabled: !!job,
     onclick: () => run(l, "preview", params) });
   const renderBtn = el("button", { class: "primary", type: "button", text: "Render", title: "The full job, a new version",
     disabled: !!job, onclick: () => run(l, "render", params) });
-  const jobLine = el("div", { class: `job ${job?.error ? "bad" : ""}`, text: job ? job.text : "" });
   const graphLink = el("a", { href: "/", target: "_blank", rel: "noopener", text: "Open ComfyUI" });
-  body.replaceChildren(head, ...fields, el("div", { class: "runs" }, preview, renderBtn), jobLine,
+  body.replaceChildren(head, ...fields, el("div", { class: "runs" }, preview, renderBtn),
     el("div", { class: "muted" }, document.createTextNode("Advanced: "), graphLink));
+  renderJob(l.name);
+}
+
+function renderJob(layerName) {
+  const job = Object.values(S.jobs).filter((j) => j.layer === layerName).pop();
+  $("jobbox").hidden = !job;
+  if (!job) return;
+  const line = $("job-line");
+  line.textContent = job.text;
+  line.className = `job ${job.error ? "bad" : ""}`;
+  $("job-thumb").hidden = !job.thumb;
+  if (job.thumb) $("job-thumb").src = job.thumb;
 }
 
 async function run(l, mode, params) {
@@ -285,10 +349,7 @@ function onEvent(type, d) {
     $("live-img").hidden = true;
     finish(job);
   }
-  if (S.shot && S.selected === job.layer) {
-    const line = document.querySelector(".job");
-    if (line) line.textContent = job.text;
-  }
+  if (S.shot && S.selected === job.layer) renderJob(job.layer);
 }
 
 async function finish(job) {
@@ -302,11 +363,11 @@ async function finish(job) {
 }
 
 function onPreview(url) {
-  const live = $("live-img");
-  const old = live.src;
-  live.src = url;
-  live.hidden = false;
-  if (old.startsWith("blob:")) URL.revokeObjectURL(old);
+  const job = Object.values(S.jobs).filter((j) => !j.done).pop();
+  if (!job) { URL.revokeObjectURL(url); return; }
+  if (job.thumb) URL.revokeObjectURL(job.thumb);
+  job.thumb = url;
+  if (S.selected === job.layer) renderJob(job.layer);
 }
 
 // ---------------------------------------------------------------------------------------------------- actions
@@ -325,6 +386,16 @@ function setFrame(f) {
   $("frame-out").textContent = S.frame;
   renderBars();
   refreshFrame();
+}
+
+// Play steps through frames as fast as the server composites them (proxy size, not real time). Frame-accurate
+// playback is DJV's job (spec: Accurate playback).
+function togglePlay() {
+  if (!S.shot) return;
+  S.playing = !S.playing;
+  $("play").setAttribute("aria-pressed", String(S.playing));
+  $("play").setAttribute("aria-label", S.playing ? "Pause" : "Play");
+  if (S.playing) setFrame(S.frame >= S.shot.last ? S.shot.first : S.frame + 1);
 }
 
 function openShotDialog() {
@@ -357,9 +428,11 @@ function wire() {
   });
   $("scrub").addEventListener("input", (e) => setFrame(Number(e.target.value)));
   $("prev").addEventListener("click", () => setFrame(S.frame - 1));
+  $("play").addEventListener("click", togglePlay);
   $("next").addEventListener("click", () => setFrame(S.frame + 1));
   document.addEventListener("keydown", (e) => {
     if (e.target.closest("input, textarea, select")) return;
+    if (e.key === " ") { e.preventDefault(); togglePlay(); }
     if (e.key === "ArrowLeft") setFrame(S.frame - 1);
     if (e.key === "ArrowRight") setFrame(S.frame + 1);
   });

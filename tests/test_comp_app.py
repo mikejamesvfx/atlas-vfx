@@ -42,7 +42,8 @@ def main():
     html = text["index.html"]
     check(re.search(r'<script[^>]+type="module"[^>]+src="/atlas/app/main\.js"', html) is not None,
           "app: index.html loads main.js as a module from /atlas/app")
-    hosts = [m for f in FILES for m in re.findall(r"https?://[^\s'\"`)]+", text[f])]
+    hosts = [m for f in FILES for m in re.findall(r"https?://[^\s'\"`)]+", text[f])
+             if m != "http://www.w3.org/2000/svg"]          # the SVG namespace is a name, never fetched
     check(not hosts, "app: no other hosts (no CDN, nothing leaves the machine)", str(hosts[:3]))
     js = text["api.js"] + text["main.js"]
     check("eval(" not in js and "new Function" not in js, "app: no eval")
@@ -71,6 +72,15 @@ def main():
               f"app: Enter in {form} submits it (its first button is OK, not Cancel)", first.group(0) if first else "")
     check("plate_proxy_error" in main and "retryProxy" in text["api.js"],
           "app: a plate that failed to decode shows why, with a retry")
+    css = text["style.css"]
+    check(all(t in css for t in ("#171411", "#1a1714", "#eaa03a", "#f5f2ed", "#a09890")) and "2px" in css,
+          "design: the Atlas Camera tokens (warm ground, one amber, bone, ash, 2px corners)")
+    check("COMPASS" in main and "compassField" in main and "segmentedField" in main,
+          "design: the sun picker is a compass grid and short choices are segmented buttons")
+    check('id="rooms"' in html and "01 CAMERA" in html and "02 SCENE" in html and "03 COMP" in html,
+          "design: the rooms bar (Camera and Scene marked as not built yet)")
+    check('id="job-thumb"' in html and 'id="play"' in html,
+          "design: the live preview sits in the job box, and the timeline has a play button")
     check("/prompt" in text["api.js"] and "/ws?clientId=" in text["api.js"],
           "app: queues on ComfyUI's /prompt and listens on its websocket")
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
