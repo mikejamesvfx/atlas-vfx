@@ -109,7 +109,7 @@ Targets live outside the repo in `~/atlas-vfx-work/atlas_comp_targets.local.json
 {"targets": [
   {"name": "render", "kind": "comfyui", "url": "http://<address>:8188", "note": "3090 24 GB"},
   {"name": "cloud", "kind": "comfy_cloud",
-   "models": {"ltx23\ltx-2.3-22b-ic-lora-relight-1.0.safetensors": "<the name your import got>"}}
+   "models": {"ltx23\\ltx-2.3-22b-ic-lora-relight-1.0.safetensors": "<the name your import got>"}}
 ]}
 ```
 
