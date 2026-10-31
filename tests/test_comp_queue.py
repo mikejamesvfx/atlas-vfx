@@ -50,11 +50,21 @@ def relight_graph(out_dir):
     return r, rc.fill(r, rc.validate(r, {"element": "el"}), ctx, str(out_dir), "preview")
 
 
+def matte_graph(out_dir):
+    from atlas_vfx.comp import recipes as rc
+
+    r = rc.load_recipe("matte")
+    ctx = {"plate": "", "first": 1130, "last": 1146, "frame_offset": 1001, "first_frame": 1130, "length": 17,
+           "plate_first": 129, "plate_last": 145, "layer": "mt", "cache_dir": str(TMP / "cache_m"),
+           "layer_patterns": {"el": str(TMP / "el" / "el.####.exr")}}
+    return r, rc.fill(r, rc.validate(r, {"element": "el"}), ctx, str(out_dir), "preview")
+
+
 def test_split():
     from atlas_vfx.comp import queue as qu
 
     r, g = relight_graph(TMP / "out")
-    pre, gen, post = qu.split_graph(g, r["stages"], "job1_guide.latent", "job1_result.latent")
+    pre, gen, post, leaks = qu.split_graph(g, r["stages"], "job1_guide.latent", "job1_result.latent")
     kinds = lambda x: {n["class_type"] for n in x.values()}  # noqa: E731
     check("AtlasVFXLatentPrerender" in kinds(pre) and "SamplerCustomAdvanced" not in kinds(pre) and links_ok(pre),
           "split: pre ends at the cached latent, no sampling", str(sorted(kinds(pre)))[:120])
@@ -72,6 +82,32 @@ def test_split():
     check("SamplerCustomAdvanced" not in kinds(post) and "LoadLatent" in kinds(post) and "AtlasVFXLTXReturn" in kinds(post)
           and links_ok(post), "split: post decodes the returned latent and runs Return, no sampling",
           str(sorted(kinds(post)))[:160])
+    check(leaks == {}, "split: relight's generate needs no value from ws's own nodes", str(leaks))
+
+
+def test_split_leaks():
+    """Matte's empty latent takes length, width and height from Alpha Prep, a ws node reading ws files. Pre reports
+    them (core PreviewAny) and generate gets them as plain numbers, so the target never runs Alpha Prep."""
+    from atlas_vfx.comp import queue as qu
+
+    r, g = matte_graph(TMP / "out_m")
+    pre, gen, post, leaks = qu.split_graph(g, r["stages"], "m_guide.latent", "m_result.latent")
+    atlas = sorted({n["class_type"] for n in gen.values() if n["class_type"].startswith("AtlasVFX")})
+    check(atlas == ["AtlasVFXGuideFromLatent"] and links_ok(gen),
+          "leaks: matte's generate holds no ws-only node (Alpha Prep, Sequence Read)", str(atlas))
+    probes = {k: n["inputs"]["source"] for k, n in pre.items() if n["class_type"] == "PreviewAny"}
+    check(sorted(map(tuple, probes.values())) == [("2", 1), ("2", 2), ("2", 3)] and set(probes) == set(leaks),
+          "leaks: pre reports Alpha Prep's length, width and height", str(probes))
+    hist = {k: {"text": [{1: "9", 2: "1920", 3: "1088"}[v[1]]]} for k, v in probes.items()}
+    qu.fill_leaks(gen, leaks, hist)
+    e = gen["42"]["inputs"]
+    check((e["width"], e["height"], e["length"], gen["44"]["inputs"]["frames_number"]) == (1920, 1088, 9, 9),
+          "leaks: generate gets them as numbers", str((e["width"], e["height"], e["length"])))
+    try:
+        qu.fill_leaks(gen, leaks, {})
+        check(False, "leaks: a value pre never reported fails the job")
+    except ValueError as ex:
+        check("did not report" in str(ex), "leaks: a value pre never reported fails the job", str(ex)[:80])
 
 
 class FakeClient:
@@ -114,6 +150,8 @@ class FakeClient:
         g = self.submitted[int(pid.rsplit("-", 1)[1]) - 1]
         outs = {}
         for nid, node in g.items():
+            if node["class_type"] == "PreviewAny":
+                outs[nid] = {"text": [{1: "9", 2: "1920", 3: "1088"}.get(node["inputs"]["source"][1], "0")]}
             if node["class_type"] == "SaveLatent":
                 outs[nid] = {"latents": [{"filename": "atlas_00001_.latent", "subfolder": "atlas_comp", "type": "output"}]}
         return {"outputs": outs}
@@ -187,7 +225,7 @@ def test_queue_survives_dead_target():
 
 
 def main():
-    for f in (test_split, test_remote_job, test_refused_and_failed, test_queue_survives_dead_target):
+    for f in (test_split, test_split_leaks, test_remote_job, test_refused_and_failed, test_queue_survives_dead_target):
         f()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

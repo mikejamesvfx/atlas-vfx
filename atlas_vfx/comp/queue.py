@@ -72,6 +72,7 @@ def _replace_ref(g: dict, src: str, slot: int, new: list) -> None:
 # no atlas-vfx install for them.
 RESOLVABLE = {"AtlasVFXShotRange": ("atlas_vfx.layers.node_shot_range", "AtlasVFXShotRange"),
               "AtlasVFXSunDirection": ("atlas_vfx.layers.node_sun_direction", "AtlasVFXSunDirection")}
+KEEP_REMOTE = {"AtlasVFXGuideFromLatent"}     # the one atlas node a farm target runs (it reads only the uploaded latent)
 
 
 def _resolve_pure(g: dict) -> dict:
@@ -94,8 +95,15 @@ def _resolve_pure(g: dict) -> dict:
     return {k: v for k, v in g.items() if not (v["class_type"] in RESOLVABLE and k not in still)}
 
 
-def split_graph(graph: dict, stages: dict, guide_name: str, result_name: str) -> tuple[dict, dict, dict]:
-    """(pre, generate, post) API graphs for a job on another machine. Node ids 9000-9002 are added."""
+PROBE = 9100      # PreviewAny ids in pre, one per value generate needs from a ws-only node
+
+
+def split_graph(graph: dict, stages: dict, guide_name: str, result_name: str):
+    """(pre, generate, post, leaks) API graphs for a job on another machine. Node ids 9000-9002 are added.
+
+    leaks: a value generate needs from a ws-only atlas node (Alpha Prep's length, width, height) is reported by a
+    core PreviewAny in pre; {probe id: [[gen node, input], ...]} says where fill_leaks puts it. The target never runs
+    a node that reads ws's files."""
     pre_id, (gen_id, gen_slot) = str(stages["pre"]), (str(stages["gen_out"][0]), int(stages["gen_out"][1]))
     pre = {k: copy.deepcopy(graph[k]) for k in ancestors(graph, [pre_id])}
 
@@ -105,12 +113,45 @@ def split_graph(graph: dict, stages: dict, guide_name: str, result_name: str) ->
     gen["9001"] = {"class_type": "SaveLatent", "inputs": {"samples": [gen_id, gen_slot],
                                                            "filename_prefix": f"atlas_comp/{Path(result_name).stem}"}}
     gen = _resolve_pure({k: gen[k] for k in ancestors(gen, ["9001"])})
+    ws_only = {k for k, n in gen.items() if k in pre and n["class_type"].startswith("AtlasVFX")
+               and n["class_type"] not in KEEP_REMOTE}
+    leaks, probes = {}, {}
+    for k in sorted(set(gen) - ws_only, key=lambda x: (len(x), x)):
+        for inp, src, slot in list(_refs(gen[k])):
+            if src in ws_only:
+                pid = probes.setdefault((src, slot), str(PROBE + len(probes)))
+                pre[pid] = {"class_type": "PreviewAny", "inputs": {"source": [src, slot]}}
+                leaks.setdefault(pid, []).append([k, inp])
+                gen[k]["inputs"][inp] = None
+    gen = {k: gen[k] for k in ancestors(gen, ["9001"])}
 
     post = copy.deepcopy(graph)
     post["9002"] = {"class_type": "LoadLatent", "inputs": {"latent": result_name}}
     _replace_ref(post, gen_id, gen_slot, ["9002", 0])
     post = {k: post[k] for k in ancestors(post, [s for s in sinks(graph) if s != gen_id])}
-    return pre, gen, post
+    return pre, gen, post, leaks
+
+
+def _literal(text: str):
+    t = text.strip()
+    if t in ("True", "False"):
+        return t == "True"
+    for cast in (int, float):
+        try:
+            return cast(t)
+        except ValueError:
+            pass
+    return text
+
+
+def fill_leaks(gen: dict, leaks: dict, outputs: dict) -> None:
+    """Put the values pre reported (history outputs of its PreviewAny probes) into generate."""
+    for pid, uses in leaks.items():
+        text = (outputs.get(pid) or {}).get("text") or []
+        if not text:
+            raise ValueError(f"pre did not report the value for {uses[0][0]}.{uses[0][1]}")
+        for node, inp in uses:
+            gen[node]["inputs"][inp] = _literal(text[0])
 
 
 # ---------------------------------------------------------------------------------------------------- running
@@ -141,14 +182,14 @@ def run_job(job: dict, graph: dict, recipe: dict, local, remote, remote_is_local
             local.wait(local.submit(graph), cancelled)
         else:
             guide, result = f"{job['id']}_guide.latent", f"{job['id']}_result.latent"
-            pre, gen, post = split_graph(graph, recipe["stages"], guide, result)
+            pre, gen, post, leaks = split_graph(graph, recipe["stages"], guide, result)
             _log(job, "preflight", job["target"])
             check = tg.preflight({"name": job["target"], "kind": "comfyui", "url": ""}, gen,
                                  fetch=lambda url, timeout=10: remote.object_info())
             if not check["ok"]:
                 raise ValueError("; ".join(check["notes"]) + ": not sent")
             _log(job, "pre", "ws")
-            local.wait(local.submit(pre), cancelled)
+            fill_leaks(gen, leaks, local.wait(local.submit(pre), cancelled).get("outputs", {}))
             pre_node = graph[str(recipe["stages"]["pre"])]["inputs"]
             data = (Path(pre_node["out_dir"]) / f"{pre_node['name']}.latent").read_bytes()
             _log(job, "upload", f"{len(data)} bytes")
