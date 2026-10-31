@@ -107,6 +107,15 @@ async def run():
               "frame: a JPEG", r.status)
         r = await c.get("/atlas/api/shots/S1/frame", params={"f": "abc"})
         check(r.status == 400, "frame: a bad frame number is a 400", r.status)
+        r = await c.get("/atlas/api/presets")
+        ps = (await r.json())["presets"]
+        check(r.status == 200 and any(p["group"] == "Right sun" for p in ps), "presets: listed with the Right sun group")
+        right_low = [p for p in ps if p["id"] == "right-low"][0]
+        r = await c.post("/atlas/api/shots/S1/layers", json={"layer": "right_low", "kind": "recipe",
+                                                              "recipe": right_low["recipe"],
+                                                              "params": {**right_low["params"], "element": "el"}})
+        check(r.status == 200 and (await r.json())["params"]["direction"] == "the right",
+              "presets: a card adds a relight layer with its settings", r.status)
         r = await c.get("/atlas/api/views")
         check(r.status == 200 and len((await r.json())["views"]) > 3, "views: listed")
         bad = pl.WORK_ROOT / "bad.mov"

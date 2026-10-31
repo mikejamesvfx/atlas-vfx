@@ -204,6 +204,11 @@ def build_routes():
     async def recipes(request):
         return web.json_response({"recipes": rc.list_recipes()})
 
+    @routes.get("/atlas/api/presets")
+    @guard
+    async def presets(request):
+        return web.json_response({"presets": rc.list_presets()})
+
     @routes.post("/atlas/api/shots/{shot}/layers/{layer}/graph")
     @guard
     async def graph(request):

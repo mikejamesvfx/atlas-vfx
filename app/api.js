@@ -29,6 +29,7 @@ export const api = {
   addLayer: (shot, d) => call("POST", `/atlas/api/shots/${enc(shot)}/layers`, d),
   patchLayer: (shot, layer, d) => call("PATCH", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}`, d),
   recipes: () => call("GET", "/atlas/api/recipes"),
+  presets: () => call("GET", "/atlas/api/presets"),
   graph: (shot, layer, mode, params) =>
     call("POST", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}/graph`, { mode, params }),
   views: () => call("GET", "/atlas/api/views"),

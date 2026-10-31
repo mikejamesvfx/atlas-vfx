@@ -123,3 +123,15 @@ menu { display: flex; flex-direction: row-reverse; justify-content: flex-start; 
   #layers, #inspector { border: 0; border-top: 1px solid var(--hairline); }
   body { overflow: auto; }
 }
+
+#presets-dialog { width: min(1200px, 94vw); max-height: 90vh; overflow: auto; padding: 24px 28px; }
+.presets-head { display: grid; gap: 12px; margin-bottom: 18px; }
+.presets-head h2 { font: 700 40px/1.05 var(--display); }
+#preset-groups { max-width: 560px; }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; }
+.preset { border: 1px solid var(--frame); border-radius: var(--r); background: var(--ground-deep); display: flex; flex-direction: column; }
+.preset-thumb { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #0f0d0b; }
+.preset-thumb.empty { display: grid; place-items: center; font: 12px var(--mono); color: var(--ash); }
+.preset-body { padding: 12px 14px 14px; display: grid; gap: 6px; }
+.preset-body h3 { margin: 0; font: 600 20px/1.2 var(--display); color: var(--bone); }
+.preset-body p { margin: 0; font-size: 13px; }

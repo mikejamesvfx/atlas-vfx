@@ -40,6 +40,16 @@ def list_recipes() -> list[dict]:
     return [{k: v for k, v in load_recipe(n).items() if k != "graph"} for n in _names()]
 
 
+def list_presets() -> list[dict]:
+    """The Presets gallery (recipes/presets/presets.json): id, group, name, what, recipe, params. A preset whose
+    recipe is missing is left out."""
+    p = RECIPES / "presets" / "presets.json"
+    if not p.is_file():
+        return []
+    names = set(_names())
+    return [x for x in json.loads(p.read_text(encoding="utf-8"))["presets"] if x.get("recipe") in names]
+
+
 def _number(key: str, v, kind):
     if isinstance(v, bool) or not isinstance(v, (int, float, str)):
         raise ValueError(f"{key}: a number")

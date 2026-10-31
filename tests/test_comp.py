@@ -390,13 +390,32 @@ def test_light_mix():
     check(np.allclose(img[3, 3, :3], [0.1, 0.2, 0.6], atol=3e-3), "mix: empty mix goes back to the chosen version")
 
 
+def test_presets():
+    from atlas_vfx.comp import recipes as rc
+
+    ps = rc.list_presets()
+    groups = {p["group"] for p in ps}
+    right = [p for p in ps if p["group"] == "Right sun"]
+    check("Right sun" in groups and len(right) >= 5, "presets: a Right sun gallery", f"{len(right)} in {sorted(groups)}")
+    check(all(p["recipe"] == "relight" and "right" in p["params"]["direction"] for p in right),
+          "presets: every right-sun card is a relight with the sun on the right side")
+    bad = []
+    for p in ps:
+        try:
+            rc.validate(rc.load_recipe(p["recipe"]), p["params"])
+        except ValueError as e:
+            bad.append((p["id"], str(e)))
+    check(not bad, "presets: every preset's settings pass its recipe's checks", str(bad[:2]))
+    check(len({p["id"] for p in ps}) == len(ps), "presets: ids are unique")
+
+
 def main():
     for t in (test_shot_roundtrip, test_names_are_safe, test_layers, test_versions, test_beauty_and_preview,
               test_recipes_listed,
               test_validate, test_fill_render_vs_preview, test_two_renders_two_versions, test_blends,
               test_skips_missing, test_jpeg, test_plate_proxy,
               test_no_second_proxy_build, test_proxy_failure_and_partial,
-              test_latest_skips_empty_versions, test_light_mix):
+              test_latest_skips_empty_versions, test_light_mix, test_presets):
         t()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

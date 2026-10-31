@@ -1,0 +1,104 @@
+{
+ "presets": [
+  {
+   "id": "right-low",
+   "group": "Right sun",
+   "name": "Low sun from frame right",
+   "what": "Golden hour, long shadows falling left.",
+   "recipe": "relight",
+   "params": {
+    "direction": "the right",
+    "height": "low",
+    "look": "hard warm golden sunset sunlight"
+   }
+  },
+  {
+   "id": "right-mid",
+   "group": "Right sun",
+   "name": "Afternoon sun from frame right",
+   "what": "Warm, shorter shadows, more fill.",
+   "recipe": "relight",
+   "params": {
+    "direction": "the right",
+    "height": "mid",
+    "look": "warm late afternoon sunlight"
+   }
+  },
+  {
+   "id": "right-high",
+   "group": "Right sun",
+   "name": "High sun from frame right",
+   "what": "Midday, crisp and short-shadowed.",
+   "recipe": "relight",
+   "params": {
+    "direction": "the right",
+    "height": "high",
+    "look": "bright clean midday sunlight"
+   }
+  },
+  {
+   "id": "front-right-low",
+   "group": "Right sun",
+   "name": "Low sun over the camera's right shoulder",
+   "what": "Face lit, shadows behind the subject.",
+   "recipe": "relight",
+   "params": {
+    "direction": "the front-right",
+    "height": "low",
+    "look": "soft warm golden light"
+   }
+  },
+  {
+   "id": "back-right-low",
+   "group": "Right sun",
+   "name": "Rim light from back right",
+   "what": "Backlit edge, the front falls into shade.",
+   "recipe": "relight",
+   "params": {
+    "direction": "the back-right",
+    "height": "low",
+    "look": "warm golden backlight rim"
+   }
+  },
+  {
+   "id": "left-low",
+   "group": "Left sun",
+   "name": "Low sun from frame left",
+   "what": "The DSCF3000 take: rendered mirrored.",
+   "recipe": "relight",
+   "params": {
+    "direction": "the left",
+    "height": "low",
+    "look": "hard warm golden sunset sunlight"
+   }
+  },
+  {
+   "id": "front-left-low",
+   "group": "Left sun",
+   "name": "Low sun over the camera's left shoulder",
+   "what": "Face lit from the left, rendered mirrored.",
+   "recipe": "relight",
+   "params": {
+    "direction": "the front-left",
+    "height": "low",
+    "look": "soft warm golden light"
+   }
+  },
+  {
+   "id": "matte",
+   "group": "Matte",
+   "name": "Alpha from anything",
+   "what": "LTX Alpha-Gen: soft edges, no green screen; a still works too.",
+   "recipe": "matte",
+   "params": {}
+  },
+  {
+   "id": "sky-burning-palms",
+   "group": "Sky",
+   "name": "Burning Palms, 6:39 pm",
+   "what": "Physical sky for DSCF2977's place and time.",
+   "recipe": "sky",
+   "params": {}
+  }
+ ]
+}

@@ -19,6 +19,7 @@ const el = (tag, props = {}, ...kids) => {
 const S = {
   shots: [], shot: null, recipes: [], views: [], view: "", frame: 1001, exposure: 0, a: "", b: "", wipe: 0.5,
   selected: null, jobs: {}, frameBusy: false, frameAgain: false, nonce: 0, playing: false,
+  presets: [], presetGroup: "Right sun",
 };
 
 function status(msg, bad = false) {
@@ -65,6 +66,7 @@ function render() {
   $("empty").hidden = has;
   $("frame-img").hidden = !has;
   $("add-layer").disabled = !has;
+  $("presets-btn").disabled = !has;
   if (!has) {
     renderEmpty();
     $("layer-list").replaceChildren();
@@ -439,6 +441,75 @@ function togglePlay() {
   if (S.playing) setFrame(S.frame >= S.shot.last ? S.shot.first : S.frame + 1);
 }
 
+// ---------------------------------------------------------------------------------------------------- presets
+// A preset is a recipe with its settings filled in. A card adds a recipe layer on the chosen element; once a layer
+// made from that preset has frames, the card shows one of them.
+function presetLayer(p) {
+  return S.shot.layers.find((l) => l.kind === "recipe" && l.recipe === p.recipe && (l.frames || []).length &&
+    Object.entries(p.params).every(([k, v]) => l.params && l.params[k] === v));
+}
+
+function renderPresets() {
+  const groups = [...new Set(S.presets.map((p) => p.group))];
+  if (!groups.includes(S.presetGroup)) S.presetGroup = groups[0];
+  $("preset-groups").replaceChildren(...groups.map((g) => el("button", { type: "button", text: g,
+    "aria-pressed": String(g === S.presetGroup), onclick: () => { S.presetGroup = g; renderPresets(); } })));
+  const sources = S.shot.layers.filter((l) => l.kind === "sequence" || (l.frames || []).length).map((l) => l.name);
+  const pick = $("preset-element");
+  const keep = pick.value;
+  pick.replaceChildren(...sources.map((n) => el("option", { value: n, text: n })));
+  pick.value = sources.includes(keep) ? keep : (sources.includes(S.selected) ? S.selected : sources[0] || "");
+  const cards = S.presets.filter((p) => p.group === S.presetGroup).map((p) => {
+    const done = presetLayer(p);
+    const thumb = done
+      ? el("img", { class: "preset-thumb", alt: `${p.name}, rendered`, src: frameURL(S.shot.name, {
+        f: done.frames[0][0], w: 480, a: S.shot.plate ? `plate,${done.name}` : done.name, view: S.view, n: ++S.nonce }) })
+      : el("div", { class: "preset-thumb empty", text: "not rendered on this shot yet" });
+    return el("article", { class: "preset" }, thumb,
+      el("div", { class: "preset-body" },
+        el("span", { class: "eyebrow", text: p.recipe }),
+        el("h3", { text: p.name }),
+        el("p", { class: "muted", text: p.what }),
+        el("div", { class: "runs" },
+          el("button", { type: "button", text: done ? `Open ${done.name}` : "Add as layer",
+            onclick: () => (done ? openPresetLayer(done) : addPreset(p)) }))));
+  });
+  $("preset-grid").replaceChildren(...cards);
+}
+
+function openPresetLayer(l) {
+  S.selected = l.name;
+  $("presets-dialog").close();
+  render();
+}
+
+async function addPreset(p) {
+  const element = $("preset-element").value;
+  const fields = (S.recipes.find((r) => r.name === p.recipe) || { fields: [] }).fields;
+  const params = { ...p.params };
+  if (fields.some((f) => f.key === "element")) {
+    if (!element) { $("preset-error").textContent = "Add an EXR layer first: presets run on a layer."; return; }
+    params.element = element;
+  }
+  const names = new Set(S.shot.layers.map((l) => l.name));
+  let name = p.id.replace(/-/g, "_");
+  for (let i = 2; names.has(name); i++) name = `${p.id.replace(/-/g, "_")}_${i}`;
+  try {
+    await api.addLayer(S.shot.name, { layer: name, kind: "recipe", recipe: p.recipe, params });
+    S.selected = name;
+    $("presets-dialog").close();
+    await reloadShot();
+    status(`${name}: added from the preset. Preview or Render it in the inspector.`);
+  } catch (e) { $("preset-error").textContent = e.message; }
+}
+
+function openPresets() {
+  if (!S.shot) return;
+  $("preset-error").textContent = "";
+  renderPresets();
+  $("presets-dialog").showModal();
+}
+
 function openShotDialog() {
   $("shot-error").textContent = "";
   $("shot-dialog").showModal();
@@ -456,6 +527,7 @@ function openLayerDialog() {
 function wire() {
   $("shot-pick").addEventListener("change", (e) => openShot(e.target.value));
   $("new-shot").addEventListener("click", openShotDialog);
+  $("presets-btn").addEventListener("click", openPresets);
   $("add-layer").addEventListener("click", openLayerDialog);
   $("layer-what").addEventListener("change", (e) => { $("source-wrap").hidden = e.target.value !== "sequence"; });
   $("view-pick").addEventListener("change", (e) => { S.view = e.target.value; localSet("view", S.view); refreshFrame(); });
@@ -509,8 +581,9 @@ async function start() {
   wire();
   listen({ onEvent, onPreview });
   try {
-    const [r, v] = await Promise.all([api.recipes(), api.views()]);
+    const [r, v, ps] = await Promise.all([api.recipes(), api.views(), api.presets()]);
     S.recipes = r.recipes;
+    S.presets = ps.presets;
     S.views = v.views;
     S.view = localGet("view") && S.views.includes(localGet("view")) ? localGet("view") : S.views[0];
     $("view-pick").replaceChildren(...S.views.map((x) => el("option", { value: x, text: x })));

@@ -16,6 +16,7 @@
     </nav>
     <label>Shot <select id="shot-pick"></select></label>
     <button id="new-shot" type="button">New shot</button>
+    <button id="presets-btn" type="button">Presets</button>
     <span id="proxy" class="muted"></span>
     <span class="grow"></span>
     <label>View <select id="view-pick"></select></label>
@@ -68,6 +69,18 @@
     <div id="bars"></div>
     <div id="status"></div>
   </footer>
+
+  <dialog id="presets-dialog" aria-labelledby="presets-title">
+    <div class="presets-head">
+      <span class="eyebrow accent">Presets — run on your plate</span>
+      <h2 id="presets-title">Pick a look. It lands on the tracked shot.</h2>
+      <div id="preset-groups" class="segmented" role="group" aria-label="Group"></div>
+      <label>On layer <select id="preset-element"></select></label>
+    </div>
+    <div id="preset-grid" class="preset-grid"></div>
+    <p class="error" id="preset-error"></p>
+    <form method="dialog"><menu><button value="close">Close</button></menu></form>
+  </dialog>
 
   <dialog id="shot-dialog">
     <form method="dialog" id="shot-form">

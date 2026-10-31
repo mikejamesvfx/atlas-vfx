@@ -112,12 +112,43 @@ def sky() -> dict:
             "preview": {"set": [["1", "width", 512]]}}
 
 
+def presets() -> list[dict]:
+    """The Presets gallery: recipes with settings filled in, grouped. The element layer is the artist's pick."""
+    def sun(pid, group, name, what, direction, height, look):
+        return {"id": pid, "group": group, "name": name, "what": what, "recipe": "relight",
+                "params": {"direction": direction, "height": height, "look": look}}
+    return [
+        sun("right-low", "Right sun", "Low sun from frame right", "Golden hour, long shadows falling left.",
+            "the right", "low", "hard warm golden sunset sunlight"),
+        sun("right-mid", "Right sun", "Afternoon sun from frame right", "Warm, shorter shadows, more fill.",
+            "the right", "mid", "warm late afternoon sunlight"),
+        sun("right-high", "Right sun", "High sun from frame right", "Midday, crisp and short-shadowed.",
+            "the right", "high", "bright clean midday sunlight"),
+        sun("front-right-low", "Right sun", "Low sun over the camera's right shoulder",
+            "Face lit, shadows behind the subject.", "the front-right", "low", "soft warm golden light"),
+        sun("back-right-low", "Right sun", "Rim light from back right", "Backlit edge, the front falls into shade.",
+            "the back-right", "low", "warm golden backlight rim"),
+        sun("left-low", "Left sun", "Low sun from frame left", "The DSCF3000 take: rendered mirrored.",
+            "the left", "low", "hard warm golden sunset sunlight"),
+        sun("front-left-low", "Left sun", "Low sun over the camera's left shoulder",
+            "Face lit from the left, rendered mirrored.", "the front-left", "low", "soft warm golden light"),
+        {"id": "matte", "group": "Matte", "name": "Alpha from anything",
+         "what": "LTX Alpha-Gen: soft edges, no green screen; a still works too.", "recipe": "matte", "params": {}},
+        {"id": "sky-burning-palms", "group": "Sky", "name": "Burning Palms, 6:39 pm",
+         "what": "Physical sky for DSCF2977's place and time.", "recipe": "sky", "params": {}},
+    ]
+
+
 def main() -> int:
     OUT.mkdir(exist_ok=True)
     for r in (matte(), relight(), sky()):
         p = OUT / f"{r['name']}.json"
         p.write_text(ui_workflow.portable(json.dumps(r, indent=1)), encoding="utf-8")
         print("wrote", p)
+    (OUT / "presets").mkdir(exist_ok=True)
+    p = OUT / "presets" / "presets.json"
+    p.write_text(json.dumps({"presets": presets()}, indent=1), encoding="utf-8")
+    print("wrote", p)
     return 0
 
 

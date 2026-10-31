@@ -83,6 +83,8 @@ def main():
           "design: the live preview sits in the job box, and the timeline has a play button")
     check("Light mix" in main and "lightMix" in main and "{ mix:" in main and "Mix off" in main,
           "design: a recipe layer with renders gets Light mix sliders, one per version, saved as mix")
+    check('id="presets-btn"' in html and 'id="presets-dialog"' in html and "renderPresets" in main
+          and "presets:" in text["api.js"], "design: a Presets gallery opens from the top bar")
     check("/prompt" in text["api.js"] and "/ws?clientId=" in text["api.js"],
           "app: queues on ComfyUI's /prompt and listens on its websocket")
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
