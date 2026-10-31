@@ -63,6 +63,37 @@ def _fetch(url: str, timeout: float = 10):
         return json.loads(r.read())
 
 
+def _same(name: str) -> str:
+    """ws writes model subfolders with \, a Linux box with /: the same file either way."""
+    return name.replace("\\", "/")
+
+
+def options_of(info: dict, cls: str, key: str):
+    """A loader input's choices from /object_info, in both formats: [[a, b]] and ["COMBO", {"options": [a, b]}]."""
+    spec = info.get(cls, {}).get("input", {})
+    for group in ("required", "optional"):
+        s = spec.get(group, {}).get(key)
+        if not s:
+            continue
+        if isinstance(s[0], list):
+            return s[0]
+        if s[0] == "COMBO" and len(s) > 1 and isinstance(s[1], dict) and isinstance(s[1].get("options"), list):
+            return s[1]["options"]
+    return None
+
+
+def localize(graph: dict, info: dict) -> dict:
+    """Rewrite model names to the target's own spelling (its / or \ subfolders), in place."""
+    for node in graph.values():
+        for key, val in node.get("inputs", {}).items():
+            if key in MODEL_INPUTS and isinstance(val, str):
+                opts = options_of(info, node["class_type"], key) or []
+                hit = [o for o in opts if isinstance(o, str) and _same(o) == _same(val)]
+                if hit:
+                    node["inputs"][key] = hit[0]
+    return graph
+
+
 def _check(graph: dict, has_node, model_options) -> tuple[list[str], list[str]]:
     missing_nodes, missing_models = [], []
     for node in graph.values():
@@ -74,7 +105,7 @@ def _check(graph: dict, has_node, model_options) -> tuple[list[str], list[str]]:
         for key, val in node.get("inputs", {}).items():
             if key in MODEL_INPUTS and isinstance(val, str):
                 opts = model_options(cls, key)
-                if opts is not None and val not in opts and val not in missing_models:
+                if opts is not None and _same(val) not in {_same(o) for o in opts if isinstance(o, str)}                         and val not in missing_models:
                     missing_models.append(val)
     return missing_nodes, missing_models
 
@@ -91,14 +122,7 @@ def preflight(target: dict, graph: dict, fetch=None, cloud=None) -> dict:
             return {"ok": False, "missing_nodes": [], "missing_models": [],
                     "notes": [f"{target['name']} is unreachable: {type(e).__name__}"]}
 
-        def options(cls, key):
-            spec = info.get(cls, {}).get("input", {})
-            for group in ("required", "optional"):
-                s = spec.get(group, {}).get(key)
-                if s and isinstance(s[0], list):
-                    return s[0]
-            return None
-        nodes, models = _check(graph, lambda c: c in info, options)
+        nodes, models = _check(graph, lambda c: c in info, lambda cls, key: options_of(info, cls, key))
     elif target["kind"] == "comfy_cloud":
         if cloud is None:
             return {"ok": False, "missing_nodes": [], "missing_models": [], "notes": ["Comfy Cloud is not set up"]}

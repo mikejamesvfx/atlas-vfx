@@ -89,6 +89,22 @@ def test_split():
           "ComfyUI accepts it", str(outs))
 
 
+def test_linux_spelling():
+    """A Linux farm box lists ltx23/name in the COMBO format; generate is sent with that spelling, not ws's \."""
+    from atlas_vfx.comp import queue as qu
+
+    info = all_info()
+    info["LTXICLoRALoaderModelOnly"] = {"input": {"required": {"lora_name": ["COMBO", {"options": [
+        "ltx23/ltx-2.3-22b-ic-lora-relight-1.0.safetensors"]}]}}}
+    r, g = relight_graph(TMP / "out_lx")
+    local, remote = FakeClient("ws"), FakeClient("render", info=info)
+    job = qu.new_job("S", "rl", "preview", "render", expected=17, out_dir=str(TMP / "out_lx"))
+    qu.run_job(job, g, r, local, remote, remote_is_local=False)
+    sent = [n["inputs"]["lora_name"] for n in remote.submitted[0].values() if "lora_name" in n["inputs"]]         if remote.submitted else []
+    check(job["status"] == "done" and sent == ["ltx23/ltx-2.3-22b-ic-lora-relight-1.0.safetensors"],
+          "linux: generate goes out with the target's own model spelling", f"{job['status']} {sent} {job['message'][:80]}")
+
+
 def test_review_fixes():
     from atlas_vfx.comp import queue as qu
 
@@ -313,7 +329,7 @@ def test_queue_survives_dead_target():
 
 
 def main():
-    for f in (test_split, test_review_fixes, test_split_leaks, test_remote_job, test_refused_and_failed, test_queue_survives_dead_target):
+    for f in (test_split, test_linux_spelling, test_review_fixes, test_split_leaks, test_remote_job, test_refused_and_failed, test_queue_survives_dead_target):
         f()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

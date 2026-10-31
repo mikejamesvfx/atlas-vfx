@@ -121,8 +121,31 @@ def test_preflight():
           str(r["notes"]))
 
 
+def test_combo_and_separators():
+    """A Linux farm box spells folders with / and newer loaders list options as ["COMBO", {"options": [...]}]; ws
+    writes ltx25\\name. Preflight must read both formats, match across separators, and localize() must rewrite the
+    graph to the target's own spelling (live on render 2026-10-31: the LoRA was "not found")."""
+    from atlas_vfx.comp import targets as tg
+
+    info = {"LTXICLoRALoaderModelOnly": {"input": {"required": {"lora_name": ["COMBO", {"multiselect": False,
+                                                                                         "options": ["ltx25/alpha.safetensors"]}]}}},
+            "UNETLoader": {"input": {"required": {"unet_name": [["ltx.safetensors"]]}}}}
+    g = {"1": {"class_type": "LTXICLoRALoaderModelOnly", "inputs": {"lora_name": "ltx25\\alpha.safetensors"}},
+         "2": {"class_type": "UNETLoader", "inputs": {"unet_name": "ltx.safetensors"}}}
+    t = {"name": "render", "kind": "comfyui", "url": "http://render.example:8188"}
+    r = tg.preflight(t, g, fetch=lambda url, timeout=10: info)
+    check(r["ok"], "combo: a / spelling on the target matches ws's \\ spelling", str(r))
+    tg.localize(g, info)
+    check(g["1"]["inputs"]["lora_name"] == "ltx25/alpha.safetensors", "combo: the graph is rewritten to the target's "
+          "spelling before it is sent", g["1"]["inputs"]["lora_name"])
+    g["1"]["inputs"]["lora_name"] = "ltx25\\missing.safetensors"
+    r = tg.preflight(t, g, fetch=lambda url, timeout=10: info)
+    check(not r["ok"] and r["missing_models"] == ["ltx25\\missing.safetensors"],
+          "combo: a model missing from a COMBO list is still refused", str(r["missing_models"]))
+
+
 def main():
-    for f in (test_targets_file, test_preflight):
+    for f in (test_targets_file, test_preflight, test_combo_and_separators):
         f()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

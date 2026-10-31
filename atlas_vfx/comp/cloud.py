@@ -106,8 +106,12 @@ def run_cloud_job(job: dict, graph: dict, recipe: dict, local, cloud, model_map:
     try:
         _, probe, _, _ = cloud_graphs(graph, recipe, ["probe.png"], result, model_map)
         qu._log(job, "preflight", job["target"])
-        check = tg.preflight({"name": job["target"], "kind": "comfyui", "url": ""}, probe,
-                             fetch=lambda url, timeout=10: cloud.object_info())
+        seen = {}
+
+        def fetch(url, timeout=10):
+            seen["info"] = cloud.object_info()
+            return seen["info"]
+        check = tg.preflight({"name": job["target"], "kind": "comfyui", "url": ""}, probe, fetch=fetch)
         if not check["ok"]:
             raise ValueError("; ".join(check["notes"]) + ": not sent")
         job["estimate"] = estimate(job["expected"])
@@ -133,6 +137,7 @@ def run_cloud_job(job: dict, graph: dict, recipe: dict, local, cloud, model_map:
         qu._log(job, "upload", f"{len(names)} reference frames to Comfy Cloud")
         _, gen, _, _ = cloud_graphs(graph, recipe, names, result, model_map)
         qu.fill_leaks(gen, leaks, outs)
+        tg.localize(gen, seen["info"])
         qu._log(job, "generate", job["target"])
         hist = cloud.wait(cloud.submit(gen), cancelled)
         files = hist.get("outputs", {}).get("9001", {}).get("latents", [])

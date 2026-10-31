@@ -193,10 +193,15 @@ def run_job(job: dict, graph: dict, recipe: dict, local, remote, remote_is_local
             guide, result = f"{job['id']}_guide.latent", f"{job['id']}_result.latent"
             pre, gen, post, leaks = split_graph(graph, recipe["stages"], guide, result)
             _log(job, "preflight", job["target"])
-            check = tg.preflight({"name": job["target"], "kind": "comfyui", "url": ""}, gen,
-                                 fetch=lambda url, timeout=10: remote.object_info())
+            seen = {}
+
+            def fetch(url, timeout=10):
+                seen["info"] = remote.object_info()
+                return seen["info"]
+            check = tg.preflight({"name": job["target"], "kind": "comfyui", "url": ""}, gen, fetch=fetch)
             if not check["ok"]:
                 raise ValueError("; ".join(check["notes"]) + ": not sent")
+            tg.localize(gen, seen["info"])          # ws's backslash subfolders become the target's own spelling
             _log(job, "pre", "ws")
             outs = local.wait(local.submit(pre), cancelled).get("outputs", {})
             fill_leaks(gen, leaks, outs)
