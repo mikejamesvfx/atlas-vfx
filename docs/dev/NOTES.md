@@ -1035,3 +1035,20 @@ latent uploaded, generate, the sampled latent downloaded, post on ws.
   (preview). The target deleted and interrupted that prompt only, but ComfyUI checks interrupts between nodes,
   so it stopped 4 min 17 s later, when the long 4K read finished. The new v003 folder stayed empty.
 
+## 2026-10-31 Farm installed: render queue runs on render and hub
+
+- **Installed on both Linux boxes:** atlas-vfx (this branch) in `custom_nodes/atlas-vfx`, plus `opencolorio` 2.6.0
+  (the only requirement missing). Both load 54 nodes, none disabled.
+- **Models:** the int8 LTX-2.5 transformer, the LTX-2.5 audio VAE, and the Alpha-Gen and Relight IC-LoRAs were
+  copied into the farm's shared model store, sha256 checked. render reads that store over NFS.
+- **Preflight bug, found live:** the first matte on render passed preflight, then failed with "Model in folder
+  'loras' with filename 'ltx25\...' not found". The LoRA loader lists its choices as `["COMBO", {"options":
+  [...]}]`, which preflight didn't read; and ws writes subfolders with `\` where Linux uses `/`. Fixed: preflight
+  reads both formats, matches across the two separators, and rewrites the graph to the target's spelling. It then
+  correctly refused both LoRAs as missing, until they were copied.
+- **Matte preview, generate on render (3090):** done, 9 of 9 frames, 97 s end to end. Against ws: mean
+  difference 0.00013, mean alpha difference 0.0005; a few edge pixels flip (max 1.0). Expected across GPUs.
+- **Relight preview, generate on hub (A4000 16 GB, the 20 GB int8 model offloaded):** done, 17 of 17 frames,
+  250 s. Against ws: mean 0.04 stop, the largest differences in the hottest highlights.
+- NFS caches folder listings: render saw new files about 30 s after they landed on hub.
+
