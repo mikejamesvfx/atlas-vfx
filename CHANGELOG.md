@@ -51,6 +51,11 @@ when it does, the entry says so and names the tool that rewrites them.
   latent in a second. Loading the pack also gives LTX samplers live previews through it when ComfyUI's live preview
   method is TAESD (`ATLAS_VFX_LTX_LIVE_PREVIEW=0` turns that off; anything unexpected falls back to ComfyUI's preview).
 
+- **Atlas Comp** (early, at `/atlas` on the running ComfyUI): a compositor's screen over these nodes. Shots on disk,
+  a layer stack (EXR sequences and recipes), a viewer through the OCIO view with A/B wipe and f-stops, recipes
+  (Matte, Relight, Sky) run as Preview with tiny-VAE live previews or Render into versions. New package
+  `atlas_vfx/comp` (allowed to import every package; only the root imports it), `app/`, `recipes/`.
+
 ## 0.1.0 (2026-10-30), first public beta
 
 The first tagged release of the public repo. 37 nodes in five families (Camera, Layers, Plate Lock, Sensor,

@@ -134,6 +134,20 @@ options", "think higgsfield but better", "Tauri sounds good, we should probably 
     yet.
   - Changes needed in Atlas Scene or Atlas Camera are made in their own repos, never from this one; this repo records
     them in `docs/dev/UPSTREAM_TODO.md`.
+- **Accurate playback: DJV now, tlRender in the shell.** Mike: "an accurate playback repo is needed", pointing at
+  github.com/grizzlypeak3d/DJV and tlRender ("whatever you think").
+  - Both are BSD-3-Clause (repo pages, read 2026-10-31).
+  - tlRender is the C++ playback library: image sequences, EXR, OCIO, OTIO timelines, A/B wipe, overlay and
+    difference, audio. It has Python bindings on PyPI for CPython 3.12+.
+  - DJV is the player built on the same engine (pip `DJV-viewer`).
+  - The browser viewer stays for quick looks and scrubbing at proxy size. Frame-accurate real-time playback is a
+    separate player.
+  - Phase 1.5: a "Play" action hands DJV the layer's EXR sequence, or two layers for A/B, with the shot's OCIO
+    config. Registered in `atlas_components.json` before use, run as its own process.
+  - Later: tlRender as the native viewer engine in the Tauri shell (sidecar window or embedded surface), with the
+    shot written as an OTIO timeline so playback and the comp share one cut.
+  - Codecs: neither package ships HEVC or ProRes decoders, so plates play through our EXR proxies or an FFmpeg the
+    user installs.
 - **"Higgsfield but better."**
   - Keep the ease: a gallery of presets with result thumbnails, one click to run, a feed of what came back.
   - Add what a preset app cannot:

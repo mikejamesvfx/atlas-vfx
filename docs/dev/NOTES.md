@@ -977,3 +977,17 @@ the element is a dark comp lifted hard by the take. Worth a look in Nuke before 
   element over DSCF3000 1130, 30 s. On a frame with no clear foreground (an empty deck) the model returns a grey copy
   of the scene: it needs a subject.
 
+## 2026-10-31 Atlas Comp Phase 1 live check (V141)
+
+- The empty state, then New shot DSCF3000_S2S3 1130-1226 from the dialog. The plate proxy built in the background
+  (97 frames, ~70 s; seeking the HEVC plate per frame had cost 8-17 s, the proxy then reads in 0.02 s).
+- Layers: the showcase element and the relit 4K take as EXR layers over the plate. A/B wipe (element | relit) at
+  +1 stop on 1178. The timeline shows each layer's frames.
+- A Matte recipe layer: Preview wrote 9 frames to layers/matte/preview and the layer switched to it. With
+  preview_method taesd sent per prompt, live tiny-VAE previews showed the matte forming at step 2/8. An identical
+  second Preview does nothing (ComfyUI's cache): change the seed or a field to run again.
+- A Sky layer: Render landed as v001. The sky is a lat-long map, so as a layer it covers the frame (plate-framed sky
+  needs the camera; Phase 2).
+- Bugs found live and fixed with tests: a reused frame URL never reloaded and left the request lock set; `[hidden]`
+  lost to the label display rule; a frame request could start a second proxy build.
+

@@ -70,6 +70,24 @@ source; this list follows it.
 `tools/clean_install_check.py` does step 2 in a ComfyUI that has never seen your machine (a fresh clone, empty home
 folder); CI runs it on Linux on every push.
 
+## Atlas Comp (early)
+
+Open **http://127.0.0.1:8188/atlas** in a browser while ComfyUI runs: a compositor's screen on top of these nodes.
+Make a shot (a plate movie and a frame range in Nuke numbers), stack layers (EXR sequences you have, or recipes:
+Matte, Relight, Sky), look at them through the OCIO view with an A/B wipe and an f-stop slider, and run a recipe as
+**Preview** (a few frames, tiny-VAE live previews) or **Render** (the full job, a new version). Everything lives on
+disk under `~/atlas-vfx-work/comp/<shot>/`:
+
+```
+shot.json                          the shot and its layers
+plate_proxy_1280/plate.####.exr    the plate, decoded once for the viewer
+layers/<layer>/v001/ ...           one folder per render (a relight's 4K result is in beauty/)
+layers/<layer>/preview/            the last Preview
+```
+
+The routes live in `atlas_vfx/comp/server.py`, the recipes in `recipes/` (written by `tools/comp_recipes.py`), the
+page in `app/`. Design and plan: `docs/superpowers/specs/2026-10-31-atlas-comp-design.md`.
+
 ## If you come from Nuke
 
 The `Atlas VFX/Artist` nodes are the familiar tools:
