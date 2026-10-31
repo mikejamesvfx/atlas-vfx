@@ -70,6 +70,22 @@ source; this list follows it.
 `tools/clean_install_check.py` does step 2 in a ComfyUI that has never seen your machine (a fresh clone, empty home
 folder); CI runs it on Linux on every push.
 
+## If you come from Nuke
+
+The `Atlas VFX/Artist` nodes are the familiar tools:
+
+| You know | Here | What it does |
+|---|---|---|
+| Project frame range | Shot Range | in/out once, in Nuke frames; gives LTX's 8k+1 length and the plate index |
+| Viewer (wipe, f-stop, view) | Viewer | A/B wipe, side by side, difference, exposure, OCIO display/view, zoom to alpha |
+| Grade | Grade | the same maths: blackpoint, whitepoint, lift, gain, multiply, offset, gamma, mask, mix |
+| Read node's file browser | Layer Picker | rendered layers and EXR sequences from a list, no typed paths |
+| A light rig | Sun Direction + Light Ball | where the sun is, in words; the relight prompt and ball are made for you |
+| Script notes | Notes | any node's report as readable lines, warnings first |
+
+Whole jobs come as one box: search the node library for **Atlas VFX Relight Element 4K** or **Atlas VFX LTX Clean
+Loop** (blueprints in `subgraphs/`). Double-click a box to see the graph inside.
+
 ## Physical Sky
 
 ![Sun Globe panel: the sun 2 degrees under the horizon with Hosek-Wilkie picked, flagged NOT RENDERED, TWILIGHT, with the reason](docs/images/sun_globe_twilight.png)

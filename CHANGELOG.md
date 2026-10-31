@@ -35,6 +35,15 @@ when it does, the entry says so and names the tool that rewrites them.
   the IMAGE graph ran out of 64 GB and had to be cut into chunks, which popped up to a stop at the joins. Starter:
   `workflows/relight_transfer_files.json`.
 
+- **Artist nodes** (catalogue 55-61, `Atlas VFX/Artist`), for a Nuke / AE / Photoshop user: Shot Range (frames
+  once, in Nuke numbers; LTX 8k+1, Plate Read's index, RAM), Sun Direction and Light Ball (the sun in words; prompt,
+  ball and the mirror trick done for you; the balls ship in `assets/relight_balls`, MIT), Layer Picker (rendered
+  layers from a list), Grade (Nuke's Grade maths), Viewer (A/B wipe, f-stops, OCIO view, zoom to alpha, gain false
+  colour) and Notes (reports as readable lines, warnings first). No new dependencies.
+- **Blueprints**: `subgraphs/relight_element_4k.json` and `subgraphs/ltx_clean_loop.json` show up in ComfyUI's node
+  library as one box each, with only the settings an artist changes (`tools/blueprints.py`). The LTX relight
+  starters now use the artist nodes.
+
 ## 0.1.0 (2026-10-30), first public beta
 
 The first tagged release of the public repo. 37 nodes in five families (Camera, Layers, Plate Lock, Sensor,
