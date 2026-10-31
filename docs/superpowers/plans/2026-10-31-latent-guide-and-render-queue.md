@@ -30,7 +30,7 @@ Atlas Comp send recipe jobs to the home farm and Comfy Cloud from a queue tab, w
 - **Nothing machine-specific in tracked files:**
   - no tokens or LAN addresses;
   - targets come from `atlas_comp_targets.local.json` beside the work root, ignored by git;
-  - `FARM_REMOTE_TOKEN` from the environment only.
+  - the farm token from its environment variable only (its name lives in `docs/MACHINES.local.md`).
 - **Guide From Latent:** frame_idx 0 and downscale 1 only; anything else is refused with a reason.
 - **Imports:** layers may import ComfyUI-LTXVideo modules only inside node `run`, so atlas-vfx loads without the pack.
 - **Commits** end with the two attribution lines.

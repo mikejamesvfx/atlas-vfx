@@ -26,7 +26,7 @@ nothing else may, under five conditions:
    readable as images. Otherwise it is failed, and the layer does not switch to it.
 3. **One job per target at a time**, in the order queued. No load balancing or splitting across boxes. The artist
    picks the target, or "first free".
-4. **Fail closed on auth.** Farm calls use the existing bearer token (`FARM_REMOTE_TOKEN`, environment only). Cloud
+4. **Fail closed on auth.** Farm calls use the existing farm bearer token (an environment variable, named in `docs/MACHINES.local.md` only). Cloud
    calls use the owner's Comfy account. No token or LAN address in any tracked file.
 5. **Cloud is opt-in per job.** The job states that reference frames leave the estate, and shows the estimated
    credits for the artist to confirm.

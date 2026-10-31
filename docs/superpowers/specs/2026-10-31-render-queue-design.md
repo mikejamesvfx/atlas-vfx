@@ -67,7 +67,7 @@ Atlas Comp renders on ws today. Two things are wanted:
 
 - A job that "succeeds with no image".
 - Plates leaving the machine without the artist knowing: a Cloud job says so and shows its cost first.
-- Tokens or LAN addresses in tracked files. Targets live in an untracked local config: `FARM_REMOTE_TOKEN`
+- Tokens or LAN addresses in tracked files. Targets live in an untracked local config: the farm token
   stays an environment variable, and addresses go in `docs/MACHINES.local.md` or a `*.local.json` file.
 
 ## Constraints
