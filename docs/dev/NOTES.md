@@ -937,3 +937,14 @@ Running log for whoever works here. Newest at the top. Keep it short: what was d
   a third of the element goes, too much.
 - holdout (MASK, optional): a roto over what LTX truly invented; its gain gets no weight and is filled from around
   it. Synthetic invented patch: sh fills from the normals (0.126 vs clean 0.117 stops), guided halves the error.
+
+## 2026-10-31 LTX relight starter, and the Triton decode crash
+
+`workflows/ltx_relight_mirror.json` ran end to end on V141 (97 frames, 15 min 23 s, Return wrote
+`~/atlas-vfx-work/DSCF3000/layers/element_relit_starter`). Sun lands on frame left as with the hand-run take.
+The element covers about 3% of the frame, so in `mode full` LTX sees it at a few hundred pixels and the face comes
+back soft and drawn over; `mode crop` gives it more pixels, and Relight Transfer puts the element's own detail back.
+
+V141 started with `--enable-triton-backend` breaks the LTX-2.5 VAE decode: comfy_kitchen's Triton `rms_rope_` in
+`na_diffusion_decoder.py` fails with `Triton Error [CUDA]: invalid argument`, on any length and on a graph that
+had worked. Without the flag the Triton backend is disabled and the decode runs. Start V141 without it for LTX work.
