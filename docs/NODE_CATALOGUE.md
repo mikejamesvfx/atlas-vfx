@@ -96,10 +96,11 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 62 | Tiny VAE | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
 | 63 | Alpha Prep | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
 | 64 | Alpha Return | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
+| 65 | Latent Pre-render | layers | atlas-vfx | built | synthetic | Render queue | |
 
-52 rows are built or deprecated, and those are the 52 nodes that load. Categories: `Atlas VFX/Camera`
+53 rows are built or deprecated, and those are the 53 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
-(layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-64), `Atlas VFX/Deliver`
+(layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-65), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
 
 ## Planned and elsewhere
@@ -825,3 +826,15 @@ Payloads (all plain JSON-safe dicts unless said):
 - needs: nothing beyond the base
 - writes: nothing
 - notes: the decoded Alpha-Gen output back to a MASK at the source size: padding cropped, the matte channel (green, as the tested graph), held frames trimmed; for a still the held frames are averaged before the clamp (synthetic: a third of the single-frame error). Live, one still of DSCF3000 1130 with the showcase element comped in: IoU 0.962 against the element's own alpha, mean error 0.0015, 30 s end to end on the 5090. Feeds EXR Write's mask, Relight Transfer's matte / holdout, Grade's mask.
+
+### 65 Latent Pre-render
+`AtlasVFXLatentPrerender` · layers · Atlas VFX/Artist
+- in: images IMAGE, vae VAE, name STRING, out_dir STRING
+- out: latent LATENT, path STRING, info STRING
+- test: tests/test_latent_guide.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: <out>/<name>.latent (safetensors, one float32 tensor `latent_tensor`) and <name>.json (frames sha256, count, size, the VAE's downscale layout, the file's sha256); default out is <work>/latent_cache
+- notes: encodes a reference clip once with the VAE (through LTXVVAEForceFloat32 for a float32 encode) and keeps the latent; the same frames again (16-bit hash) load the file instead of encoding. Frames are trimmed to LTX's 8k+1 as its guide node does. What Guide From Latent (66) adds as the IC-LoRA guide, and what a farm or cloud job sends (a few MB instead of the frames). Read back with safetensors only, never pickle.
+

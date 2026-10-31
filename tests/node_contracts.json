@@ -1228,6 +1228,46 @@
    }
   ]
  },
+ "AtlasVFXLatentPrerender": {
+  "folder": "layers",
+  "category": "Atlas VFX/Artist",
+  "inputs": [
+   {
+    "name": "images",
+    "type": "IMAGE",
+    "group": "required"
+   },
+   {
+    "name": "vae",
+    "type": "VAE",
+    "group": "required"
+   },
+   {
+    "name": "name",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "out_dir",
+    "type": "STRING",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "latent",
+    "type": "LATENT"
+   },
+   {
+    "name": "path",
+    "type": "STRING"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
  "AtlasVFXLayerPicker": {
   "folder": "layers",
   "category": "Atlas VFX/Artist",
