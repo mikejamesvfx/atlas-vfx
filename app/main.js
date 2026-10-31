@@ -454,11 +454,14 @@ function renderPresets() {
   if (!groups.includes(S.presetGroup)) S.presetGroup = groups[0];
   $("preset-groups").replaceChildren(...groups.map((g) => el("button", { type: "button", text: g,
     "aria-pressed": String(g === S.presetGroup), onclick: () => { S.presetGroup = g; renderPresets(); } })));
-  const sources = S.shot.layers.filter((l) => l.kind === "sequence" || (l.frames || []).length).map((l) => l.name);
+  // EXR elements first and the default; a render of another recipe can still be picked (a matte to relight, say)
+  const exrs = S.shot.layers.filter((l) => l.kind === "sequence").map((l) => l.name);
+  const renders = S.shot.layers.filter((l) => l.kind === "recipe" && (l.frames || []).length).map((l) => l.name);
+  const sources = [...exrs, ...renders];
   const pick = $("preset-element");
   const keep = pick.value;
   pick.replaceChildren(...sources.map((n) => el("option", { value: n, text: n })));
-  pick.value = sources.includes(keep) ? keep : (sources.includes(S.selected) ? S.selected : sources[0] || "");
+  pick.value = sources.includes(keep) ? keep : (exrs.includes(S.selected) ? S.selected : exrs[0] || sources[0] || "");
   const cards = S.presets.filter((p) => p.group === S.presetGroup).map((p) => {
     const done = presetLayer(p);
     const thumb = done

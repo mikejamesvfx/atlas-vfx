@@ -85,6 +85,8 @@ def main():
           "design: a recipe layer with renders gets Light mix sliders, one per version, saved as mix")
     check('id="presets-btn"' in html and 'id="presets-dialog"' in html and "renderPresets" in main
           and "presets:" in text["api.js"], "design: a Presets gallery opens from the top bar")
+    check("const exrs = S.shot.layers.filter((l) => l.kind === \"sequence\")" in main,
+          "design: a preset runs on an EXR element by default, not on another recipe's render")
     check("/prompt" in text["api.js"] and "/ws?clientId=" in text["api.js"],
           "app: queues on ComfyUI's /prompt and listens on its websocket")
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
