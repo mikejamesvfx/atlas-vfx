@@ -6,6 +6,7 @@ Run: <V141 python> tests\\test_comp_server.py
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import tempfile
@@ -144,6 +145,25 @@ async def run():
               "queue: a job whose frames never arrive fails, listed without paths", js[-1]["message"])
         r = await c.post(f"/atlas/api/queue/{job['id']}/cancel")
         check(r.status == 200, "queue: cancel answers", r.status)
+        r = await c.post(f"/atlas/api/queue/{job['id']}/confirm")
+        check(r.status == 400 and "confirm" in (await r.json())["error"],
+              "queue: only a job waiting for its yes can be confirmed", r.status)
+        (pl.WORK_ROOT / "atlas_comp_targets.local.json").write_text(json.dumps({"targets": [
+            {"name": "cloud", "kind": "comfy_cloud", "models": {"a.safetensors": "b.safetensors"}}]}))
+        os.environ.pop("COMFY_CLOUD_API_KEY", None)
+        try:
+            srv._client_for("cloud")
+            check(False, "cloud: without COMFY_CLOUD_API_KEY the target says so")
+        except ValueError as e:
+            check("COMFY_CLOUD_API_KEY" in str(e), "cloud: without COMFY_CLOUD_API_KEY the target says so", str(e))
+        os.environ["COMFY_CLOUD_API_KEY"] = "k-test"
+        cc = srv._client_for("cloud")
+        check(cc.kind == "comfy_cloud" and cc.model_map == {"a.safetensors": "b.safetensors"},
+              "cloud: the client carries the target's model map")
+        os.environ.pop("COMFY_CLOUD_API_KEY", None)
+        r = await c.get("/atlas/api/targets")
+        check(all("models" not in t for t in (await r.json())["targets"]), "cloud: the model map is not listed")
+        (pl.WORK_ROOT / "atlas_comp_targets.local.json").unlink()
         r = await c.get("/atlas/api/views")
         check(r.status == 200 and len((await r.json())["views"]) > 3, "views: listed")
         bad = pl.WORK_ROOT / "bad.mov"

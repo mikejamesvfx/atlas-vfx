@@ -145,3 +145,5 @@ menu { display: flex; flex-direction: row-reverse; justify-content: flex-start; 
 .qjob.failed { border-color: var(--red); }
 .runs .target { display: inline-flex; gap: 6px; align-items: center; }
 #queue-count:not(:empty) { color: var(--amber); margin-left: 4px; }
+.qjob .confirm { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; color: var(--bone); }
+.qjob.confirm { border-color: var(--amber); }

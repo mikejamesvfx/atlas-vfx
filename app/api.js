@@ -37,6 +37,7 @@ export const api = {
   targets: () => call("GET", "/atlas/api/targets"),
   jobs: () => call("GET", "/atlas/api/queue"),
   queueJob: (d) => call("POST", "/atlas/api/queue", d),
+  confirmJob: (id) => call("POST", `/atlas/api/queue/${enc(id)}/confirm`),
   cancelJob: (id) => call("POST", `/atlas/api/queue/${enc(id)}/cancel`),
   // ComfyUI's own queue
   // preview_method: ComfyUI previews nothing unless asked; taesd uses the tiny VAE (atlas_vfx ltx_live_preview)

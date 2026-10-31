@@ -556,11 +556,23 @@ function renderQueue() {
     el("span", { class: "muted", text: j.stage }),
     el("span", { class: "num", text: `${j.frames_back}/${j.expected}` }),
     el("span", { class: j.status === "failed" ? "error" : "", text: j.message || j.status }),
+    j.status === "confirm" ? confirmBox(j) : null,
     ACTIVE(j) ? el("button", { type: "button", text: "Cancel", onclick: async () => {
       try { await api.cancelJob(j.id); pollQueue(); } catch (e) { status(e.message, true); }
     } }) : el("span")));
   $("queue-list").replaceChildren(...(rows.length ? rows
     : [el("li", { class: "muted", text: "Nothing queued. Pick a farm machine beside Render to send a job there." })]));
+}
+
+// A Cloud job waits here: what it costs and what it sends, before anything goes.
+function confirmBox(j) {
+  const e = j.estimate || {};
+  return el("div", { class: "confirm" },
+    el("span", { text: `About ${e.credits_low}-${e.credits_high} credits (${e.note || "rough"}). ` +
+      `${e.frames} reference frames will leave this machine for Comfy Cloud; the result comes back here.` }),
+    el("button", { class: "primary", type: "button", text: "Confirm", onclick: async () => {
+      try { await api.confirmJob(j.id); pollQueue(); } catch (err) { status(err.message, true); }
+    } }));
 }
 
 function openQueue() {

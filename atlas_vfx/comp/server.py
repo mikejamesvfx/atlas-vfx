@@ -10,12 +10,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import threading
 from pathlib import Path
 
 from atlas_vfx.camera_side import plate as pl
 
+from . import cloud
 from . import frames as fr
 from . import queue as qu
 from . import recipes as rc
@@ -150,8 +152,11 @@ def _client_for(name: str):
     t = next((t for t in tg.load_targets() if t["name"] == name), None)
     if t is None:
         raise ValueError(f"no target {name!r}")
-    if t["kind"] != "comfyui":
-        raise ValueError(f"{name}: Comfy Cloud jobs are not built yet")
+    if t["kind"] == "comfy_cloud":
+        key = os.environ.get("COMFY_CLOUD_API_KEY", "")
+        if not key:
+            raise ValueError(f"{name}: set COMFY_CLOUD_API_KEY (your Comfy account's API key) and restart ComfyUI")
+        return cloud.CloudClient(key, model_map=t.get("models", {}))
     return qu.HttpClient(t["url"])
 
 
@@ -301,6 +306,11 @@ def build_routes():
         job = qu.new_job(jg["shot"], jg["layer"], mode, target, jg["expected"], str(jg["out"]), jg["version"])
         _queue(request).add(job, jg["graph"], jg["recipe"])
         return web.json_response(qu.public(job))
+
+    @routes.post("/atlas/api/queue/{job}/confirm")
+    @guard
+    async def queue_confirm(request):
+        return web.json_response(qu.public(_queue(request).confirm(request.match_info["job"])))
 
     @routes.post("/atlas/api/queue/{job}/cancel")
     @guard

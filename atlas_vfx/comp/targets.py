@@ -42,6 +42,11 @@ def load_targets() -> list[dict]:
             if u.scheme not in ("http", "https") or not u.netloc:
                 raise ValueError(f"target {name}: url must be http(s)://host:port")
             clean["url"] = url
+        models = t.get("models", {})
+        if not isinstance(models, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in models.items()):
+            raise ValueError(f"target {name}: models must map file names to file names")
+        if models:
+            clean["models"] = dict(models)
         if name in [x["name"] for x in targets]:
             raise ValueError(f"target {name}: listed twice")
         targets.append(clean)

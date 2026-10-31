@@ -35,7 +35,7 @@ def new_job(shot: str, layer: str, mode: str, target: str, expected: int, out_di
 
 
 def public(job: dict) -> dict:
-    return {k: v for k, v in job.items() if k not in ("cancel", "out_dir")} | {"log": [list(x) for x in job["log"]]}
+    return {k: v for k, v in job.items() if k not in ("cancel", "out_dir", "confirmed")} | {"log": [list(x) for x in job["log"]]}
 
 
 # ---------------------------------------------------------------------------------------------------- splitting
@@ -253,7 +253,11 @@ class Queue:
             except Exception as e:  # noqa: BLE001
                 job["status"], job["message"] = "failed", str(e)
                 continue
-            run_job(job, graph, recipe, self.local, remote, remote_is_local)
+            if getattr(remote, "kind", "") == "comfy_cloud":
+                from . import cloud
+                cloud.run_cloud_job(job, graph, recipe, self.local, remote, remote.model_map)
+            else:
+                run_job(job, graph, recipe, self.local, remote, remote_is_local)
             if self.on_done:
                 try:
                     self.on_done(job)
@@ -262,6 +266,16 @@ class Queue:
 
     def list(self) -> list[dict]:
         return list(self.jobs)
+
+    def confirm(self, job_id: str) -> dict:
+        """The artist's yes to a Cloud job's estimate: only now does anything leave ws."""
+        for j in self.jobs:
+            if j["id"] == job_id:
+                if j["status"] != "confirm":
+                    raise ValueError(f"job {job_id} is {j['status']}, not waiting to confirm")
+                j["confirmed"] = True
+                return j
+        raise ValueError(f"no job {job_id!r}")
 
     def cancel(self, job_id: str) -> dict:
         for j in self.jobs:

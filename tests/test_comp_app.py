@@ -97,6 +97,9 @@ def main():
           "queue: a Queue panel opens from the top bar")
     check(all(k in main for k in ("j.target", "j.stage", "j.frames_back", "j.expected")) and "api.cancelJob(" in main,
           "queue: each job shows target, stage, frames back and a cancel")
+    check('j.status === "confirm"' in main and "j.estimate" in main and "api.confirmJob(" in main
+          and "confirmJob:" in text["api.js"] and "leave this machine" in main,
+          "cloud: a Cloud job shows its credit estimate and what leaves the machine, and waits for Confirm")
     check("pollQueue" in main and "setTimeout(pollQueue" in main,
           "queue: the panel polls while a job runs, and a finished job reloads the shot")
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
