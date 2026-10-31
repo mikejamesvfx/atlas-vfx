@@ -1,2 +1,84 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Atlas Comp</title></head><body><p>Atlas Comp</p></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atlas Comp</title>
+  <link rel="stylesheet" href="/atlas/app/style.css">
+</head>
+<body>
+  <header id="bar">
+    <span class="brand">Atlas Comp</span>
+    <label>Shot <select id="shot-pick"></select></label>
+    <button id="new-shot" type="button">New shot</button>
+    <span id="proxy" class="muted"></span>
+    <span class="grow"></span>
+    <label>View <select id="view-pick"></select></label>
+    <a class="muted" href="/" target="_blank" rel="noopener">ComfyUI</a>
+  </header>
+
+  <main id="room">
+    <section id="layers" aria-label="Layers">
+      <div class="pane-head">Layers <button id="add-layer" type="button" title="Add a layer">+ Layer</button></div>
+      <ol id="layer-list"></ol>
+    </section>
+
+    <section id="viewer" aria-label="Viewer">
+      <div id="stage">
+        <img id="frame-img" alt="">
+        <img id="live-img" alt="" hidden>
+        <div id="empty" hidden></div>
+      </div>
+      <div id="viewer-tools">
+        <label>A <select id="a-pick"></select></label>
+        <label>B <select id="b-pick"></select></label>
+        <label id="wipe-wrap" hidden>Wipe <input id="wipe" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+        <label>f-stop <input id="exposure" type="range" min="-6" max="6" step="0.25" value="0"></label>
+        <output id="exposure-out">0</output>
+        <span id="viewer-note" class="muted"></span>
+      </div>
+    </section>
+
+    <section id="inspector" aria-label="Inspector">
+      <div class="pane-head">Inspector</div>
+      <div id="inspector-body" class="muted">Pick a layer.</div>
+    </section>
+  </main>
+
+  <footer id="timeline" aria-label="Timeline">
+    <div id="time-row">
+      <button id="prev" type="button" title="Previous frame (left arrow)">&lsaquo;</button>
+      <input id="scrub" type="range" min="1001" max="1001" value="1001">
+      <button id="next" type="button" title="Next frame (right arrow)">&rsaquo;</button>
+      <output id="frame-out">1001</output>
+    </div>
+    <div id="bars"></div>
+    <div id="status" class="muted"></div>
+  </footer>
+
+  <dialog id="shot-dialog">
+    <form method="dialog" id="shot-form">
+      <h2>New shot</h2>
+      <label>Name <input name="name" required pattern="[A-Za-z0-9_][A-Za-z0-9_ .\-]*" placeholder="DSCF3000_S2S3"></label>
+      <label>Plate (movie file, optional) <input name="plate" placeholder="~/Videos/atlas-vfx_footage/DSCF3000.MOV"></label>
+      <label>First frame (Nuke) <input name="first" type="number" value="1130" required></label>
+      <label>Last frame (Nuke) <input name="last" type="number" value="1226" required></label>
+      <p class="error" id="shot-error"></p>
+      <menu><button value="cancel" formnovalidate>Cancel</button> <button value="ok" id="shot-ok">Create</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="layer-dialog">
+    <form method="dialog" id="layer-form">
+      <h2>Add a layer</h2>
+      <label>Name <input name="layer" required pattern="[A-Za-z0-9_][A-Za-z0-9_ .\-]*" placeholder="element"></label>
+      <label>What <select name="what" id="layer-what"></select></label>
+      <label id="source-wrap">EXR sequence <input name="source" placeholder="~/atlas-vfx-work/.../name.####.exr"></label>
+      <p class="error" id="layer-error"></p>
+      <menu><button value="cancel" formnovalidate>Cancel</button> <button value="ok">Add</button></menu>
+    </form>
+  </dialog>
+
+  <script type="module" src="/atlas/app/main.js"></script>
+</body>
+</html>

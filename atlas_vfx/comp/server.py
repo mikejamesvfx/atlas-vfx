@@ -24,7 +24,7 @@ log = logging.getLogger("atlas_vfx.comp")
 APP = Path(__file__).resolve().parents[2] / "app"
 STATIC = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml"}
 _NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
-_building: set[str] = set()
+_building = fr.BUILDING
 _lock = threading.Lock()
 
 
@@ -53,9 +53,28 @@ def _start_proxy(shot: dict) -> None:
     threading.Thread(target=work, daemon=True, name=f"atlas-comp-proxy-{shot['name']}").start()
 
 
+def _ranges(frames) -> list[list[int]]:
+    out = []
+    for n in sorted(frames):
+        if out and n == out[-1][1] + 1:
+            out[-1][1] = n
+        else:
+            out.append([n, n])
+    return out
+
+
 def _shot_json(name: str) -> dict:
+    """The shot as the app sees it: plus the plate proxy state and, per layer, the frame ranges it has on disk."""
+    from atlas_vfx.layers import chunks as ch
+
     s = sh.load_shot(name)
     s["plate_proxy"] = _proxy_state(s)
+    for lay in s["layers"]:
+        pattern = sh.layer_pattern(s, lay)
+        try:
+            lay["frames"] = _ranges(ch.scan(pattern)) if pattern else []
+        except ValueError:
+            lay["frames"] = []
     return s
 
 

@@ -296,11 +296,30 @@ def test_plate_proxy():
           "plate: read from the proxy, never the movie, once it exists", str(img[2, 2]))
 
 
+def test_no_second_proxy_build():
+    from atlas_vfx.comp import frames as fr
+    from atlas_vfx.comp import shot as sh
+
+    fake = pl.WORK_ROOT / "fake2.mov"
+    fake.write_bytes(b"not a movie")
+    sh.create_shot("Q", str(fake), 1130, 1131)
+    s = sh.load_shot("Q")
+    fr.BUILDING.add("Q")
+    try:
+        img, used = fr.composite(s, 1130, width=32)          # would try to decode the fake movie and raise
+        check(used == [] and not fr.proxy_dir(s).exists(), "plate: no second build while one is running")
+    except Exception as e:  # noqa: BLE001
+        check(False, "plate: no second build while one is running", repr(e)[:100])
+    finally:
+        fr.BUILDING.discard("Q")
+
+
 def main():
     for t in (test_shot_roundtrip, test_names_are_safe, test_layers, test_versions, test_beauty_and_preview,
               test_recipes_listed,
               test_validate, test_fill_render_vs_preview, test_two_renders_two_versions, test_blends,
-              test_skips_missing, test_jpeg, test_plate_proxy):
+              test_skips_missing, test_jpeg, test_plate_proxy,
+              test_no_second_proxy_build):
         t()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

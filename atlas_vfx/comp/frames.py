@@ -20,6 +20,7 @@ _PLATE_FRAMES: OrderedDict = OrderedDict()
 _PROCS: dict = {}
 PLATE_CACHE = 8
 PROXY_W = 1280
+BUILDING: set[str] = set()          # shots whose plate proxy is being made (one build at a time)
 
 
 def _resize(img: np.ndarray, size: tuple[int, int]) -> np.ndarray:
@@ -53,6 +54,16 @@ def build_plate_proxy(shot: dict, width: int = PROXY_W, progress=None) -> str:
     linear ACEScg half EXRs `width` wide; the viewer reads those. Returns the #### pattern."""
     from atlas_vfx.camera_side import exr_io
 
+    BUILDING.add(shot["name"])
+    try:
+        return _build(shot, width, progress)
+    finally:
+        BUILDING.discard(shot["name"])
+
+
+def _build(shot: dict, width: int, progress) -> str:
+    from atlas_vfx.camera_side import exr_io
+
     ref = _plate_ref(shot)
     off = int(ref["frame_offset"])
     first = max(int(shot["first"]), off)
@@ -80,6 +91,8 @@ def _plate_frame(shot: dict, frame: int, width: int) -> np.ndarray | None:
         return _PLATE_FRAMES[key]
     dirs = [d for d in (proxy_dir(shot, width), proxy_dir(shot, PROXY_W)) if d.is_dir()]
     if not dirs:
+        if shot["name"] in BUILDING:
+            return None
         build_plate_proxy(shot)
         dirs = [proxy_dir(shot, PROXY_W)]
     try:

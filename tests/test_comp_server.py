@@ -71,6 +71,11 @@ async def run():
         pat = seq(pl.WORK_ROOT / "renders" / "el", "el", [1130])
         r = await c.post("/atlas/api/shots/S1/layers", json={"layer": "el", "kind": "sequence", "source": pat})
         check(r.status == 200, "layers: added", await r.text())
+        seq(pl.WORK_ROOT / "renders" / "el", "el", [1131, 1132, 1140])
+        r = await c.get("/atlas/api/shots/S1")
+        el = [x for x in (await r.json())["layers"] if x["name"] == "el"][0]
+        check(el["frames"] == [[1130, 1132], [1140, 1140]], "shots: each layer's frame ranges for the timeline",
+              str(el.get("frames")))
         r = await c.patch("/atlas/api/shots/S1/layers/el", json={"opacity": 0.5})
         check(r.status == 200 and (await r.json())["opacity"] == 0.5, "layers: changed")
         r = await c.post("/atlas/api/shots/S1/layers", json={"layer": "rl", "kind": "recipe", "recipe": "relight",
