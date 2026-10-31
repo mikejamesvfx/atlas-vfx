@@ -60,6 +60,17 @@ def main():
           "app: every frame request has its own URL (a reused URL never reloads, and the lock would never clear)")
     check('preview_method: "taesd"' in text["api.js"],
           "app: asks ComfyUI for tiny-VAE live previews with each prompt (its default is none)")
+    main = text["main.js"]
+    check('"execution_interrupted"' in main and re.search(r'type === "execution_success"\)\s*\{', main) is not None
+          and 'd.node === null' not in main,
+          "app: a cancelled job is reported as cancelled, and only a success switches the layer's version")
+    for form in ("shot-form", "layer-form"):
+        block = html.split(f'id="{form}"', 1)[1].split("</form>", 1)[0]
+        first = re.search(r"<button[^>]*>", block)
+        check(first is not None and 'value="ok"' in first.group(0),
+              f"app: Enter in {form} submits it (its first button is OK, not Cancel)", first.group(0) if first else "")
+    check("plate_proxy_error" in main and "retryProxy" in text["api.js"],
+          "app: a plate that failed to decode shows why, with a retry")
     check("/prompt" in text["api.js"] and "/ws?clientId=" in text["api.js"],
           "app: queues on ComfyUI's /prompt and listens on its websocket")
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")

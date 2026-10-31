@@ -80,4 +80,4 @@ dialog::backdrop { background: #000a; }
 dialog form { display: grid; gap: 10px; }
 dialog label { display: grid; gap: 3px; }
 dialog h2 { margin: 0 0 4px; font-size: 16px; }
-menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 0; }
+menu { display: flex; flex-direction: row-reverse; justify-content: flex-start; gap: 8px; padding: 0; margin: 0; }  /* OK first in the DOM (Enter submits), shown last */

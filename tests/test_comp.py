@@ -105,7 +105,8 @@ def test_versions():
           "versions: two renders, two versions")
     s = sh.load_shot("S2S3")
     lay = [x for x in s["layers"] if x["name"] == "matte"][0]
-    check(lay["versions"] == ["v001", "v002"], "versions: scanned from disk", str(lay["versions"]))
+    check(lay["versions"] == [] and lay["empty_versions"] == ["v001", "v002"], "versions: scanned from disk",
+          f"{lay['versions']} {lay['empty_versions']}")
     check(sh.layer_pattern(s, lay) is None, "versions: nothing rendered yet")
     write_seq(sh.layer_dir("S2S3", "matte") / "v002", "matte", [1130])
     lay = sh.update_layer("S2S3", "matte", version="v002")
@@ -314,12 +315,59 @@ def test_no_second_proxy_build():
         fr.BUILDING.discard("Q")
 
 
+def test_proxy_failure_and_partial():
+    from atlas_vfx.comp import frames as fr
+    from atlas_vfx.comp import shot as sh
+
+    bad = pl.WORK_ROOT / "bad_plate.mov"
+    bad.write_bytes(b"not a movie")
+    sh.create_shot("BAD", str(bad), 1130, 1131)
+    r = pl.WORK_ROOT / "renders"
+    sh.add_layer("BAD", "grey", "sequence", source=write_seq(r / "bgrey", "g", [1130], (0.2, 0.2, 0.2)))
+    s = sh.load_shot("BAD")
+    try:
+        img, used = fr.composite(s, 1130, width=32)
+        check(used == ["grey"], "proxy: a plate that will not decode never breaks the layers", str(used))
+    except Exception as e:  # noqa: BLE001
+        check(False, "proxy: a plate that will not decode never breaks the layers", repr(e)[:120])
+    try:
+        fr.build_plate_proxy(s)
+        check(False, "proxy: a failed build raises", "no error")
+    except Exception as e:  # noqa: BLE001
+        check(fr.proxy_state(s)[0] == "error" and str(e)[:20] in fr.proxy_state(s)[1],
+              "proxy: a failed build is remembered as an error with its message", str(fr.proxy_state(s)))
+    check(not fr.proxy_dir(s).exists(), "proxy: a failed build leaves no folder that looks ready")
+    sh.create_shot("PART", str(bad), 1130, 1131)
+    s2 = sh.load_shot("PART")
+    tmp = fr.proxy_dir(s2).with_name(fr.proxy_dir(s2).name + ".tmp")
+    write_seq(tmp, "plate", [1130], (0.3, 0.3, 0.3))
+    check(fr.proxy_state(s2)[0] == "missing", "proxy: a half-built proxy (interrupted) is not ready",
+          str(fr.proxy_state(s2)))
+
+
+def test_latest_skips_empty_versions():
+    from atlas_vfx.comp import shot as sh
+
+    sh.add_layer("S2S3", "lat", "recipe", recipe="matte")
+    v1 = sh.next_version("S2S3", "lat")
+    write_seq(sh.layer_dir("S2S3", "lat") / v1, "lat", [1130])
+    sh.next_version("S2S3", "lat")                                    # a render that failed or was cancelled
+    s = sh.load_shot("S2S3")
+    lay = [x for x in s["layers"] if x["name"] == "lat"][0]
+    pat = sh.layer_pattern(s, lay)
+    check(pat is not None and "v001" in pat, "versions: latest is the newest version with frames, not an empty one",
+          str(pat))
+    check(lay["versions"] == ["v001"] and lay["empty_versions"] == ["v002"],
+          "versions: empty versions are listed apart", f"{lay['versions']} {lay.get('empty_versions')}")
+
+
 def main():
     for t in (test_shot_roundtrip, test_names_are_safe, test_layers, test_versions, test_beauty_and_preview,
               test_recipes_listed,
               test_validate, test_fill_render_vs_preview, test_two_renders_two_versions, test_blends,
               test_skips_missing, test_jpeg, test_plate_proxy,
-              test_no_second_proxy_build):
+              test_no_second_proxy_build, test_proxy_failure_and_partial,
+              test_latest_skips_empty_versions):
         t()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

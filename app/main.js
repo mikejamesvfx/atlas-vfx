@@ -74,8 +74,16 @@ function render() {
     return;
   }
   const p = S.shot.plate_proxy;
-  $("proxy").textContent = p === "building" ? "Making the plate proxy (once per shot, about a minute)..." :
-    p === "none" ? "No plate" : "";
+  const proxy = $("proxy");
+  if (p === "error") {
+    proxy.replaceChildren(el("span", { class: "error", text: `The plate would not decode: ${S.shot.plate_proxy_error}` }),
+      document.createTextNode(" "),
+      el("button", { type: "button", text: "Retry", onclick: async () => {
+        try { S.shot = await api.retryProxy(S.shot.name); render(); } catch (e) { status(e.message, true); } } }));
+  } else {
+    proxy.textContent = p === "building" ? "Making the plate proxy (once per shot, about a minute)..." :
+      p === "none" ? "No plate" : "";
+  }
   const scrub = $("scrub");
   scrub.min = S.shot.first; scrub.max = S.shot.last; scrub.value = S.frame;
   $("frame-out").textContent = S.frame;
@@ -262,11 +270,15 @@ function onEvent(type, d) {
     job.text = `${job.mode}: step ${d.value}/${d.max}`;
   } else if (type === "executing" && d.node) {
     job.text = `${job.mode}: running node ${d.node}`;
-  } else if (type === "execution_error") {
-    job.text = `${job.mode} failed: ${d.exception_message || d.exception_type || "error"}`;
+  } else if (type === "execution_error" || type === "execution_interrupted") {
+    // a failed or cancelled job never switches the layer: its version folder may be empty or half written
+    job.text = type === "execution_interrupted" ? `${job.mode} cancelled`
+      : `${job.mode} failed: ${d.exception_message || d.exception_type || "error"}`;
     job.error = true; job.done = true;
+    $("live-img").hidden = true;
     status(`${job.layer}: ${job.text}`, true);
-  } else if ((type === "executing" && d.node === null) || type === "execution_success") {
+    reloadShot();
+  } else if (type === "execution_success") {
     if (job.done) return;
     job.done = true;
     job.text = `${job.mode} done (${job.version})`;

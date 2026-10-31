@@ -29,11 +29,7 @@ _lock = threading.Lock()
 
 
 def _proxy_state(shot: dict) -> str:
-    if not shot.get("plate"):
-        return "none"
-    if shot["name"] in _building:
-        return "building"
-    return "ready" if fr.proxy_dir(shot).is_dir() else "missing"
+    return fr.proxy_state(shot)[0]
 
 
 def _start_proxy(shot: dict) -> None:
@@ -42,12 +38,13 @@ def _start_proxy(shot: dict) -> None:
         if not shot.get("plate") or shot["name"] in _building or fr.proxy_dir(shot).is_dir():
             return
         _building.add(shot["name"])
+        fr.FAILED.pop(shot["name"], None)
 
     def work():
         try:
             fr.build_plate_proxy(shot)
-        except Exception:  # noqa: BLE001
-            log.exception("plate proxy for %s failed", shot["name"])
+        except Exception as e:  # noqa: BLE001 (remembered in fr.FAILED and shown in the app; never retried alone)
+            log.warning("Atlas Comp: plate proxy for %s failed: %s", shot["name"], str(e)[:300])
         finally:
             _building.discard(shot["name"])
     threading.Thread(target=work, daemon=True, name=f"atlas-comp-proxy-{shot['name']}").start()
@@ -68,7 +65,7 @@ def _shot_json(name: str) -> dict:
     from atlas_vfx.layers import chunks as ch
 
     s = sh.load_shot(name)
-    s["plate_proxy"] = _proxy_state(s)
+    s["plate_proxy"], s["plate_proxy_error"] = fr.proxy_state(s)
     for lay in s["layers"]:
         pattern = sh.layer_pattern(s, lay)
         try:
@@ -172,6 +169,13 @@ def build_routes():
             _start_proxy(s)
             s["plate_proxy"] = _proxy_state(s)
         return web.json_response(s)
+
+    @routes.post("/atlas/api/shots/{shot}/plate_proxy")
+    @guard
+    async def retry_proxy(request):
+        s = sh.load_shot(request.match_info["shot"])
+        _start_proxy(s)
+        return web.json_response(_shot_json(s["name"]))
 
     @routes.post("/atlas/api/shots/{shot}/layers")
     @guard

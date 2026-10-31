@@ -109,6 +109,26 @@ async def run():
         check(r.status == 400, "frame: a bad frame number is a 400", r.status)
         r = await c.get("/atlas/api/views")
         check(r.status == 200 and len((await r.json())["views"]) > 3, "views: listed")
+        bad = pl.WORK_ROOT / "bad.mov"
+        bad.write_bytes(b"not a movie")
+        r = await c.post("/atlas/api/shots", json={"name": "BAD", "plate": str(bad), "first": 1130, "last": 1131})
+        state = None
+        for _ in range(100):
+            await asyncio.sleep(0.1)
+            d = await (await c.get("/atlas/api/shots/BAD")).json()
+            state = d["plate_proxy"]
+            if state == "error":
+                break
+        check(state == "error" and d.get("plate_proxy_error"), "proxy: a plate that will not decode shows an error",
+              f"{state} {str(d.get('plate_proxy_error'))[:60]}")
+        await asyncio.sleep(0.3)
+        d = await (await c.get("/atlas/api/shots/BAD")).json()
+        check(d["plate_proxy"] == "error", "proxy: a failed build is not retried on its own", d["plate_proxy"])
+        r = await c.post("/atlas/api/shots/BAD/plate_proxy")
+        check(r.status == 200 and (await r.json())["plate_proxy"] in ("building", "error"),
+              "proxy: the retry route starts a new build", r.status)
+        r = await c.get("/atlas/api/shots/BAD/frame", params={"f": "1130", "w": "128"})
+        check(r.status == 200, "frame: a shot whose plate failed still draws", r.status)
         r = await c.get("/atlas/api/shots/nope")
         check(r.status == 400, "shots: an unknown shot is a 400", r.status)
 

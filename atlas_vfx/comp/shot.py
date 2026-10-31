@@ -46,7 +46,7 @@ def _file(name: str) -> Path:
 
 
 def save_shot(shot: dict) -> None:
-    clean = {**shot, "layers": [{k: v for k, v in lay.items() if k not in ("versions", "has_preview")}
+    clean = {**shot, "layers": [{k: v for k, v in lay.items() if k not in ("versions", "empty_versions", "has_preview")}
                                 for lay in shot["layers"]]}
     p = _file(shot["name"])
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -92,7 +92,10 @@ def load_shot(name: str) -> dict:
         raise ValueError(f"no shot {pl.safe_name(name, 'shot name')!r}")
     shot = json.loads(p.read_text(encoding="utf-8"))
     for lay in shot["layers"]:
-        lay["versions"] = versions(shot["name"], lay["name"])
+        vs = versions(shot["name"], lay["name"])
+        full = [v for v in vs if _pattern_in(layer_dir(shot["name"], lay["name"]) / v)]
+        lay["versions"] = full                              # renders with frames: what the artist can pick
+        lay["empty_versions"] = [v for v in vs if v not in full]   # failed, cancelled or still running
         lay["has_preview"] = _pattern_in(preview_dir(shot["name"], lay["name"])) is not None
     return shot
 
@@ -183,8 +186,12 @@ def layer_pattern(shot: dict, layer: dict) -> str | None:
     newest when none is chosen); None when nothing is rendered."""
     if layer["kind"] == "sequence":
         return layer["source"] or None
-    vs = layer.get("versions") or versions(shot["name"], layer["name"])
-    v = layer.get("version") or (vs[-1] if vs else None)
+    if "versions" in layer:
+        vs = layer["versions"]
+    else:
+        d = layer_dir(shot["name"], layer["name"])
+        vs = [v for v in versions(shot["name"], layer["name"]) if _pattern_in(d / v)]
+    v = layer.get("version") or (vs[-1] if vs else None)   # latest = the newest render that has frames
     if not v:
         return None
     if v == PREVIEW:

@@ -3,6 +3,7 @@ bottom when the shot has one), then shown through a named OCIO view as a JPEG. R
 wipe and view code. Layers are premultiplied EXRs; a layer missing the frame is left out, never an error."""
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
 
 import numpy as np
@@ -21,6 +22,8 @@ _PROCS: dict = {}
 PLATE_CACHE = 8
 PROXY_W = 1280
 BUILDING: set[str] = set()          # shots whose plate proxy is being made (one build at a time)
+FAILED: dict[str, str] = {}         # shot -> why its last proxy build failed (cleared by the next build)
+_CACHE_LOCK = threading.Lock()
 
 
 def _resize(img: np.ndarray, size: tuple[int, int]) -> np.ndarray:
@@ -49,26 +52,51 @@ def proxy_dir(shot: dict, width: int = PROXY_W):
     return shot_dir(shot["name"]) / f"plate_proxy_{int(width)}"
 
 
+def proxy_state(shot: dict) -> tuple[str, str]:
+    """(state, message): none (no plate), building, error (the last build failed, with why), ready, missing."""
+    if not shot.get("plate"):
+        return "none", ""
+    if shot["name"] in BUILDING:
+        return "building", ""
+    if proxy_dir(shot).is_dir():
+        return "ready", ""
+    if shot["name"] in FAILED:
+        return "error", FAILED[shot["name"]]
+    return "missing", ""
+
+
 def build_plate_proxy(shot: dict, width: int = PROXY_W, progress=None) -> str:
     """Decode the shot's range of the plate once (one pass, a movie decodes fast forwards and slowly by seeking) into
-    linear ACEScg half EXRs `width` wide; the viewer reads those. Returns the #### pattern."""
-    from atlas_vfx.camera_side import exr_io
+    linear ACEScg half EXRs `width` wide; the viewer reads those. Written into <dir>.tmp and renamed when complete,
+    so an interrupted build never looks ready. A failure is remembered (proxy_state) and raised. Returns the ####
+    pattern."""
+    import shutil
 
-    BUILDING.add(shot["name"])
+    name = shot["name"]
+    BUILDING.add(name)
+    FAILED.pop(name, None)
+    final = proxy_dir(shot, width)
+    tmp = final.with_name(final.name + ".tmp")
     try:
-        return _build(shot, width, progress)
+        shutil.rmtree(tmp, ignore_errors=True)       # our own leftovers from an interrupted build
+        _build(shot, width, progress, tmp)
+        tmp.replace(final)
+        return str(final / "plate.####.exr")
+    except Exception as e:
+        FAILED[name] = f"{type(e).__name__}: {e}"[:600]
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
     finally:
-        BUILDING.discard(shot["name"])
+        BUILDING.discard(name)
 
 
-def _build(shot: dict, width: int, progress) -> str:
+def _build(shot: dict, width: int, progress, out) -> None:
     from atlas_vfx.camera_side import exr_io
 
     ref = _plate_ref(shot)
     off = int(ref["frame_offset"])
     first = max(int(shot["first"]), off)
     last = min(int(shot["last"]), off + int(ref["frame_count"]) - 1)
-    out = proxy_dir(shot, width)
     out.mkdir(parents=True, exist_ok=True)
     for (i, img), n in zip(pl.decode_rgb(ref, first - off, last - off), range(first, last + 1)):
         lin = np.ascontiguousarray(pl.to_working(img, ref), np.float32)
@@ -77,33 +105,32 @@ def _build(shot: dict, width: int, progress) -> str:
         exr_io.write_rgba(out / f"plate.{n:04d}.exr", rgba, attrs={"frame": n, "source": "Atlas Comp plate proxy"})
         if progress:
             progress(n - first + 1, last - first + 1)
-    return str(out / "plate.####.exr")
 
 
 def _plate_frame(shot: dict, frame: int, width: int) -> np.ndarray | None:
-    """The plate at `frame` as linear ACEScg RGBA (alpha 1) at `width`, from the plate proxy (built on first need);
-    None when the shot has no plate or the frame is outside the proxy."""
+    """The plate at `frame` as linear ACEScg RGBA (alpha 1) at `width`, from the plate proxy; None when the shot has
+    no plate, the proxy is not ready (the server builds it in the background) or lacks the frame. Never builds here
+    and never raises, so the layers always composite."""
     if not shot.get("plate"):
         return None
     key = (shot["name"], int(frame), int(width))
-    if key in _PLATE_FRAMES:
-        _PLATE_FRAMES.move_to_end(key)
-        return _PLATE_FRAMES[key]
+    with _CACHE_LOCK:
+        if key in _PLATE_FRAMES:
+            _PLATE_FRAMES.move_to_end(key)
+            return _PLATE_FRAMES[key]
     dirs = [d for d in (proxy_dir(shot, width), proxy_dir(shot, PROXY_W)) if d.is_dir()]
     if not dirs:
-        if shot["name"] in BUILDING:
-            return None
-        build_plate_proxy(shot)
-        dirs = [proxy_dir(shot, PROXY_W)]
+        return None
     try:
         img = vw.read_frame(str(dirs[0] / "plate.####.exr"), int(frame))
-    except (ValueError, RuntimeError):
+    except (ValueError, RuntimeError, OSError):
         return None
     h = max(1, round(img.shape[0] * width / img.shape[1]))
     rgba = _resize(img, (int(width), h))
-    _PLATE_FRAMES[key] = rgba
-    while len(_PLATE_FRAMES) > PLATE_CACHE:
-        _PLATE_FRAMES.popitem(last=False)
+    with _CACHE_LOCK:
+        _PLATE_FRAMES[key] = rgba
+        while len(_PLATE_FRAMES) > PLATE_CACHE:
+            _PLATE_FRAMES.popitem(last=False)
     return rgba
 
 

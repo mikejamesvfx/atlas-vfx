@@ -25,6 +25,7 @@ export const api = {
   shots: () => call("GET", "/atlas/api/shots"),
   createShot: (d) => call("POST", "/atlas/api/shots", d),
   shot: (name) => call("GET", `/atlas/api/shots/${enc(name)}`),
+  retryProxy: (shot) => call("POST", `/atlas/api/shots/${enc(shot)}/plate_proxy`),
   addLayer: (shot, d) => call("POST", `/atlas/api/shots/${enc(shot)}/layers`, d),
   patchLayer: (shot, layer, d) => call("PATCH", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}`, d),
   recipes: () => call("GET", "/atlas/api/recipes"),
