@@ -19,7 +19,8 @@ PREVIEW = "preview"
 SHOW_FIRST = ("", "beauty")        # a render shows the EXRs at the version root, else in beauty/ (Relight Transfer)
 KINDS = ("sequence", "recipe")
 BLENDS = ("over", "plus", "multiply", "screen")
-CHANGEABLE = ("visible", "opacity", "blend", "version", "params", "order")
+CHANGEABLE = ("visible", "opacity", "blend", "version", "params", "order", "mix")
+MIX_MAX = 2.0           # a light mix weight: 0 off, 1 as rendered, up to 2 (a light pushed brighter)
 _VERSION = re.compile(r"^v\d{3}$")
 _FRAME = re.compile(r"^(.*?)(\d+)(\.exr)$")
 
@@ -156,6 +157,17 @@ def update_layer(name: str, layer: str, **changes) -> dict:
             raise ValueError("params: a JSON object")
         elif k == "order":
             v = int(v)
+        elif k == "mix":
+            if not isinstance(v, dict):
+                raise ValueError("mix: an object of version -> weight")
+            clean = {}
+            for ver, w in v.items():
+                if ver not in lay["versions"]:
+                    raise ValueError(f"mix: version {ver!r} is not rendered ({', '.join(lay['versions']) or 'none'})")
+                if isinstance(w, bool) or not isinstance(w, (int, float)) or not 0.0 <= float(w) <= MIX_MAX:
+                    raise ValueError(f"mix: weight for {ver} must be 0-{MIX_MAX:g}")
+                clean[ver] = float(w)
+            v = clean
         lay[k] = v
     save_shot(shot)
     return lay
@@ -179,6 +191,13 @@ def _pattern_in(folder: Path) -> str | None:
             if m:
                 return str(f.parent / f"{m.group(1)}{'#' * len(m.group(2))}{m.group(3)}")
     return None
+
+
+def version_pattern(shot: dict, layer: dict, version: str) -> str | None:
+    """The #### pattern of one version of a recipe layer (None when it has no frames)."""
+    if version == PREVIEW:
+        return _pattern_in(preview_dir(shot["name"], layer["name"]))
+    return _pattern_in(layer_dir(shot["name"], layer["name"]) / version)
 
 
 def layer_pattern(shot: dict, layer: dict) -> str | None:

@@ -154,6 +154,38 @@ def blend(base: np.ndarray, layer: np.ndarray, mode: str, opacity: float) -> np.
     return out
 
 
+def _single(shot: dict, lay: dict, frame: int) -> np.ndarray | None:
+    pattern = layer_pattern(shot, lay)
+    if not pattern:
+        return None
+    try:
+        return vw.read_frame(pattern, int(frame))
+    except (ValueError, RuntimeError):
+        return None
+
+
+def _mixed(shot: dict, lay: dict, frame: int) -> np.ndarray | None:
+    """A light mix: the weighted sum of the layer's versions in linear (light adds), alpha the weighted sum clipped
+    to 1. Versions missing the frame are left out; None when none has it."""
+    from .shot import version_pattern
+
+    out = None
+    for ver, w in lay["mix"].items():
+        pattern = version_pattern(shot, lay, ver)
+        if not pattern or w <= 0:
+            continue
+        try:
+            img = vw.read_frame(pattern, int(frame))
+        except (ValueError, RuntimeError):
+            continue
+        if out is not None and img.shape[:2] != out.shape[:2]:
+            img = _resize(img, (out.shape[1], out.shape[0]))
+        out = img * np.float32(w) if out is None else out + img * np.float32(w)
+    if out is not None:
+        out[..., 3] = np.clip(out[..., 3], 0.0, 1.0)
+    return out
+
+
 def composite(shot: dict, frame: int, width: int = 1280, only: list[str] | None = None
               ) -> tuple[np.ndarray, list[str]]:
     """Linear ACEScg RGBA at `width` and the names of the layers that went in (bottom first)."""
@@ -164,12 +196,8 @@ def composite(shot: dict, frame: int, width: int = 1280, only: list[str] | None 
     for lay in layers:
         if not lay.get("visible", True) or (only is not None and lay["name"] not in only):
             continue
-        pattern = layer_pattern(shot, lay)
-        if not pattern:
-            continue
-        try:
-            img = vw.read_frame(pattern, int(frame))
-        except (ValueError, RuntimeError):
+        img = _mixed(shot, lay, frame) if lay.get("mix") else _single(shot, lay, frame)
+        if img is None:
             continue
         if canvas is None:
             h = max(1, round(img.shape[0] * width / img.shape[1]))

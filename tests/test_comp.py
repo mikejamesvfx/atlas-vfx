@@ -361,13 +361,42 @@ def test_latest_skips_empty_versions():
           "versions: empty versions are listed apart", f"{lay['versions']} {lay.get('empty_versions')}")
 
 
+def test_light_mix():
+    from atlas_vfx.comp import frames as fr
+    from atlas_vfx.comp import shot as sh
+
+    sh.create_shot("MIX", "", 1130, 1131)
+    sh.add_layer("MIX", "rl", "recipe", recipe="relight")
+    d = sh.layer_dir("MIX", "rl")
+    for v, val in (("v001", (0.8, 0.4, 0.1)), ("v002", (0.1, 0.2, 0.6))):
+        assert sh.next_version("MIX", "rl") == v
+        write_seq(d / v / "beauty", "rl", [1130], val)
+    lay = sh.update_layer("MIX", "rl", mix={"v001": 0.7, "v002": 0.3})
+    img, used = fr.composite(sh.load_shot("MIX"), 1130, width=32)
+    want = 0.7 * np.array([0.8, 0.4, 0.1]) + 0.3 * np.array([0.1, 0.2, 0.6])
+    check(used == ["rl"] and np.allclose(img[3, 3, :3], want, atol=3e-3) and abs(img[3, 3, 3] - 1.0) < 1e-3,
+          "mix: the layer is the weighted sum of its versions in linear", f"{img[3, 3, :3]} want {want}")
+    sh.update_layer("MIX", "rl", mix={"v001": 1.0, "v002": 1.0})
+    img, _ = fr.composite(sh.load_shot("MIX"), 1130, width=32)
+    check(np.allclose(img[3, 3, :3], [0.9, 0.6, 0.7], atol=3e-3), "mix: weights add like lights (no normalising)",
+          str(img[3, 3, :3]))
+    img, used = fr.composite(sh.load_shot("MIX"), 1131, width=32)
+    check(used == [], "mix: a frame no version has is skipped, no error")
+    raises(lambda: sh.update_layer("MIX", "rl", mix={"v009": 1.0}), "mix: an unknown version refused", "v009")
+    raises(lambda: sh.update_layer("MIX", "rl", mix={"v001": 5.0}), "mix: a weight outside 0-2 refused", "0-2")
+    raises(lambda: sh.update_layer("MIX", "rl", mix=[1, 2]), "mix: must be version -> weight", "mix")
+    lay = sh.update_layer("MIX", "rl", mix={})
+    img, _ = fr.composite(sh.load_shot("MIX"), 1130, width=32)
+    check(np.allclose(img[3, 3, :3], [0.1, 0.2, 0.6], atol=3e-3), "mix: empty mix goes back to the chosen version")
+
+
 def main():
     for t in (test_shot_roundtrip, test_names_are_safe, test_layers, test_versions, test_beauty_and_preview,
               test_recipes_listed,
               test_validate, test_fill_render_vs_preview, test_two_renders_two_versions, test_blends,
               test_skips_missing, test_jpeg, test_plate_proxy,
               test_no_second_proxy_build, test_proxy_failure_and_partial,
-              test_latest_skips_empty_versions):
+              test_latest_skips_empty_versions, test_light_mix):
         t()
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     return 1 if FAILS else 0

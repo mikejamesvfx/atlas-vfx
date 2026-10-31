@@ -297,9 +297,50 @@ function renderInspector() {
   const renderBtn = el("button", { class: "primary", type: "button", text: "Render", title: "The full job, a new version",
     disabled: !!job, onclick: () => run(l, "render", params) });
   const graphLink = el("a", { href: "/", target: "_blank", rel: "noopener", text: "Open ComfyUI" });
-  body.replaceChildren(head, ...fields, el("div", { class: "runs" }, preview, renderBtn),
+  const mixBox = lightMix(l);
+  body.replaceChildren(head, ...(mixBox ? [mixBox] : []), ...fields, el("div", { class: "runs" }, preview, renderBtn),
     el("div", { class: "muted" }, document.createTextNode("Advanced: "), graphLink));
   renderJob(l.name);
+}
+
+// Light mix: a recipe layer's renders blended in linear, one slider per version (0-200 %). Light adds, so 70 % of a
+// left-sun take plus 30 % of a right-sun take is a believable two-light look. Saved on the layer as mix, so the
+// viewer, the timeline and a later Nuke handoff all see the same blend. Empty = the chosen version alone.
+function lightMix(l) {
+  const versions = l.versions || [];
+  if (versions.length < 2) return null;
+  const mix = { ...(l.mix || {}) };
+  const on = Object.keys(mix).length > 0;
+  let timer = null;
+  const save = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try { await api.patchLayer(S.shot.name, l.name, { mix: { ...mix } }); l.mix = { ...mix }; refreshFrame(); }
+      catch (e) { status(e.message, true); }
+    }, 120);
+  };
+  const rows = versions.map((v) => {
+    const pct = el("output", { class: "num", text: `${Math.round((mix[v] ?? 0) * 100)}%` });
+    const slider = el("input", { type: "range", min: 0, max: 200, step: 5, value: Math.round((mix[v] ?? 0) * 100),
+      "aria-label": `${v} weight` });
+    slider.addEventListener("input", () => {
+      mix[v] = Number(slider.value) / 100;
+      pct.textContent = `${slider.value}%`;
+      save();
+    });
+    return el("label", { class: "mixrow" }, el("span", { class: "num", text: v }), slider, pct);
+  });
+  const start = el("button", { type: "button", text: on ? "Mix off" : "Mix these renders", onclick: async () => {
+    const next = on ? {} : Object.fromEntries(versions.map((v, i) => [v, i === versions.length - 1 ? 1 : 0]));
+    try { await api.patchLayer(S.shot.name, l.name, { mix: next }); await reloadShot(); }
+    catch (e) { status(e.message, true); }
+  } });
+  const box = el("fieldset", { class: "field" }, el("legend", { text: "Light mix" }));
+  box.append(el("p", { class: "muted", style: "margin: 0 0 8px;",
+    text: on ? "Each render is a light. Blend them like a light mixer." : "Blend this layer's renders like lights." }));
+  if (on) box.append(...rows);
+  box.append(start);
+  return box;
 }
 
 function renderJob(layerName) {
