@@ -238,6 +238,54 @@ def test_builder(tmp: Path, cam: sc.ShotCamera, cam_res: dict, layer_pattern: st
     print("ok fallbacks: Camera2 when Camera3 is absent; a missing file stops the build before any node is made")
 
 
+def test_lens_delivery(tmp: Path, cam_res: dict, layer_pattern: str):
+    """clean + STMaps: the clean layers are stacked, redistorted once through the Raw STMap Read and merged over
+    the untouched plate; an undistorted plate branch exists for lining up. Layer versions come from render.json."""
+    import json as _json
+
+    lf = tmp / "lens"
+    lf.mkdir()
+    for k in ("undistort_g", "redistort_g"):
+        (lf / f"{k}.exr").write_bytes(b"\0")
+    base = make_shot(tmp / "lensshot", cam_res, layer_pattern)
+    data = nb.build_data(shot="SYN_S1", plate=base["plate"], plate_colorspace="F-Log2 F-Gamut",
+                         plate_frames=(1130, 1159), fmt=(4096, 2160, 1.0), ocio_config=OCIO,
+                         camera_chan=cam_res["chan"], camera_settings=cam_res["settings"], layers=base["layers"],
+                         write_pattern=str(tmp / "comp.%04d.exr"),
+                         lens_maps={"undistort": lf / "undistort_g.exr", "redistort": lf / "redistort_g.exr"})
+    text = nb.script_text(data)
+    assert not (nb.node_classes_used(text) & set(nb.NUKEX_ONLY)), "STMap is Indie; LensDistortion must not appear"
+    fake = fake_nuke(("Read", "Merge2", "Write", "Camera3", "ReadGeo2", "STMap"))
+    run_in_fake(text, fake)
+    by = {n.name(): n for n in fake.all}
+    rd, ud = by["AVFX_Redistort_layers"], by["AVFX_Undistort_plate"]
+    stack, over, wr = by["AVFX_Stack_grass"], by["AVFX_Over_layers"], by["AVFX_Write_comp"]
+    assert stack.inputs[0] is by["AVFX_Layer_element"] and stack.inputs[1] is by["AVFX_Layer_grass"]
+    assert rd.inputs[0] is stack and rd.inputs[1] is by["AVFX_Read_redistort"] and rd["uv"].value == "rgb"
+    assert over.inputs[0] is by["AVFX_Plate"] and over.inputs[1] is rd and wr.inputs[0] is over
+    assert ud.inputs[0] is by["AVFX_Plate"] and by["AVFX_Read_undistort"]["raw"].value is True
+    assert by["AVFX_Read_redistort"]["raw"].value is True
+    print("ok lens delivery: clean layers stacked -> one STMap redistort (Raw map) -> over the untouched plate -> "
+          "Write; undistorted plate branch; no NukeX-only nodes")
+
+    # layer versions
+    d = tmp / "layer_v"
+    d.mkdir()
+    (d / "el.render.json").write_text(_json.dumps({"card": "el", "pattern": "el.%04d.exr", "frames": [1, 2],
+                                                   "versions": {"clean": "el.%04d.exr"}}), encoding="utf-8")
+    assert nb.find_layer(d, "clean")["pattern"].endswith("/el.%04d.exr")
+    try:
+        nb.find_layer(d, "plate")
+        raise AssertionError("missing plate version not refused")
+    except ValueError as e:
+        assert "lens" in str(e)
+    (d / "el.render.json").write_text(_json.dumps({"card": "el", "pattern": "el.%04d.exr", "frames": [1, 2]}),
+                                      encoding="utf-8")
+    assert nb.find_layer(d, "plate")["pattern"] == nb.find_layer(d, "clean")["pattern"]
+    print("ok layer versions: clean / plate from render.json; a lensed layer with no plate version is refused; "
+          "an old folder is both")
+
+
 def main() -> int:
     cam = camera()
     with tempfile.TemporaryDirectory() as t:
@@ -245,6 +293,7 @@ def main() -> int:
         layer_pattern = test_exr_write(tmp)
         cam_res = test_camera_export(cam, tmp)
         test_builder(tmp, cam, cam_res, layer_pattern)
+        test_lens_delivery(tmp, cam_res, layer_pattern)
     return 0
 
 

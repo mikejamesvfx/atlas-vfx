@@ -197,7 +197,7 @@ Payloads (all plain JSON-safe dicts unless said):
 - in: plate_ref ATLAS_PLATE_SEQ, sensor_preset auto|fujifilm_xh2_dci4k_24p_dis_off|custom, sensor_width_mm FLOAT, sensor_height_mm FLOAT, focal_guess_mm FLOAT, solve_focal BOOLEAN, solve_distortion BOOLEAN, lens_model k1 k2 (RADIAL)|k1 (SIMPLE_RADIAL)|k1 k2 p1 p2 (OPENCV), proxy_width INT, max_features INT, overlap INT, reject_px FLOAT, name STRING, out_dir STRING
 - in, optional: masks MASK, mask_dilate_px INT, tracks ATLAS_TRACKS_2D, seed INT
 - out: shot_camera ATLAS_TRACKED_CAMERA, path STRING, report STRING, preview IMAGE
-- test: tests/test_plate_solve.py, tests/test_camera_io.py
+- test: tests/test_plate_solve.py, tests/test_camera_io.py, tests/test_camera_checks.py
 - proof: synthetic (dolly: focal 0.1 % and k1/k2 from an 8 % wrong guess, all frames; moving board: its points
   dropped or masked out; nodal pan: rotation-only fallback with the focal solved)
 - licences: `pycolmap`, `opencv-python`, `scipy`, `numpy`
@@ -282,7 +282,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 14 Card Project
 `AtlasVFXCardProject` · layers · Atlas VFX/Layers
 - in: plate_ref ATLAS_PLATE_SEQ, shot_camera ATLAS_TRACKED_CAMERA, card ATLAS_VFX_CARD, scale FLOAT, frame_step INT, preview_every INT, preview_width INT, out_dir STRING
-- in, optional: holdout_depth STRING, holdout_margin_m FLOAT, holdout_soft_m FLOAT
+- in, optional: holdout_depth STRING, holdout_margin_m FLOAT, holdout_soft_m FLOAT, sensor_lens_folder STRING
 - out: exr_folder STRING, preview IMAGE
 - test: tests/test_card_project.py
 - proof: plate V141 (S2-S3)
@@ -340,7 +340,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 24 Nuke Builder
 `AtlasVFXNukeBuilder` · deliver · Atlas VFX/Deliver
 - in: plate_ref ATLAS_PLATE_SEQ, nuke_camera_json STRING, layer_folders STRING, shot STRING, plate_kind dpx|prores|original, set_proxy_obj STRING, prefix STRING, set_root BOOLEAN, out_dir STRING
-- in, optional: x_offset INT
+- in, optional: x_offset INT, lens_delivery plate|clean + STMaps, sensor_lens_folder STRING
 - out: script_path STRING, script STRING
 - test: tests/test_nuke_builder.py, tests/test_nuke_text.py
 - proof: Nuke accepted (T8, Nuke Indie 17.1 on S2-S3, accepted by Mike)
@@ -468,6 +468,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 37 Plate Lock Camera
 `AtlasVFXPlateLockCamera` · platelock · Atlas VFX/Layers/Plate Lock
 - in: frames IMAGE, mode locked_off|shot_camera|platelock_json, path STRING, focal_mm FLOAT, sensor_width_mm FLOAT, readout_ms FLOAT, fps FLOAT, rs_anchor centre|top
+- in, optional: frames_are_clean BOOLEAN
 - out: camera ATLAS_VFX_PLATELOCK_TRACK, info STRING
 - test: tests/test_platelock_nodes.py, tests/test_rs_time.py
 - proof: synthetic
@@ -551,7 +552,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 44 LTX Prep
 `AtlasVFXLTXPrep` · layers · Atlas VFX/Layers
 - in: plate_ref ATLAS_PLATE_SEQ, layer_folder STRING, first_frame INT, length INT, width INT, height INT, mask_thresh FLOAT, shadow_px INT, dilate_px INT, keyframe_every INT, mode full|crop, crop_margin INT, extra_layers STRING, reference plate|comp, mask_mode layer|none
-- in, optional: sensor_rs_folder STRING, sensor_lens_folder STRING, mirror BOOLEAN
+- in, optional: sensor_rs_folder STRING, sensor_lens_folder STRING, mirror BOOLEAN, allow_raw_lens BOOLEAN
 - out: reference IMAGE, mask MASK, reference_half IMAGE, mask_half MASK, start_image IMAGE, ltx_prep ATLAS_VFX_LTX_PREP, keyframes_half IMAGE
 - test: tests/test_ltx_integration.py, tests/test_ltx_sensor_loop.py
 - proof: plate V141 (LTX clean loop, S2-S3)

@@ -33,15 +33,19 @@ class AtlasVFXPlateLockCamera:
                 "fps": ("FLOAT", {"default": 24.0, "min": 1.0, "max": 240.0, "step": 0.001}),
                 "rs_anchor": (["centre", "top"], {"default": "centre",
                                                   "tooltip": "which row a solved pose represents"}),
-            }
+            },
+            "optional": {
+                "frames_are_clean": ("BOOLEAN", {"default": False, "tooltip": "shot_camera with a lens: the frames "
+                                                 "are already undistorted (clean space), so the pinhole lock fits"}),
+            },
         }
 
-    def run(self, frames, mode, path, focal_mm, sensor_width_mm, readout_ms, fps, rs_anchor):
+    def run(self, frames, mode, path, focal_mm, sensor_width_mm, readout_ms, fps, rs_anchor, frames_are_clean=False):
         n, h, w = frames.shape[0], frames.shape[1], frames.shape[2]
         ro = readout_frames(readout_ms, fps)
         p = _comfy.clean_path(path)
         if mode == "shot_camera":
-            tr = adapters.track_from_shot_camera(p, ro, rs_anchor)
+            tr = adapters.track_from_shot_camera(p, ro, rs_anchor, frames_are_clean)
         elif mode == "platelock_json":
             tr = CameraTrack.load(p).with_readout(ro, rs_anchor) if ro > 0 else CameraTrack.load(p)
         else:

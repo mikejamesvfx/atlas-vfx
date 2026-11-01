@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
+from atlas_vfx.camera_side import camera_checks as cc
 from atlas_vfx.camera_side import exr_io
 from atlas_vfx.camera_side import plate as pl
 from atlas_vfx.contracts import shot_camera as sc
@@ -83,6 +84,7 @@ class AtlasVFXCharacterInsert:
         if warn:
             log.warning("atlas-vfx Character Insert (%s): %s", source_model, warn)
         cam = sc.ShotCamera(shot_camera)
+        cc.require_metric(cam, "Character Insert", "deck_y and height_m (metres)")
         frames = [n for n in cam.frames if first_frame <= n <= last_frame]
         if not frames:
             raise ValueError(f"no camera frames in {first_frame}-{last_frame}")

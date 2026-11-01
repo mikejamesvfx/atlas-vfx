@@ -21,9 +21,13 @@ Return (from LTX):
 """
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 
 from atlas_vfx.camera_side import plate as pl
+
+log = logging.getLogger("atlas_vfx")
 
 
 def view_processors(ocio_config: str, working: str = "ACEScg", display: str = pl.DEFAULT_DISPLAY,
@@ -56,6 +60,21 @@ def from_view(disp: np.ndarray, inv) -> np.ndarray:
     out = np.ascontiguousarray(np.clip(disp, 0.0, 1.0), dtype=np.float32).copy()
     inv.applyRGB(out)
     return out
+
+
+ROUNDTRIP_CLIP_SHARE = 0.005     # more than 0.5 % of the plate off by over 5 % after view -> inverse: say so
+
+
+def roundtrip_warnings(rt: dict | None, mask_mode: str) -> list[str]:
+    """What the SDR view round trip loses on this plate. LTX sees display-referred 0-1, so anything brighter than
+    the view's peak comes back clipped inside the generated mask (outside it the plate is untouched)."""
+    if not rt or rt["share_over_5pct"] <= ROUNDTRIP_CLIP_SHARE:
+        return []
+    msg = (f"{100 * rt['share_over_5pct']:.1f} % of the plate does not survive the SDR view round trip (max "
+           f"luminance {rt['max_luminance']:.2f}); highlights inside the mask come back clipped")
+    if mask_mode == "none":
+        msg += ". mask_mode none replaces the WHOLE plate, so the delivered plate loses them everywhere"
+    return [msg]
 
 
 def roundtrip_report(lin: np.ndarray, fwd, inv, step: int = 4) -> dict:

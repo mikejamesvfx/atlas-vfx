@@ -8,6 +8,7 @@ import numpy as np
 
 from atlas_vfx.contracts import shot_camera as sc
 
+from . import camera_checks as cc
 from . import lock_check as lc
 from . import plate as pl
 
@@ -15,6 +16,9 @@ from . import plate as pl
 def _centre(cam: sc.ShotCamera, spec: str, points: dict):
     spec = spec.strip()
     if spec in ("", "auto"):
+        if cc.is_nodal(cam):
+            raise ValueError("Lock Check: a nodal camera has no height above any ground, so the auto card (ground, "
+                             "4 m ahead) means nothing; give a centre in solve units or a measured point")
         f0 = -cam.cam_to_world(cam.frames[0])[:3, 2]
         flat = np.array([f0[0], 0.0, f0[2]])
         flat /= np.linalg.norm(flat)
@@ -62,6 +66,8 @@ class AtlasVFXLockCheck:
         import torch
 
         cam = sc.ShotCamera(shot_camera)
+        cc.check_frame_offset(cam, plate_ref, "Lock Check")
+        cc.require_metric(cam, "Lock Check", "card width and height (metres)")
         points = {}
         if measure_report and measure_report.strip() not in ("", "None", "null"):
             points = json.loads(measure_report).get("points_m", {})

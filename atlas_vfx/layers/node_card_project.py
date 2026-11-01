@@ -7,11 +7,13 @@ from pathlib import Path
 
 import numpy as np
 
+from atlas_vfx.camera_side import camera_checks as cc
 from atlas_vfx.camera_side import exr_io
 from atlas_vfx.camera_side import plate as pl
 from atlas_vfx.contracts import shot_camera as sc
 
 from . import card_project as cp
+from . import ltx_integration as li
 from . import holdout as ho
 
 
@@ -45,15 +47,26 @@ class AtlasVFXCardProject:
                                                "tooltip": "plate must be this much nearer before the card is hidden"}),
                 "holdout_soft_m": ("FLOAT", {"default": 0.1, "min": 0.01, "max": 10.0, "step": 0.05,
                                              "tooltip": "depth range over which the holdout ramps in"}),
+                "sensor_lens_folder": ("STRING", {"default": "", "tooltip": "Sensor Lens Maps of this camera: also "
+                                                  "write the card redistorted onto the plate as shot (plate/), next "
+                                                  "to the clean (pinhole) frames. Nuke Builder picks one"}),
             },
         }
 
     def run(self, plate_ref, shot_camera, card, scale, frame_step, preview_every, preview_width, out_dir,
-            holdout_depth="", holdout_margin_m=0.6, holdout_soft_m=0.1):
+            holdout_depth="", holdout_margin_m=0.6, holdout_soft_m=0.1, sensor_lens_folder=""):
         import cv2
         import torch
 
         cam = sc.ShotCamera(shot_camera)
+        cc.check_frame_offset(cam, plate_ref, "Card Project")
+        if pl.clean_path(holdout_depth):
+            cc.require_metric(cam, "Card Project", "holdout margin and softness (metres)")
+        lensed = cc.has_lens(cam)
+        sensor = li.sensor_maps("", sensor_lens_folder) if pl.clean_path(sensor_lens_folder) else None
+        if sensor is not None and scale != 1:
+            raise ValueError("Card Project: the redistorted (plate/) version needs scale 1 (the lens maps are plate "
+                             "size)")
         cache = {}
 
         def texture(path):
@@ -80,7 +93,12 @@ class AtlasVFXCardProject:
                 else:
                     held[n] = None                      # no depth for this frame: card left as is
             p = exr_io.write_rgba(out / f"{name}.{n:04d}.exr", img,
-                                  attrs={"card": name, "camera": cam.name, "frame": n, "scale": scale})
+                                  attrs={"card": name, "camera": cam.name, "frame": n, "scale": scale,
+                                         "space": "clean"})
+            if sensor is not None:
+                exr_io.write_rgba(out / "plate" / f"{name}.{n:04d}.exr", li.apply_camera(img, sensor, n),
+                                  attrs={"card": name, "camera": cam.name, "frame": n, "space": "plate",
+                                         "lens_folder": str(sensor.lens_folder)})
             written.append(p.name)
             coverage.append(float((img[..., 3] > 0.5).mean()))
             if (n - f0) % preview_every == 0:
@@ -94,7 +112,14 @@ class AtlasVFXCardProject:
                   "files": len(written), "pattern": f"{name}.%04d.exr", "corners_m": card["corners"],
                   "animated": bool(card.get("corners_by_frame") or card.get("texture_pattern")),
                   "coverage_max": max(coverage), "frames_with_card": int(sum(c > 0 for c in coverage)),
-                  "colorspace": "ACEScg (premultiplied)"}
+                  "colorspace": "ACEScg (premultiplied)",
+                  # rendered pinhole: a clean-space layer. The camera's lens says what the plate needs to match it
+                  "space": "clean", "lens": cam.data.get("lens") or {"distortion_model": "none"},
+                  "scale_method": (cam.data.get("scale") or {}).get("method"),
+                  # clean = pinhole (this folder); plate = on the plate as shot. With no lens they are the same frames
+                  "versions": ({"clean": f"{name}.%04d.exr", "plate": f"plate/{name}.%04d.exr"} if sensor is not None
+                               else {"clean": f"{name}.%04d.exr"} if lensed
+                               else {"clean": f"{name}.%04d.exr", "plate": f"{name}.%04d.exr"})}
         if depth:
             vals = [v for v in held.values() if v is not None]
             report["holdout"] = {"depth": hd, "margin_m": holdout_margin_m, "soft_m": holdout_soft_m,

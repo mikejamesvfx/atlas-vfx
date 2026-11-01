@@ -33,15 +33,25 @@ def _fwd(p) -> str:
     return str(p).replace("\\", "/")
 
 
-def find_layer(folder) -> dict:
-    """A Card Project output folder -> {name, pattern, first, last} from its render.json."""
+LENS_DELIVERY = ("plate", "clean + STMaps")
+
+
+def find_layer(folder, version: str = "plate") -> dict:
+    """A layer folder (Card Project, LTX Return, ...) -> {name, pattern, first, last} from its render.json, for the
+    version asked: 'plate' (on the plate as shot) or 'clean' (pinhole, undistorted). A folder from before versions
+    existed was made with lens-free cameras, so its one sequence is both."""
     folder = Path(folder)
     rj = sorted(folder.glob("*.render.json"))
     if not rj:
         raise FileNotFoundError(f"no *.render.json in {folder}")
     r = json.loads(rj[0].read_text(encoding="utf-8"))
-    return {"name": r["card"], "pattern": _fwd(folder / r["pattern"]), "first": r["frames"][0], "last": r["frames"][1],
-            "colorspace": "ACEScg", "premultiplied": True}
+    versions = r.get("versions") or {"plate": r["pattern"], "clean": r["pattern"]}
+    if version not in versions:
+        raise ValueError(f"layer {r['card']} ({folder}) has no {version} version, only {sorted(versions)}: "
+                         + ("its camera has a lens; give Card Project / LTX Prep the Sensor Lens Maps folder"
+                            if version == "plate" else "use lens_delivery plate"))
+    return {"name": r["card"], "pattern": _fwd(folder / versions[version]), "first": r["frames"][0],
+            "last": r["frames"][1], "colorspace": "ACEScg", "premultiplied": True, "version": version}
 
 
 def plate_source(plate_path, kind: str = "dpx", frame_offset: int = 1001) -> dict:
@@ -64,7 +74,11 @@ def plate_source(plate_path, kind: str = "dpx", frame_offset: int = 1001) -> dic
 def build_data(*, shot: str, plate: dict, plate_colorspace: str, plate_frames: tuple[int, int], fmt: tuple,
                ocio_config: str, camera_chan: str, camera_settings: dict, layers: list[dict], write_pattern: str,
                set_proxy_obj: str | None = None, prefix: str = "AVFX_", set_root: bool = True, fps: float = 24.0,
-               x_offset: int = 0) -> dict:
+               x_offset: int = 0, lens_maps: dict | None = None) -> dict:
+    """lens_maps: {"undistort", "redistort"} STMap EXRs (Sensor Lens Maps, G channel) for lens_delivery 'clean +
+    STMaps': the clean layers are stacked, redistorted once and merged over the untouched plate."""
+    if lens_maps:
+        lens_maps = {k: _fwd(lens_maps[k]) for k in ("undistort", "redistort")}
     # names that become the script's file name, Nuke node names and the prefix of the nodes a re-run deletes
     shot = safe_name(shot, "shot")
     if not re.fullmatch(r"\w+", prefix or ""):
@@ -72,14 +86,18 @@ def build_data(*, shot: str, plate: dict, plate_colorspace: str, plate_frames: t
                          f"whose name starts with it)")
     layers = [dict(l, name=safe_name(l["name"], "layer name")) for l in layers]
     reads = [plate["probe"], _fwd(camera_chan), _fwd(ocio_config)] + [l["pattern"] % l["first"] for l in layers]
+    if lens_maps:
+        reads += [lens_maps["undistort"], lens_maps["redistort"]]
     if set_proxy_obj:
         reads.append(_fwd(set_proxy_obj))
     return {"shot": shot, "prefix": prefix, "set_root": set_root, "fps": fps, "x_offset": x_offset,
             "frames": list(plate_frames), "format": list(fmt), "ocio_config": _fwd(ocio_config),
             "working_space": "ACEScg", "plate": dict(plate, colorspace=plate_colorspace),
             "camera": {"chan": _fwd(camera_chan), **{k: camera_settings[k] for k in
-                                                       ("rot_order", "haperture", "vaperture", "win_translate")}},
+                                                       ("rot_order", "haperture", "vaperture", "win_translate")},
+                       "units": camera_settings.get("units", "metres")},
             "layers": layers, "set_proxy_obj": _fwd(set_proxy_obj) if set_proxy_obj else None,
+            "lens": lens_maps,
             "write": {"file": _fwd(write_pattern), "colorspace": "ACEScg"}, "reads": reads}
 
 
@@ -166,8 +184,30 @@ setk(plate, "before", "hold")
 setk(plate, "after", "hold")
 setk(plate, "label", "%s\n%s" % (pl["kind"], pl["range_note"]))
 
-# 4. layers over the plate, back to front
-x, below = 0, plate
+# 4. layers, back to front. lens 'plate': each (redistorted) layer straight over the plate. lens 'clean + STMaps':
+#    the clean (pinhole) layers are stacked, the stack is redistorted ONCE with the lens STMap and goes over the
+#    untouched plate (the plate itself is never resampled); an undistorted plate branch is there for lining up.
+LENS = DATA.get("lens")
+
+
+def stmap_read(name, path, x, y):
+    rd = make(["Read"], name, x, y)
+    setk(rd, "file", path)
+    setk(rd, "raw", True)                       # an STMap is data: never colour converted
+    setk(rd, "label", "STMap (Raw)")
+    return rd
+
+
+def stmap(name, src, uv, x, y, label):
+    st = make(["STMap"], name, x, y)
+    st.setInput(0, src)                         # src
+    st.setInput(1, uv)                          # stmap
+    setk(st, "uv", "rgb")
+    setk(st, "label", label)
+    return st
+
+
+x, below, stack = 0, plate, None
 for i, L in enumerate(DATA["layers"]):
     rd = make(["Read"], "Layer_" + L["name"], 180 * (i + 1), -200)
     setk(rd, "file", L["pattern"])
@@ -179,10 +219,30 @@ for i, L in enumerate(DATA["layers"]):
     setk(rd, "premultiplied", L["premultiplied"])
     setk(rd, "before", "black")
     setk(rd, "after", "black")
-    mg = make(["Merge2"], "Over_" + L["name"], 0, 120 * (i + 1), operation="over")
-    mg.setInput(0, below)                       # B
-    mg.setInput(1, rd)                          # A
-    below = mg
+    setk(rd, "label", L.get("version", "plate"))
+    if LENS:
+        if stack is None:
+            stack = rd
+        else:
+            mg = make(["Merge2"], "Stack_" + L["name"], 180 * (i + 1), -80, operation="over")
+            mg.setInput(0, stack)
+            mg.setInput(1, rd)
+            stack = mg
+    else:
+        mg = make(["Merge2"], "Over_" + L["name"], 0, 120 * (i + 1), operation="over")
+        mg.setInput(0, below)                   # B
+        mg.setInput(1, rd)                      # A
+        below = mg
+if LENS:
+    stmap("Undistort_plate", plate, stmap_read("Read_undistort", LENS["undistort"], -180, 0), -180, 120,
+               "plate -> clean (line up the camera here)")
+    if stack is not None:
+        rdm = stmap("Redistort_layers", stack, stmap_read("Read_redistort", LENS["redistort"], 0, -80), 180, 40,
+                    "clean layers -> plate as shot")
+        mg = make(["Merge2"], "Over_layers", 0, 120, operation="over")
+        mg.setInput(0, plate)
+        mg.setInput(1, rdm)
+        below = mg
 
 # 5. write (not rendered)
 wr = make(["Write"], "Write_comp", 0, 120 * (len(DATA["layers"]) + 1))
@@ -213,7 +273,7 @@ try:
         cam["focal"].setValueAt(v[6], f)
 except Exception as e:
     problems.append("camera animation: %s" % e)
-setk(cam, "label", "metres, ZXY, %d frames" % len(rows))
+setk(cam, "label", "%s, ZXY, %d frames" % (c["units"], len(rows)))
 
 # 7. set proxy geometry, for lining up (optional)
 if DATA["set_proxy_obj"]:

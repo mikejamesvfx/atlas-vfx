@@ -71,7 +71,10 @@ class AtlasVFXLTXReturn:
             else:
                 rgba = li.return_frame(ltx[i], masks[i], (W, H), inv, feather_px)
             if sensor is not None:
-                rgba = li.apply_camera(rgba, sensor, n)     # LTX worked in clean space: put the plate camera back
+                # LTX worked in clean space: keep that frame (clean/) and put the plate camera back for the main one
+                exr_io.write_rgba(out / "clean" / f"{name}.{n:04d}.exr", rgba,
+                                  attrs={"layer": name, "frame": n, "space": "clean"})
+                rgba = li.apply_camera(rgba, sensor, n)
             exr_io.write_rgba(out / f"{name}.{n:04d}.exr", rgba,
                               attrs={"layer": name, "frame": n, "source": "LTX integration pass",
                                      "replaces": ltx_prep["layer"]})
@@ -88,7 +91,13 @@ class AtlasVFXLTXReturn:
                   "mirror": bool(ltx_prep.get("mirror")),
                   "window_scale": ([round(w[3] / wh, 3) for w in ltx_prep["windows"]] if ltx_prep.get("windows") else None),
                   "sensor": ({**sens, "applied": "vignette -> CA + distortion -> RS"} if sensor is not None else None),
-                  "note": "inside the mask: LTX output upscaled from work size; outside: alpha 0 (plate untouched)"}
+                  "note": "inside the mask: LTX output upscaled from work size; outside: alpha 0 (plate untouched)",
+                  # plate = on the plate as shot (this folder). clean = the pinhole frame LTX made, when Prep worked
+                  # in clean space. With no lens on the camera (Prep had no lens folder and layers had none) they match
+                  "space": "plate",
+                  "versions": ({"plate": f"{name}.%04d.exr", "clean": f"clean/{name}.%04d.exr"} if sensor is not None
+                               else {"plate": f"{name}.%04d.exr", "clean": f"{name}.%04d.exr"}
+                               if not ltx_prep.get("lens_on_layers") else {"plate": f"{name}.%04d.exr"})}
         (out / f"{name}.render.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
         pl.write_sidecar(out / f"{name}.sidecar.json", "AtlasVFXLTXReturn",
                          inputs={k: v for k, v in ltx_prep.items() if k != "masks_work"}, outputs=report)

@@ -296,6 +296,11 @@
     "name": "holdout_soft_m",
     "type": "FLOAT",
     "group": "optional"
+   },
+   {
+    "name": "sensor_lens_folder",
+    "type": "STRING",
+    "group": "optional"
    }
   ],
   "outputs": [
@@ -1199,6 +1204,11 @@
     "name": "mirror",
     "type": "BOOLEAN",
     "group": "optional"
+   },
+   {
+    "name": "allow_raw_lens",
+    "type": "BOOLEAN",
+    "group": "optional"
    }
   ],
   "outputs": [
@@ -1696,6 +1706,20 @@
     "name": "x_offset",
     "type": "INT",
     "group": "optional"
+   },
+   {
+    "name": "lens_delivery",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "plate",
+     "clean + STMaps"
+    ]
+   },
+   {
+    "name": "sensor_lens_folder",
+    "type": "STRING",
+    "group": "optional"
    }
   ],
   "outputs": [
@@ -2111,6 +2135,11 @@
      "centre",
      "top"
     ]
+   },
+   {
+    "name": "frames_are_clean",
+    "type": "BOOLEAN",
+    "group": "optional"
    }
   ],
   "outputs": [

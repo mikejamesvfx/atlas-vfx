@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
+from atlas_vfx.camera_side import camera_checks as cc
 from atlas_vfx.camera_side import exr_io
 from atlas_vfx.camera_side import measure as ms
 from atlas_vfx.camera_side import plate as pl
@@ -52,6 +53,7 @@ class AtlasVFXForegroundElement:
         import torch
 
         cam = sc.ShotCamera(shot_camera)
+        cc.require_metric(cam, "Foreground Element", "distance, lateral, height and ground (metres)")
         if frame not in cam.frames:
             raise ValueError(f"frame {frame} not in camera {cam.name} ({cam.frames[0]}-{cam.frames[-1]})")
         img = image[min(batch_index, image.shape[0] - 1)].cpu().numpy()[..., :3]
