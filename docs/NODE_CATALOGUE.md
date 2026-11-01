@@ -373,13 +373,19 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 29 Sensor Lens Maps
 `AtlasVFXSensorLensMaps` · sensor · Atlas VFX/Sensor
 - in: lens_source camera|camera + typed|typed, k1 FLOAT, k2 FLOAT, k3 FLOAT, p1 FLOAT, p2 FLOAT, ca_r FLOAT, ca_b FLOAT, vig_1 FLOAT, vig_2 FLOAT, vig_3 FLOAT, map_scale FLOAT, out_dir STRING
-- in, optional: shot_camera ATLAS_TRACKED_CAMERA, plate_ref ATLAS_PLATE_SEQ
+- in, optional: shot_camera ATLAS_TRACKED_CAMERA, plate_ref ATLAS_PLATE_SEQ, overscan none|auto|5 %|10 %
 - out: sensor_lens ATLAS_VFX_SENSOR_LENS, lens_folder STRING, preview IMAGE, report STRING
-- test: tests/test_sensor_lens.py
-- proof: plate V141 (DEMO sensor pass, S2-S3; k1 k2 are 0 until the chart shoot measures them)
+- test: tests/test_sensor_lens.py, tests/test_overscan.py
+- proof: plate V141 (DEMO sensor pass, S2-S3; k1 k2 are 0 until the chart shoot measures them); synthetic overscan
 - licences: `scipy`, `openimageio`
 - needs: scipy (load); OpenImageIO (run)
 - writes: STMaps (Brown-Conrady + lateral CA) and a vignette map + `.nk` under out_dir
+- notes: overscan (none | auto | 5 % | 10 %) makes the clean frame bigger than the plate so barrel corners survive
+  undistort: undistort maps live on the clean grid and point into the plate, redistort maps on the plate grid point
+  into the clean frame; sensor_lens.json records `clean_size` and `overscan_px`. Everything in clean space follows
+  that size: Card Project renders through `camera_side/clean_space.clean_camera` (no lens, wider sensor, same focal
+  in pixels, principal point shifted), LTX Prep / Return work on the clean frame, the Nuke Builder's clean +
+  STMaps branch widens the camera aperture to it. Sensor Apply with LTX crop windows refuses an overscanned folder.
 
 ### 30 Sensor RS Maps
 `AtlasVFXSensorRSMaps` · sensor · Atlas VFX/Sensor

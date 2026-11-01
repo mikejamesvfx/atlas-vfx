@@ -179,32 +179,49 @@ def lens_from_inputs(cam: sc.ShotCamera | None, source: str, typed: dict, plate_
 
 def make_lens_maps(lens: ln.BrownConrady, plate_size, out_dir, *, ca_r=0.0, ca_b=0.0, v1=0.0, v2=0.0, v3=0.0,
                    scale: float = 1.0, lens_from: str = "camera", ca_from: str = "typed",
-                   vignette_from: str = "typed") -> dict:
+                   vignette_from: str = "typed", overscan="none") -> dict:
+    """overscan: 'none' (clean frame = plate), 'auto' (just enough that no sensor pixel falls outside the clean
+    frame), or a fraction per side (0.05 = 5 % of the plate width / height each side)."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    W0, H0 = (int(v) for v in plate_size)
+    if overscan in (None, "none", 0, 0.0):
+        oxp, oyp = 0, 0
+    elif overscan == "auto":
+        oxp, oyp = ln.overscan_for(lens, W0, H0)
+    else:
+        f = float(overscan)
+        if not 0.0 <= f <= 0.5:
+            raise ValueError(f"overscan {overscan!r}: 'none', 'auto' or a fraction 0-0.5")
+        oxp, oyp = (int(2 * round(f * W0 / 2)), int(2 * round(f * H0 / 2)))
+    clean_size = [W0 + 2 * oxp, H0 + 2 * oyp]
     W, H = [int(round(v * scale)) for v in plate_size]
     L = lens.scaled(scale) if scale != 1 else lens
-    maps = ln.lens_maps(L, W, H, ca_r, ca_b)
+    ox, oy = int(round(oxp * scale)), int(round(oyp * scale))
+    maps = ln.lens_maps(L, W, H, ca_r, ca_b, (ox, oy))
     for kind in ("undistort", "redistort"):
         for c in ln.CHANNELS:
             mio.write_stmap(out / f"{kind}_{c.lower()}.exr", maps[kind][c], {"map": f"{kind} {c}"})
     g = ln.vignette_gain(W, H, v1, v2, v3, L.cx, L.cy)
     mio.write_exr(out / "vignette.exr", {"R": g, "G": g, "B": g},
                   {"map": "vignette gain: multiply linear ACEScg to apply, divide to remove"})
-    # the inverse check: undistort(redistort(p)) per channel
+    # the inverse check: undistort(redistort(p)) per channel (redistort points into the clean frame)
     X, Y = ln.pixel_grid(W, H)
+    Wc, Hc = W + 2 * ox, H + 2 * oy
     err = {}
     for c in ln.CHANNELS:
-        px, py = ln.from_st(maps["redistort"][c], W, H)
-        st = rs.sample(maps["undistort"][c].astype(np.float64), px, py, W, H)
+        px, py = ln.from_st(maps["redistort"][c], Wc, Hc)
+        st = rs.sample(maps["undistort"][c].astype(np.float64), px, py, Wc, Hc)
         qx, qy = ln.from_st(st, W, H)
-        inside = (px > 2) & (px < W - 2) & (py > 2) & (py < H - 2)
+        inside = (px > 2) & (px < Wc - 2) & (py > 2) & (py < Hc - 2)
         e = np.hypot(qx - X, qy - Y)[inside]
         err[c] = float(np.median(e)) / scale if e.size else None
     report = {"schema": "atlas_vfx.sensor_lens/1", "lens": lens.to_dict(), "lens_from": lens_from,
               "ca": {"R": ca_r, "B": ca_b, "G": 0.0}, "ca_from": ca_from,
               "vignette": {"v1": v1, "v2": v2, "v3": v3, "r": "1 at the corners"}, "vignette_from": vignette_from,
               "plate_size": list(plate_size), "map_size": [W, H], "colorspace": "Raw (STMap, Nuke s/t; gain)",
+              # the clean (undistorted) frame: plate + overscan_px each side. undistort maps live on it
+              "clean_size": clean_size, "overscan_px": [oxp, oyp], "overscan": overscan,
               "roundtrip_median_px": err,
               "files": sorted(p.name for p in out.glob("*.exr"))}
     (out / "sensor_lens.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
@@ -228,6 +245,8 @@ class Maps:
         if rep is None:
             raise ValueError("Sensor Apply: give an RS maps folder, a lens maps folder, or both")
         self.plate_size = tuple(rep["plate_size"])
+        self.clean_size = tuple((self.lens_report or {}).get("clean_size") or self.plate_size)
+        self.overscan = self.clean_size != self.plate_size
         self._lens = {}
 
     def _map_window(self, st, win):
@@ -261,13 +280,24 @@ class Maps:
             self._lens[kind] = {c: mio.read_stmap(self.lens_folder / f"{kind}_{c.lower()}.exr") for c in ln.CHANNELS}
         return {c: self._map_window(m, win) for c, m in self._lens[kind].items()}
 
-    def gain(self, win=None):
+    def out_size(self, in_width: int, direction: str) -> tuple[int, int]:
+        """Output (w, h) for an image in_width wide: remove takes a plate-shaped image to the clean frame, apply
+        a clean-frame-shaped image to the plate, both at the image's own scale."""
+        src, dst = (self.plate_size, self.clean_size) if direction == "remove" else (self.clean_size, self.plate_size)
+        s = in_width / src[0]
+        return int(round(dst[0] * s)), int(round(dst[1] * s))
+
+    def gain(self, win=None, clean: bool = False):
+        """Vignette gain on the plate grid, or (clean=True, overscan) carried through the undistort map onto the
+        clean grid, where the clean image is multiplied / divided by it."""
         if not self.lens_folder:
             return None
         v = self.lens_report["vignette"]
         if not any(v[k] for k in ("v1", "v2", "v3")):
             return None
         g = mio.read_exr(self.lens_folder / "vignette.exr")[0][..., 0]
+        if clean and self.overscan:
+            return ap.warp(g[..., None], self.lens("undistort")["G"], "edge", self.clean_size)[..., 0]
         if win is None:
             return g
         import cv2
@@ -314,27 +344,36 @@ def apply_batch(images: np.ndarray, maps: Maps, *, direction: str = "apply camer
                 windows=None, colorspace: str = WARP_ONLY, ocio_config: str | None = None,
                 use_vignette: bool = True, use_lens: bool = True, use_rs: bool = True, edge: str = "edge",
                 progress=None) -> tuple[np.ndarray, dict]:
-    """images (N, h, w, C) -> same shape. Image i is Nuke frame first_frame + i showing plate window windows[i]
+    """images (N, h, w, C) -> (N, h', w', C): the same shape, or with an overscanned lens the clean frame (remove)
+    / the plate (apply) at the image's scale. Image i is Nuke frame first_frame + i showing plate window windows[i]
     ([x0, y0, w, h] plate px, or None = the whole plate), resized to the image size."""
     to_lin, from_lin = colour_procs(colorspace, ocio_config or str(pl.DEFAULT_OCIO))
     if colorspace == WARP_ONLY:
         use_vignette = False
-    out = np.empty_like(images, dtype=np.float32)
     applied = []
+    if maps.overscan and windows:
+        raise ValueError("Sensor Apply: crop windows with an overscanned clean frame are not supported; use LTX "
+                         "Return (it puts the camera back on the whole clean frame)")
+    over = maps.overscan and use_lens
+    if maps.overscan and not use_lens:
+        raise ValueError("Sensor Apply: these lens maps overscan the clean frame, so the lens can't be left out")
+    out = []
     for i in range(len(images)):
         n = first_frame + i
         win = windows[i] if windows else None
         img = _apply_proc(to_lin, images[i].astype(np.float32))
-        gain = maps.gain(win) if use_vignette else None
+        gain = maps.gain(win, clean=over) if use_vignette else None
         if direction == "apply camera":
+            size = maps.out_size(img.shape[1], "apply") if over else None
             r = ap.apply(img, gain=gain, lens=maps.lens("redistort", win) if use_lens else None,
-                         rs=maps.rs(n, "rs", win) if use_rs else None, edge=edge)
+                         rs=maps.rs(n, "rs", win) if use_rs else None, edge=edge, out_size=size)
         else:
             de = maps.rs(n, "ders", win) if use_rs else []
+            size = maps.out_size(img.shape[1], "remove") if over else None
             r = ap.remove(img, gain=gain, lens=maps.lens("undistort", win) if use_lens else None,
-                          ders=de[0] if de else None, edge=edge)
+                          ders=de[0] if de else None, edge=edge, out_size=size)
         r = _apply_proc(from_lin, r)
-        out[i] = np.clip(r, 0.0, 1.0) if colorspace == DISPLAY_VIEW else r
+        out.append(np.clip(r, 0.0, 1.0) if colorspace == DISPLAY_VIEW else r)
         applied.append(n)
         if progress:
             progress(i + 1, len(images))
@@ -347,7 +386,7 @@ def apply_batch(images: np.ndarray, maps: Maps, *, direction: str = "apply camer
               "lens_folder": str(maps.lens_folder) if maps.lens_folder else None,
               "order": ("vignette (linear) -> CA + distortion -> RS" if direction == "apply camera"
                         else "de-RS -> undistort + CA -> devignette (linear)")}
-    return out, report
+    return (np.stack(out) if out else np.zeros((0,) + images.shape[1:], np.float32)), report
 
 
 def frames_windows_from_prep(ltx_prep: dict, n_images: int):

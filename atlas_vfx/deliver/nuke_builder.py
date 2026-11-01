@@ -50,8 +50,10 @@ def find_layer(folder, version: str = "plate") -> dict:
         raise ValueError(f"layer {r['card']} ({folder}) has no {version} version, only {sorted(versions)}: "
                          + ("its camera has a lens; give Card Project / LTX Prep the Sensor Lens Maps folder"
                             if version == "plate" else "use lens_delivery plate"))
+    size = (r.get("sizes") or {}).get(version)
     return {"name": r["card"], "pattern": _fwd(folder / versions[version]), "first": r["frames"][0],
-            "last": r["frames"][1], "colorspace": "ACEScg", "premultiplied": True, "version": version}
+            "last": r["frames"][1], "colorspace": "ACEScg", "premultiplied": True, "version": version,
+            "size": list(size) if size else None}
 
 
 def plate_source(plate_path, kind: str = "dpx", frame_offset: int = 1001) -> dict:

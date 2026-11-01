@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from atlas_vfx.camera_side import camera_checks as cc
+from atlas_vfx.camera_side import clean_space as cs
 from atlas_vfx.camera_side import exr_io
 from atlas_vfx.camera_side import plate as pl
 from atlas_vfx.contracts import shot_camera as sc
@@ -67,6 +68,11 @@ class AtlasVFXCardProject:
         if sensor is not None and scale != 1:
             raise ValueError("Card Project: the redistorted (plate/) version needs scale 1 (the lens maps are plate "
                              "size)")
+        if sensor is not None and pl.clean_path(holdout_depth):
+            raise ValueError("Card Project: a depth holdout (Plate Depth is of the distorted plate) with a lens folder "
+                             "is not supported yet; run the holdout without sensor_lens_folder")
+        # pinhole layers are rendered through the clean camera: no lens, on the clean frame (plate + overscan)
+        rcam = cs.clean_camera(cam, sensor.lens_folder) if sensor is not None else cam
         cache = {}
 
         def texture(path):
@@ -86,7 +92,7 @@ class AtlasVFXCardProject:
         disp_proc = pl._cpu(plate_ref["ocio_config"], "ACEScg", None, pl.DEFAULT_DISPLAY, pl.DEFAULT_VIEW)
         for n in range(f0, f1 + 1, frame_step):
             corners, tex_path = cp.card_at(card, n)
-            img = cp.render(cam, n, corners, texture(tex_path), scale=scale)
+            img = cp.render(rcam, n, corners, texture(tex_path), scale=scale)
             if depth:
                 if n in depth:
                     img, held[n] = ho.apply(img, cam, n, corners, depth[n], holdout_margin_m, holdout_soft_m)
@@ -95,8 +101,10 @@ class AtlasVFXCardProject:
             p = exr_io.write_rgba(out / f"{name}.{n:04d}.exr", img,
                                   attrs={"card": name, "camera": cam.name, "frame": n, "scale": scale,
                                          "space": "clean"})
+            plate_img = img
             if sensor is not None:
-                exr_io.write_rgba(out / "plate" / f"{name}.{n:04d}.exr", li.apply_camera(img, sensor, n),
+                plate_img = li.apply_camera(img, sensor, n)
+                exr_io.write_rgba(out / "plate" / f"{name}.{n:04d}.exr", plate_img,
                                   attrs={"card": name, "camera": cam.name, "frame": n, "space": "plate",
                                          "lens_folder": str(sensor.lens_folder)})
             written.append(p.name)
@@ -104,7 +112,7 @@ class AtlasVFXCardProject:
             if (n - f0) % preview_every == 0:
                 i, plate_img = next(pl.decode_rgb(plate_ref, n - off, n - off, width=preview_width))
                 lin = pl.to_working(plate_img, plate_ref)
-                small = cv2.resize(img, (lin.shape[1], lin.shape[0]), interpolation=cv2.INTER_AREA)
+                small = cv2.resize(plate_img, (lin.shape[1], lin.shape[0]), interpolation=cv2.INTER_AREA)
                 comp = np.ascontiguousarray(cp.over(small, lin))
                 disp_proc.applyRGB(comp)
                 previews.append(np.clip(comp, 0, 1).astype(np.float32))
@@ -117,6 +125,8 @@ class AtlasVFXCardProject:
                   "space": "clean", "lens": cam.data.get("lens") or {"distortion_model": "none"},
                   "scale_method": (cam.data.get("scale") or {}).get("method"),
                   # clean = pinhole (this folder); plate = on the plate as shot. With no lens they are the same frames
+                  "sizes": {"clean": [rcam.data["plate"]["width"], rcam.data["plate"]["height"]],
+                            "plate": [cam.data["plate"]["width"], cam.data["plate"]["height"]]},
                   "versions": ({"clean": f"{name}.%04d.exr", "plate": f"plate/{name}.%04d.exr"} if sensor is not None
                                else {"clean": f"{name}.%04d.exr"} if lensed
                                else {"clean": f"{name}.%04d.exr", "plate": f"{name}.%04d.exr"})}

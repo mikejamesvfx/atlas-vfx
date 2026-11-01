@@ -67,7 +67,20 @@ class AtlasVFXNukeBuilder:
             # G is the reference channel: lateral CA (R/B) stays in the maps folder, not in this one STMap
             lens_maps = {"undistort": lf / "undistort_g.exr", "redistort": lf / "redistort_g.exr"}
         w, h = plate_ref["width"], plate_ref["height"]
-        checks = [exr_io.check_sequence(L["pattern"], L["first"], L["last"], w, h, every=24) for L in layers]
+        if clean:
+            # the camera lines up on the undistorted plate: same focal, aperture widened to the clean frame
+            rep = json.loads((lf / "sensor_lens.json").read_text(encoding="utf-8"))
+            W0, H0 = rep["plate_size"]
+            Wc, Hc = rep.get("clean_size") or rep["plate_size"]
+            cam = dict(cam, haperture=cam["haperture"] * Wc / W0, vaperture=cam["vaperture"] * Hc / H0,
+                       win_translate=[v * W0 / Wc for v in cam["win_translate"]],
+                       units=f"{cam.get('units', 'metres')}, clean frame {Wc}x{Hc}")
+            for L in layers:
+                if L["size"] and list(L["size"]) != [Wc, Hc]:
+                    raise ValueError(f"Nuke Builder: layer {L['name']} clean frames are {L['size']}, the lens maps' "
+                                     f"clean frame is {Wc}x{Hc} (made with other lens maps?)")
+        checks = [exr_io.check_sequence(L["pattern"], L["first"], L["last"], *(L["size"] or (w, h)), every=24)
+                  for L in layers]
         f0, f1 = plate_ref["nuke_first"], plate_ref["nuke_last"]
         plate = nb.plate_source(plate_ref["path"], plate_kind, plate_ref["frame_offset"])
         stem = Path(plate_ref["path"]).stem

@@ -95,6 +95,7 @@ class AtlasVFXLTXReturn:
                   # plate = on the plate as shot (this folder). clean = the pinhole frame LTX made, when Prep worked
                   # in clean space. With no lens on the camera (Prep had no lens folder and layers had none) they match
                   "space": "plate",
+                  "sizes": {"clean": [W, H], "plate": ltx_prep.get("true_plate_size") or [W, H]},
                   "versions": ({"plate": f"{name}.%04d.exr", "clean": f"clean/{name}.%04d.exr"} if sensor is not None
                                else {"plate": f"{name}.%04d.exr", "clean": f"{name}.%04d.exr"}
                                if not ltx_prep.get("lens_on_layers") else {"plate": f"{name}.%04d.exr"})}

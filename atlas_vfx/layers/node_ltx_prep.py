@@ -86,7 +86,13 @@ class AtlasVFXLTXPrep:
         def load(folder):
             folder = Path(pl.clean_path(folder))
             rj = json.loads(next(folder.glob("*.render.json")).read_text(encoding="utf-8"))
-            return {"name": rj["card"], "pattern": str(folder / rj["pattern"]), "range": rj["frames"],
+            # clean-space Prep (lens folder) comps the clean (pinhole) version, raw-plate Prep the plate version
+            want = "clean" if sensor is not None and sensor.lens_folder is not None else "plate"
+            versions = rj.get("versions") or {want: rj["pattern"]}
+            pat = versions.get(want)
+            if pat is None:
+                raise ValueError(f"LTX Prep: layer {rj['card']} has no {want} version ({sorted(versions)})")
+            return {"name": rj["card"], "pattern": str(folder / pat), "range": rj["frames"],
                     "lens": rj.get("lens")}
 
         main = load(layer_folder)
@@ -99,7 +105,9 @@ class AtlasVFXLTXPrep:
         frames = list(range(first_frame, first_frame + length))
         if mode == "crop" and (frames[0] < main["range"][0] or frames[-1] > main["range"][1]):
             raise ValueError(f"crop mode: layer covers {main['range']}, asked {frames[0]}-{frames[-1]}")
-        H0, W0 = plate_ref["height"], plate_ref["width"]
+        # the frame LTX works on: the plate, or with an overscanned lens the bigger clean frame
+        W0, H0 = (sensor.clean_size if sensor is not None and sensor.lens_folder is not None
+                  else (plate_ref["width"], plate_ref["height"]))
 
         def read(L, n):
             """A layer frame, or nothing (zeros) outside its range."""
@@ -109,7 +117,7 @@ class AtlasVFXLTXPrep:
         fwd, inv = li.view_processors(plate_ref["ocio_config"])
         off = plate_ref["frame_offset"]
         size, half = (width, height), (width // 2, height // 2)
-        plate_size = (plate_ref["width"], plate_ref["height"])
+        plate_size = (W0, H0)
         windows = None
         if mode == "crop":
             boxes = [li.bbox(exr_io.read_rgba(pattern % n)[0][..., 3], mask_thresh) for n in frames]
@@ -149,6 +157,7 @@ class AtlasVFXLTXPrep:
             m_half.append((li.resize(m, half) > 0.5).astype(np.float32))
         prep = {"plate_ref": plate_ref, "layer": rj["card"], "layer_pattern": pattern, "frames": [frames[0], frames[-1]],
                 "work_size": list(size), "plate_size": list(plate_size), "mode": mode, "windows": windows,
+                "true_plate_size": [plate_ref["width"], plate_ref["height"]],
                 "mask": {"thresh": mask_thresh, "shadow_px": shadow_px, "dilate_px": dilate_px},
                 "masks_work": None, "view": [pl.DEFAULT_DISPLAY, pl.DEFAULT_VIEW], "roundtrip": rt,
                 "mask_coverage": float(np.mean(m_full)), "keyframes": key_idx,

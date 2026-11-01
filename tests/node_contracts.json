@@ -3250,6 +3250,17 @@
     "name": "plate_ref",
     "type": "ATLAS_PLATE_SEQ",
     "group": "optional"
+   },
+   {
+    "name": "overscan",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "none",
+     "auto",
+     "5 %",
+     "10 %"
+    ]
    }
   ],
   "outputs": [
