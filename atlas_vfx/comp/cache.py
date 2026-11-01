@@ -192,6 +192,8 @@ def _layer_at(shot: dict, lay: dict, frame: int, level: str, size: tuple[int, in
         return mx.mix_frame(imgs, m)
     v = lay.get("version") or (lay["versions"][-1] if lay.get("versions") else None)
     if lay["kind"] == "recipe" and v and v != sh.PREVIEW:
+        if v not in lay.get("versions", []):          # chosen version has no frames (failed render): left out,
+            return None                               # as the comp leaves it out
         data = take_bytes(shot["name"], lay["name"], v, level, frame)
         return None if data is None else decode(data)[0]
     return fr._single(shot, lay, frame)              # sequence layers and previews: read directly

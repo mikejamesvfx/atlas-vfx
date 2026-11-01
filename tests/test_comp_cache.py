@@ -131,6 +131,13 @@ def test_stack(H, W):
     under2 = cc.decode(cc.stack_bytes("C", "rl", "under", "proxy", 1001, size))[0]
     check(k1 != k2 and np.allclose(under2, bg * 0.5, atol=2e-3), "a change below the layer changes the key and the image")
     raises(lambda: cc.stack_bytes("C", "rl", "middle", "proxy", 1001, size), "unknown side refused", "side")
+    sh.next_version("C", "bg")                                      # v002: an empty render (no frames)
+    shot = sh.load_shot("C")
+    bg = [x for x in shot["layers"] if x["name"] == "bg"][0]
+    bg["version"] = "v002"
+    sh.save_shot(shot)
+    u3 = cc.decode(cc.stack_bytes("C", "rl", "under", "proxy", 1001, size))[0]
+    check(not u3.any(), "a layer whose chosen version has no frames is left out of under, not an error")
 
 
 def test_shader():
