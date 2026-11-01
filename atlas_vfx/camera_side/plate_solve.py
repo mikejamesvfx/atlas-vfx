@@ -25,7 +25,7 @@ import re
 import shutil
 import sqlite3
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -57,6 +57,12 @@ class SolveOptions:
     nodal_panoramic_frac: float = 0.5       # this share of rotation-only (panoramic) pairs makes it a candidate
     camera_move: str = "auto"               # auto | free (always SfM) | nodal (tripod pan: always rotation-only)
     lens_k_limit: float = 0.25              # |k1| or |k2| past this is not a real lens: SfM has gone degenerate
+    # SfM saw real parallax when points triangulate at this median angle and the camera path is at least this many
+    # median depths long (dolly test: 6.4 deg, 0.40 depths; DSCF3002: 3.1 deg, 8.9 depths); then an implausible lens
+    # is re-solved (lens rescue), never taken as a pan (DSCF3002, 2026-11-01)
+    parallax_path_depth: float = 0.3
+    parallax_tri_deg: float = 1.5
+    lens_rescue: bool = True
     ba_global_ratio: float = 1.4            # global BA every 40 % of model growth (COLMAP default 1.1)
     ba_global_iterations: int = 30          # COLMAP default 50
     reject_px: float = 2.0                  # drop points whose worst observation reprojects further than this
@@ -220,29 +226,32 @@ def _project(cam, x) -> tuple[float, float]:
 
 
 def observation_errors(rec) -> dict[int, float]:
-    """Worst reprojection error (px, at the solver's image size) per 3D point."""
-    worst: dict[int, float] = {}
+    """Worst reprojection error (px, at the solver's image size) per 3D point. One batched projection per image
+    (pycolmap's img_from_cam takes arrays; a call per point was most of this function's time)."""
+    ids_all, err_all = [], []
+    xyz = {pid: pt.xyz for pid, pt in rec.points3D.items()}
     for img in rec.images.values():
         if not img.has_pose:
             continue
-        cam = rec.cameras[img.camera_id]
-        pose = img.cam_from_world()
-        ids, xy = [], []
-        for p in img.points2D:
-            if p.has_point3D():
-                ids.append(int(p.point3D_id))
-                xy.append(p.xy)
-        if not ids:
+        obs = [(int(p.point3D_id), p.xy) for p in img.points2D if p.has_point3D()]
+        if not obs:
             continue
-        X = np.array([rec.points3D[i].xyz for i in ids], float)
-        Xc = (np.asarray(pose.rotation.matrix()) @ X.T).T + np.asarray(pose.translation)
-        uv = np.array([_project(cam, x) for x in Xc], float)
-        e = np.linalg.norm(uv - np.asarray(xy, float), axis=1)
-        e = np.where(np.isfinite(e), e, np.inf)                       # behind the camera: as wrong as it gets
-        for i, v in zip(ids, e):
-            if v > worst.get(i, -1.0):
-                worst[i] = float(v)
-    return worst
+        ids = np.fromiter((i for i, _ in obs), np.int64, len(obs))
+        xy = np.array([q for _, q in obs], float)
+        X = np.array([xyz[i] for i in ids], float)
+        pose = img.cam_from_world()
+        Xc = X @ np.asarray(pose.rotation.matrix()).T + np.asarray(pose.translation)
+        uv = np.asarray(rec.cameras[img.camera_id].img_from_cam(Xc), float).reshape(-1, 2)
+        uv[Xc[:, 2] <= 1e-9] = np.nan                                 # behind the camera (see _project)
+        e = np.linalg.norm(uv - xy, axis=1)
+        ids_all.append(ids)
+        err_all.append(np.where(np.isfinite(e), e, np.inf))           # behind the camera: as wrong as it gets
+    if not ids_all:
+        return {}
+    ids, e = np.concatenate(ids_all), np.concatenate(err_all)
+    order = np.lexsort((e, ids))                                       # by point, worst last
+    last = np.r_[ids[order][1:] != ids[order][:-1], True]
+    return {int(i): float(v) for i, v in zip(ids[order][last], e[order][last])}
 
 
 def reject_and_refine(rec, opts: SolveOptions) -> dict:
@@ -384,7 +393,14 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
     if masks is not None:
         mask_dir = write_masks(resize_masks(masks, size), names, out / "masks", mask_dilate_px)
     fe = FRONT_ENDS[opts.front_end]()
+    stages, t_stage = {}, [time.time()]
+
+    def stage(name):                                    # seconds per step, in the report
+        now = time.time()
+        stages[name] = round(now - t_stage[0], 1)
+        t_stage[0] = now
     fe.extract(db, image_dir, names, opts, mask_dir, size)
+    stage("features")
     log(f"solve: features on {len(names)} images ({size[0]}x{size[1]})")
     fe.match(db, opts)
     n_tracks = 0
@@ -392,20 +408,30 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
         from . import tracks2d
         n_tracks = tracks2d.add_track_matches(db, names, tracks)
     log("solve: matched" + (f" (+{n_tracks} manual track matches)" if n_tracks else ""))
+    stage("matching")
 
     first, last = frame_of(names[0]), frame_of(names[-1])
-    rec, models = _map(db, image_dir, out / "sparse_1", _mapper_options(opts))
-    passes = [{"pass": "map", "models": models, "registered": rec.num_reg_images() if rec else 0}]
-    if rec is not None and opts.bridge_gaps and rec.num_reg_images() < len(names):
-        seed_dir = out / "sparse_seed"
-        shutil.rmtree(seed_dir, ignore_errors=True)
-        seed_dir.mkdir()
-        rec.write(str(seed_dir))
-        rec2, models2 = _map(db, image_dir, out / "sparse_2", _mapper_options(opts, relaxed=True), seed_dir)
-        if rec2 is not None and rec2.num_reg_images() > rec.num_reg_images():
-            rec = rec2
-        passes.append({"pass": "bridge", "models": models2, "registered": rec.num_reg_images()})
+
+    def map_and_bridge(o: SolveOptions, tag: str):
+        """Incremental mapping, then a relaxed pass seeded with the model to bridge unregistered frames."""
+        r, models = _map(db, image_dir, out / f"sparse{tag}_1", _mapper_options(o))
+        ps_ = [{"pass": f"map{tag}", "models": models, "registered": r.num_reg_images() if r else 0}]
+        stage(f"mapping{tag}")
+        if r is not None and opts.bridge_gaps and r.num_reg_images() < len(names):
+            seed_dir = out / f"sparse{tag}_seed"
+            shutil.rmtree(seed_dir, ignore_errors=True)
+            seed_dir.mkdir()
+            r.write(str(seed_dir))
+            r2, models2 = _map(db, image_dir, out / f"sparse{tag}_2", _mapper_options(o, relaxed=True), seed_dir)
+            if r2 is not None and r2.num_reg_images() > r.num_reg_images():
+                r = r2
+            ps_.append({"pass": f"bridge{tag}", "models": models2, "registered": r.num_reg_images()})
+            stage(f"bridge{tag}")
+        return r, ps_
+
+    rec, passes = map_and_bridge(opts, "")
     rejected = reject_and_refine(rec, opts) if rec is not None else {"rounds": []}
+    stage("reject_refine")
     weak = rec is None or (len(_registered(rec)) < opts.min_registered_frac * len(names)
                            or rec.num_points3D() < opts.min_points)
     mode, nodal_info = "sfm", None
@@ -418,6 +444,36 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
     # pan away is SfM's lens: with no baseline it trades focal against distortion into an impossible lens
     # (synthetic pan: focal +98 %, k1 +0.66). So a panoramic shot goes nodal only when SfM's lens is implausible.
     lens_bad = None if rec is None or weak else _implausible_lens(rec, size, opts)
+    def has_parallax(d) -> bool:
+        return (d is not None and d["path_over_median_depth"] >= opts.parallax_path_depth
+                and d["median_tri_angle_deg"] >= opts.parallax_tri_deg)
+
+    parallax = has_parallax(deg_sfm)
+    rescue = None
+    if lens_bad and not weak and opts.lens_rescue and opts.refine_distortion and opts.camera_move != "nodal":
+        # The lens came out impossible. On a walk that is distortion trading against the path (DSCF3002, through
+        # glass doors: k1 +0.37); on a pan it is the missing baseline. SfM's own parallax can't tell them apart
+        # while its lens is broken (a synthetic pan shows 3.1 deg triangulation, like DSCF3002), so map again with
+        # distortion held at zero and judge the parallax of THAT solve: kept only with a plausible lens, as many
+        # frames, and real parallax; otherwise the shot goes on to the nodal rule below.
+        log(f"solve: SfM's lens is implausible ({lens_bad}); mapping again with distortion fixed")
+        fixed = replace(opts, refine_distortion=False)
+        rec_r, passes_r = map_and_bridge(fixed, "_rescue")
+        rescue = {"lens_was": lens_bad, "passes": passes_r}
+        if rec_r is not None:
+            rej_r = reject_and_refine(rec_r, opts)
+            stage("reject_refine_rescue")
+            bad_r = _implausible_lens(rec_r, size, opts)
+            enough = len(_registered(rec_r)) >= len(_registered(rec))
+            deg_r = degeneracy(db, rec_r)
+            moved = has_parallax(deg_r)
+            rescue.update(lens_after=bad_r, registered=rec_r.num_reg_images(), parallax=moved,
+                          tri_deg=deg_r["median_tri_angle_deg"], path_over_depth=deg_r["path_over_median_depth"],
+                          kept=bool(not bad_r and enough and moved))
+            if rescue["kept"]:
+                rec, rejected, lens_bad, deg_sfm, parallax = rec_r, rej_r, None, deg_r, True
+                passes += passes_r
+        log(f"solve: lens rescue {'kept' if rescue.get('kept') else 'not kept'} ({rescue.get('lens_after')})")
     go_nodal = {"nodal": True, "free": False}.get(opts.camera_move)
     if go_nodal is None:
         if opts.camera_move != "auto":
@@ -446,6 +502,7 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
         nodal_info = {"rms_px": sol["rms_px"], "focal_start_px": sol["focal_start_px"],
                       "fov_x_deg": nodal_solve.fov_deg(sol), "point_distance": nodal_solve.POINT_DISTANCE}
         passes.append({"pass": "nodal", "why": why, "registered": rec.num_reg_images()})
+        stage("nodal")
     reg = _registered(rec) if rec is not None else []
     if rec is None or len(reg) < opts.min_registered_frac * len(names) or rec.num_points3D() < opts.min_points:
         raise SolveError(f"solve too weak: {len(reg)}/{len(names)} frames, "
@@ -464,7 +521,8 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
         "mean_track_length": float(rec.compute_mean_track_length()),
         "camera": _camera_report(rec, size, opts), "passes": passes, "reject": rejected,
         "degeneracy": deg, "manual_track_matches": n_tracks, "masked": mask_dir is not None,
-        "seconds": round(time.time() - t0, 1),
+        "lens_rescue": rescue, "parallax": bool(parallax),
+        "seconds": round(time.time() - t0, 1), "stage_seconds": stages,
     }
     if mode == "nodal":            # the model's points sit on their mean rays, so its own error says nothing
         report["mean_reproj_px"] = nodal_info["rms_px"]
@@ -480,6 +538,13 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
     if deg["warn"]:
         warn.append("low parallax: " + "; ".join(deg["reasons"]) + ". Focal and distortion are weakly determined; "
                     "check the focal against the lens or lock it from a chart.")
+    if mode == "sfm" and lens_bad:
+        warn.append(f"SfM's lens is implausible ({lens_bad}) and re-solving it with distortion fixed did not fix it; "
+                    "the camera moves (real parallax), so it is kept as SfM solved it. Lock the lens (focal from the "
+                    "lens, distortion from a chart) and solve again.")
+    if rescue and rescue.get("kept"):
+        warn.append(f"SfM's first lens was implausible ({rescue['lens_was']}); re-solved with distortion fixed "
+                    "while mapping and freed at the end (lens rescue).")
     if report["missing"]:
         warn.append(f"{len(report['missing'])} frames did not register; the camera keeps frames {run[0]}-{run[1]}")
     report["warnings"] = warn

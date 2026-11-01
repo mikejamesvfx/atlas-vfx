@@ -313,6 +313,36 @@ def case_nodal():
     check(e < 0.5, f"nodal: points reproject through the shot camera (lens applied) at {e:.3f} px")
 
 
+def case_lens_rescue():
+    """DSCF3002 (2026-11-01): a walk with real parallax whose first SfM lens came out impossible went nodal (1.5 px,
+    44 min). Now an implausible lens on a moving camera is re-solved with distortion fixed while mapping and freed
+    at the end. Simulated by failing the first lens check on the dolly shot."""
+    mats = dolly_pan()
+    names = write_shot(TMP / "rescue", mats)
+    real = ps._implausible_lens
+    calls = []
+
+    def first_fails(rec, size, opts):
+        calls.append(1)
+        return "k1 +0.370 (simulated)" if len(calls) == 1 else real(rec, size, opts)
+    ps._implausible_lens = first_fails
+    try:
+        res = ps.solve_folder(TMP / "rescue", names, TMP / "rescue_solve", ps.SolveOptions(focal_px=F_PX * 1.08))
+    finally:
+        ps._implausible_lens = real
+    r = res.report
+    lr = r["lens_rescue"] or {}
+    check(r["mode"] == "sfm" and lr.get("kept") and r["parallax"],
+          f"lens rescue: a moving camera stays SfM, lens re-solved ({lr.get('lens_was')} -> kept {lr.get('kept')})")
+    f = r["camera"]["focal_px"]
+    k1 = r["camera"]["params"][3]
+    check(abs(f / F_PX - 1) < 0.01 and abs(k1 - K1) < 0.01,
+          f"lens rescue: focal {f:.2f} vs {F_PX:.2f}, k1 {k1:.4f} vs {K1} (distortion freed at the end)")
+    med, mx = rot_error(solved_camera(res, "rescue_solve"), truth_camera(mats, "truth"))
+    check(mx < 0.05, f"lens rescue: rotation error median {med:.4f}, max {mx:.4f} deg")
+    check(any("lens rescue" in w for w in r["warnings"]), "lens rescue: the report says so")
+
+
 def main() -> int:
     try:
         check(ps.longest_run([3, 4, 5, 9, 10]) == (3, 5) and ps.gaps([1, 2, 4], 1, 5) == [3, 5],
@@ -328,6 +358,7 @@ def main() -> int:
         case_mover()
         case_walk_pan()
         case_nodal()
+        case_lens_rescue()
     finally:
         if not fails:
             shutil.rmtree(TMP, ignore_errors=True)

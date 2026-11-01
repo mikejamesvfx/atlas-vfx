@@ -58,6 +58,11 @@
       "note": "4.2.1, BSD-3-Clause (COLMAP). SfM solve, proven on DSCF3000 2026-10-18."
     },
     {
+      "id": "pycolmap-caspar-cuda",
+      "usage": "runtime",
+      "note": "Optional, ws only: COLMAP / pycolmap 4.2.1 built from source (github.com/colmap/colmap tag 4.2.1, BSD-3-Clause, COPYING.txt) with CUDA_ENABLED and CASPAR_ENABLED, for GPU bundle adjustment in Solve Plate. Caspar's generated kernels are vendored at src/thirdparty/Symforce-Caspar (Apache-2.0, its LICENSE file; checked 2026-11-01). Built into its own venv outside the repo and the ComfyUI venv (CUDA DLLs kept apart from torch); nothing of it ships in this tree. Dependencies through COLMAP's own vcpkg manifest (Ceres BSD-3, SuiteSparse, Boost BSL-1.0, glog/gflags BSD-3, OpenImageIO Apache-2.0, SQLite public domain)."
+    },
+    {
       "id": "opencolorio",
       "usage": "runtime",
       "note": "2.6, BSD-3-Clause. Config config/atlas_aces2.0_studio_flog2.ocio is derived from the ACES studio-config-v4.0.0_aces-v2.0_ocio-v2.5 (BSD-3, Academy) with added F-Log2 F-Gamut and F-Log F-Gamut input spaces from the Fujifilm F-Log2 and F-Log data sheets (F-Log added 2026-10-20, checked against colour-science log_decoding_FLog to 1e-6). Installed into V141 venv as opencolorio==2.6.0 on 2026-10-19 (was missing there)."
