@@ -57,6 +57,8 @@ class SolveOptions:
     nodal_panoramic_frac: float = 0.5       # this share of rotation-only (panoramic) pairs makes it a candidate
     camera_move: str = "auto"               # auto | free (always SfM) | nodal (tripod pan: always rotation-only)
     lens_k_limit: float = 0.25              # |k1| or |k2| past this is not a real lens: SfM has gone degenerate
+    ba_global_ratio: float = 1.4            # global BA every 40 % of model growth (COLMAP default 1.1)
+    ba_global_iterations: int = 30          # COLMAP default 50
     reject_px: float = 2.0                  # drop points whose worst observation reprojects further than this
     reject_rounds: int = 2
     seed: int = 0
@@ -179,6 +181,12 @@ def _mapper_options(opts: SolveOptions, relaxed: bool = False):
     o.random_seed = opts.seed
     if opts.num_threads > 0:
         o.num_threads = opts.num_threads
+    # global bundle adjust when the model grows 40 % (COLMAP: 10 %), at most 30 iterations: DSCF2977 (336 frames,
+    # rotation heavy) mapped in 1031 s instead of 1822 s, the same camera against the pixels (0.164 vs 0.163 deg).
+    # The motion test's own adjust afterwards refines the whole solve anyway.
+    o.ba_global_frames_ratio = opts.ba_global_ratio
+    o.ba_global_points_ratio = opts.ba_global_ratio
+    o.ba_global_max_num_iterations = opts.ba_global_iterations
     if relaxed:                              # second pass: let weakly matched frames register onto the model
         o.mapper.abs_pose_min_num_inliers = 15
         o.mapper.abs_pose_min_inlier_ratio = 0.15
@@ -255,6 +263,14 @@ def reject_and_refine(rec, opts: SolveOptions) -> dict:
                               "mean_reproj_px": float(rec.compute_mean_reprojection_error())})
         if not bad:
             break
+    # the last adjust can still push a point behind its cameras (DSCF2977: one point made the mean error 1e170):
+    # drop whatever is out of tolerance now, without another adjust, so the model holds no broken point
+    worst = observation_errors(rec)
+    late = [i for i, e in worst.items() if not e <= opts.reject_px]
+    for i in late:
+        rec.delete_point3D(i)
+    out["final_dropped"] = len(late)
+    out["final_mean_reproj_px"] = float(rec.compute_mean_reprojection_error()) if rec.num_points3D() else None
     return out
 
 

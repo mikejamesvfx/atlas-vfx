@@ -95,7 +95,7 @@ def gs_solve(track: Path, out: Path, names: list[str], fix_focal: bool):
     motion rejection, no nodal fallback."""
     opts = ps.SolveOptions(camera_model="SIMPLE_RADIAL", focal_px=F16_PX_1024, refine_focal=not fix_focal,
                            refine_distortion=False, max_image_size=PROXY_W, bridge_gaps=False, reject_rounds=0,
-                           nodal_fallback=False, min_points=500)
+                           nodal_fallback=False, min_points=500, ba_global_ratio=1.1, ba_global_iterations=50)
     try:
         res = ps.solve_folder(track, names, out, opts, log=log)
     except ps.SolveError as e:
