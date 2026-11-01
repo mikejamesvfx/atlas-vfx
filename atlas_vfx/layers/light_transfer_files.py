@@ -12,6 +12,22 @@ from . import relight as rl
 from .node_sequence_read_chunk import read_image
 
 KINDS = ("rgb", "alpha", "mask")
+_RAW = OrderedDict()          # (path, mtime, size) -> decoded file: an element's RGB and its alpha matte share a read
+_RAW_KEEP = 2
+
+
+def _read(path: Path):
+    st = path.stat()
+    key = (str(path), st.st_mtime_ns, st.st_size)
+    if key in _RAW:
+        _RAW.move_to_end(key)
+        return _RAW[key]
+    img, _ = read_image(path)
+    img.flags.writeable = False                   # shared: _convert copies before changing anything
+    _RAW[key] = img
+    while len(_RAW) > _RAW_KEEP:
+        _RAW.popitem(last=False)
+    return img
 
 
 class SeqFrames:
@@ -45,13 +61,16 @@ class SeqFrames:
         else:
             out = np.repeat(img, 3, -1) if img.shape[-1] == 1 else img[..., :3]
             out = np.ascontiguousarray(out, np.float32)
+            if np.shares_memory(out, img):            # the decoded file is shared (_read): change a copy
+                out = out.copy()
             if self.proc is not None:
                 self.proc.applyRGB(out)
             if self.srgb:
                 out = rl.srgb_to_lin(out)
         if self.flip:
             out = out[:, ::-1]
-        return np.ascontiguousarray(out, np.float32)
+        out = np.ascontiguousarray(out, np.float32)
+        return out.copy() if np.shares_memory(out, img) else out
 
     def __getitem__(self, t):
         t = int(t)
@@ -60,7 +79,7 @@ class SeqFrames:
         if t in self._cache:
             self._cache.move_to_end(t)
             return self._cache[t]
-        img, _ = read_image(self.files[t])
+        img = _read(self.files[t])
         out = self._convert(img, self.files[t].name)
         if hasattr(self, "shape") and out.shape != self.shape[1:]:
             raise ValueError(f"{self.files[t].name}: {out.shape[1]}x{out.shape[0]}, the sequence started at "

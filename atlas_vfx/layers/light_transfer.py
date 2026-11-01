@@ -190,7 +190,11 @@ def guided_filter(guide, src, r, eps, weight=None, subsample=1):
     p = _f32(src if src.ndim == 3 else src[..., None])
     H, W, k = I.shape
     s = int(subsample)
+    from . import guided_gpu
+    use_gpu = guided_gpu.available() and H * W >= guided_gpu.MIN_PIXELS
     if s <= 1 or min(H, W) < 4 * s:
+        if use_gpu:
+            return guided_gpu.guided_filter(I, p, r, eps, weight, 1, None)
         ma, mb = _guided_coeffs(I, p, r, eps, weight)
         return (np.einsum("hwk,hwkc->hwc", I, ma) + mb).astype(np.float32)
     h, w = max(1, round(H / s)), max(1, round(W / s))
@@ -200,13 +204,16 @@ def guided_filter(guide, src, r, eps, weight=None, subsample=1):
             return cv2.resize(x, (w, h), interpolation=cv2.INTER_AREA)
         return np.stack([cv2.resize(np.ascontiguousarray(x[..., c]), (w, h), interpolation=cv2.INTER_AREA)
                          for c in range(x.shape[-1])], -1)
-    if weight is None:
-        Is, ps, ws = shrink(I), shrink(p), None
-    else:                                                 # weighted shrink: an edge pixel keeps only element values
-        wt = _f32(weight)
+    def shrunk():
+        if weight is None:
+            return shrink(I), shrink(p), None
+        wt = _f32(weight)                                 # weighted shrink: an edge pixel keeps only element values
         ws = shrink(wt)
         dn = np.maximum(ws, 1e-6)[..., None]
-        Is, ps = shrink(I * wt[..., None]) / dn, shrink(p * wt[..., None]) / dn
+        return shrink(I * wt[..., None]) / dn, shrink(p * wt[..., None]) / dn, ws
+    if use_gpu:
+        return guided_gpu.guided_filter(I, p, r, eps, weight, s, shrunk)
+    Is, ps, ws = shrunk()
     ma, mb = _guided_coeffs(Is, ps, max(1, round(r / s)), eps, ws)
     grow = (lambda x: cv2.resize(_f32(x), (W, H), interpolation=cv2.INTER_LINEAR))
     out = np.empty((H, W, p.shape[-1]), np.float32)

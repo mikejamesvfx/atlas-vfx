@@ -263,9 +263,53 @@ def test_node():
 
 def test_fast_guided():
     """subsample 4 (fast guided filter) against 1 (exact): within a few hundredths of a stop, as close to the
-    truth, faster."""
+    truth, faster. The timing is the CPU filter's (on the GPU a small test image gains nothing from subsampling)."""
+    import os
     import time
 
+    from atlas_vfx.layers import guided_gpu
+
+    os.environ["ATLAS_VFX_GPU_GUIDED"] = "0"
+    guided_gpu.available.cache_clear()
+    try:
+        _fast_guided_cpu(time)
+    finally:
+        os.environ.pop("ATLAS_VFX_GPU_GUIDED")
+        guided_gpu.available.cache_clear()
+
+
+def test_guided_gpu():
+    """layers/guided_gpu.py (speed pass 2026-11-01): the CUDA guided filter equals the CPU one to float rounding,
+    weighted and not, subsampled and not, 1 and 5 guide channels, odd sizes."""
+    import os
+
+    from atlas_vfx.layers import guided_gpu
+
+    if not guided_gpu.available():
+        print("skip guided filter on the GPU: no CUDA")
+        return
+    rng = np.random.default_rng(3)
+    for H, W, k, s, weighted in [(700, 1281, 5, 2, True), (643, 901, 1, 1, False), (600, 800, 5, 1, True),
+                                 (720, 1080, 5, 4, False)]:
+        yy, xx = np.mgrid[:H, :W] / max(H, W)
+        I = np.dstack([np.sin(7 * xx + j) * np.cos(5 * yy - j) + 0.1 * rng.random((H, W))
+                       for j in range(k)]).astype(np.float32)
+        p = np.dstack([np.sin(3 * xx * (j + 1)) + yy for j in range(3)]).astype(np.float32)
+        w = np.clip(np.sin(9 * xx) * 2, 1e-3, 1).astype(np.float32) if weighted else None
+        gpu = lt.guided_filter(I, p, 6, 0.01, weight=w, subsample=s)
+        os.environ["ATLAS_VFX_GPU_GUIDED"] = "0"
+        guided_gpu.available.cache_clear()
+        try:
+            cpu = lt.guided_filter(I, p, 6, 0.01, weight=w, subsample=s)
+        finally:
+            os.environ.pop("ATLAS_VFX_GPU_GUIDED")
+            guided_gpu.available.cache_clear()
+        d = float(np.abs(gpu - cpu).max())
+        check(d < 1e-5, f"guided filter GPU = CPU ({W}x{H}, {k} guides, subsample {s}, weighted {weighted})",
+              f"max {d:.1e}")
+
+
+def _fast_guided_cpu(time):
     n, matte, bump, element, truth, relit_low = setup()
     inner = cv2.erode(matte, np.ones((9, 9), np.uint8)) > 0.5
     depth = np.where(matte > 0, 3.0, 20.0).astype(np.float32)
@@ -447,6 +491,7 @@ def main():
     test_files()
     test_guided_filter_identity()
     test_fast_guided()
+    test_guided_gpu()
     test_quality()
     test_halo()
     test_clamp_temporal_fallback()
