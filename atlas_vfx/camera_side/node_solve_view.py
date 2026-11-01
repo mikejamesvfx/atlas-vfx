@@ -103,13 +103,31 @@ def check_cube(cam: sc.ShotCamera, disp: dict | None, xyz) -> dict | None:
             n += bool(((uv[:, 0] > 0) & (uv[:, 0] < W) & (uv[:, 1] > 0) & (uv[:, 1] < H)).all())
         return n
 
-    # standing on a solve point (the ground, a step, the deck), wherever it stays whole in view longest
-    cands = d[np.random.default_rng(0).choice(len(d), min(300, len(d)), replace=False)]
+    # standing on a flat, level patch of solve points (the ground, a step, the deck), wherever it stays whole in view
+    # longest; any point when there is no such patch
+    flat = _level_points(d, 0.25 * side)
+    pool = d[flat] if len(flat) >= 20 else d
+    cands = pool[np.random.default_rng(0).choice(len(pool), min(300, len(pool)), replace=False)]
     c = max(cands, key=seen)
     corners = unit + c
     world = corners @ R + o                                     # back to the camera's world
     return {"centre": c.tolist(), "side": float(side), "note": how, "corners_disp": corners.tolist(),
             "corners_world": world}
+
+
+def _level_points(d: np.ndarray, radius: float) -> np.ndarray:
+    """Indices of points whose neighbourhood (radius, display world) is a level plane: normal within ~18 deg of +Y."""
+    from scipy.spatial import cKDTree
+
+    idx = []
+    for i, nb in enumerate(cKDTree(d).query_ball_point(d, radius)):
+        if len(nb) < 12:
+            continue
+        q = d[nb] - d[nb].mean(0)
+        w, v = np.linalg.eigh(q.T @ q)
+        if abs(v[1, 0]) > 0.95 and w[0] < 0.1 * w[1]:
+            idx.append(i)
+    return np.array(idx, int)
 
 
 CUBE_EDGES = [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)]

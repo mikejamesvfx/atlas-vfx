@@ -9,7 +9,40 @@ from atlas_vfx.contracts import shot_camera as sc
 
 from . import camera_checks as cc
 from . import lock_check as lc
+from . import measure as ms
 from . import plate as pl
+
+
+def levelled_card(cam: sc.ShotCamera, width_m: float, height_m: float, divisions: int):
+    """For a raw solve (no Measure & Scale): levelled by the cameras' up as Solve View shows it, a ground card under
+    Solve View's 1 m check cube (on a solve point that stays in view) plus the cube's edges, in the camera's world.
+    None when there are no solve points."""
+    from .node_solve_view import CUBE_EDGES, check_cube, display_frame
+
+    pts, _ = ms.points_for_camera(cam, max_reproj_px=1e9)
+    if pts is None or not len(pts["xyz"]):
+        return None
+    disp = display_frame(cam, pts["xyz"])
+    cube = check_cube(cam, disp, pts["xyz"]) if disp is not None else None
+    if cube is None:
+        return None
+    R, o, s = disp["R"], disp["origin"], cube["side"]
+    c = np.array(cube["centre"])
+    f0 = R @ -cam.cam_to_world(cam.frames[0])[:3, 2]
+    v = np.array([f0[0], 0.0, f0[2]])
+    v = v / np.linalg.norm(v) if np.linalg.norm(v) > 1e-6 else np.array([0, 0, -1.0])
+    u = np.cross(v, [0, 1.0, 0])
+    U, V = u * width_m * s, v * height_m * s
+    q = c - U / 2 - V / 2
+    lines = []
+    for k in range(divisions + 1):
+        a = k / divisions
+        lines.append((q + U * a, q + U * a + V))
+        lines.append((q + V * a, q + V * a + U))
+    corners = np.array(cube["corners_disp"])
+    lines += [(corners[a], corners[b]) for a, b in CUBE_EDGES]
+    world = [(a @ R + o, b @ R + o) for a, b in lines]        # display world -> the camera's world
+    return world, c @ R + o, f"auto: under the 1 m check cube, levelled by the cameras' up ({cube['note']})"
 
 
 def _centre(cam: sc.ShotCamera, spec: str, points: dict):
@@ -72,8 +105,14 @@ class AtlasVFXLockCheck:
             points = json.loads(measure_report).get("points_m", {})
         elif "atlas_vfx_measure" in cam.data.get("extensions", {}):
             points = cam.data["extensions"]["atlas_vfx_measure"].get("points_m", {})
-        c, how = _centre(cam, centre, points)
-        lines = lc.card_lines(cam, c, orientation, width_m, height_m, divisions)
+        lev = None
+        if centre.strip() in ("", "auto") and orientation == "ground" and not points and not cc.is_nodal(cam)                 and cam.data["source"].get("kind") == "solve":
+            lev = levelled_card(cam, width_m, height_m, divisions)
+        if lev is not None:
+            lines, c, how = lev
+        else:
+            c, how = _centre(cam, centre, points)
+            lines = lc.card_lines(cam, c, orientation, width_m, height_m, divisions)
         out = pl.resolve_out_dir(out_path, pl.WORK_ROOT / pl.plate_stem(plate_ref) / "lock_check" /
                                  f"{cam.name}_{orientation}.mp4", plate_path=plate_ref["path"], what="out_path")
         path, kept = lc.render(plate_ref, cam, out, lines=lines, marks=points, width=proxy_width,
