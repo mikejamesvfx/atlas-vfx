@@ -1,0 +1,707 @@
+{
+ "last_node_id": 11,
+ "last_link_id": 14,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    40,
+    851
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      1,
+      2,
+      5,
+      10,
+      13
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~/Videos/atlas-vfx_footage/DSCF3000.MOV",
+    0,
+    296,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    48
+   ]
+  },
+  {
+   "id": 2,
+   "type": "AtlasVFXSolveMask",
+   "pos": [
+    460,
+    804
+   ],
+   "size": [
+    300,
+    316
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "masks",
+     "type": "MASK",
+     "links": [
+      3
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSolveMask"
+   },
+   "widgets_values": [
+    "person. car. bicycle. dog. tree. bush. water. flag.",
+    16,
+    0.35,
+    0.25,
+    6,
+    1024
+   ]
+  },
+  {
+   "id": 3,
+   "type": "AtlasVFXSolvePlate",
+   "pos": [
+    880,
+    579
+   ],
+   "size": [
+    300,
+    640
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 2
+    },
+    {
+     "name": "masks",
+     "type": "MASK",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      4,
+      6,
+      11,
+      12
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": [
+      9
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSolvePlate"
+   },
+   "widgets_values": [
+    "auto",
+    23.5,
+    12.39,
+    16.0,
+    true,
+    true,
+    "k1 k2 (RADIAL)",
+    1024,
+    8192,
+    15,
+    2.0,
+    "DSCF3000_S1S3_solve",
+    "",
+    4,
+    0,
+    "fixed"
+   ]
+  },
+  {
+   "id": 4,
+   "type": "AtlasVFXSolveView",
+   "pos": [
+    1300,
+    1176
+   ],
+   "size": [
+    300,
+    178
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 4
+    }
+   ],
+   "outputs": [
+    {
+     "name": "seeds",
+     "type": "STRING",
+     "links": [
+      14
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSolveView"
+   },
+   "widgets_values": [
+    20000,
+    8,
+    "[]"
+   ]
+  },
+  {
+   "id": 5,
+   "type": "AtlasVFXCameraImport",
+   "pos": [
+    460,
+    1190
+   ],
+   "size": [
+    300,
+    526
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 5
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      7
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraImport"
+   },
+   "widgets_values": [
+    "~/ComfyUI_V135/ComfyUI/output/_pick/vfx_probe/solve_s1s3_f16",
+    "colmap",
+    "auto",
+    23.5,
+    12.39,
+    1.0,
+    "ZXY",
+    0.0,
+    true,
+    "DSCF3000_S1S3_f16",
+    "",
+    "off",
+    ""
+   ]
+  },
+  {
+   "id": 6,
+   "type": "AtlasVFXSolveCompare",
+   "pos": [
+    1300,
+    1424
+   ],
+   "size": [
+    300,
+    184
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "camera_a",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 6
+    },
+    {
+     "name": "camera_b",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 7
+    }
+   ],
+   "outputs": [
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": [
+      8
+     ]
+    },
+    {
+     "name": "residual_pct_of_path",
+     "type": "FLOAT",
+     "links": []
+    },
+    {
+     "name": "view_angle_median_deg",
+     "type": "FLOAT",
+     "links": []
+    },
+    {
+     "name": "scale_b_per_a",
+     "type": "FLOAT",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSolveCompare"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 7,
+   "type": "PreviewAny",
+   "pos": [
+    1720,
+    1256
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 8
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 8,
+   "type": "PreviewAny",
+   "pos": [
+    1300,
+    40
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 9
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 9,
+   "type": "AtlasVFXLockCheck",
+   "pos": [
+    1300,
+    754
+   ],
+   "size": [
+    300,
+    352
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 10
+    },
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 11
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mp4",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXLockCheck"
+   },
+   "widgets_values": [
+    "auto",
+    "ground",
+    4.0,
+    4.0,
+    8,
+    1024,
+    24,
+    ""
+   ]
+  },
+  {
+   "id": 10,
+   "type": "AtlasVFXCameraExport",
+   "pos": [
+    1300,
+    458
+   ],
+   "size": [
+    300,
+    226
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 12
+    }
+   ],
+   "outputs": [
+    {
+     "name": "chan",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "usda",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "nuke_camera_json",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXCameraExport"
+   },
+   "widgets_values": [
+    1.0,
+    "DSCF3000_S1S3_solve",
+    ""
+   ]
+  },
+  {
+   "id": 11,
+   "type": "AtlasVFXTrack2D",
+   "pos": [
+    1720,
+    870
+   ],
+   "size": [
+    300,
+    316
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 13
+    },
+    {
+     "name": "seeds",
+     "type": "STRING",
+     "widget": {
+      "name": "seeds"
+     },
+     "link": 14
+    }
+   ],
+   "outputs": [
+    {
+     "name": "tracks",
+     "type": "ATLAS_TRACKS_2D",
+     "links": []
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXTrack2D"
+   },
+   "widgets_values": [
+    "[]",
+    0.5,
+    0,
+    1.0,
+    41,
+    4
+   ]
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   2,
+   1,
+   0,
+   3,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   3,
+   2,
+   0,
+   3,
+   1,
+   "MASK"
+  ],
+  [
+   4,
+   3,
+   0,
+   4,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   5,
+   1,
+   0,
+   5,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   6,
+   3,
+   0,
+   6,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   7,
+   5,
+   0,
+   6,
+   1,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   8,
+   6,
+   1,
+   7,
+   0,
+   "*"
+  ],
+  [
+   9,
+   3,
+   2,
+   8,
+   0,
+   "*"
+  ],
+  [
+   10,
+   1,
+   0,
+   9,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   11,
+   3,
+   0,
+   9,
+   1,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   12,
+   3,
+   0,
+   10,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   13,
+   1,
+   0,
+   11,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   14,
+   4,
+   0,
+   11,
+   1,
+   "STRING"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "3D camera tracker: Solve Mask -> Solve Plate -> Solve View / Compare / Lock / Export",
+   "bounding": [
+    -5,
+    -51,
+    2070,
+    1812
+   ],
+   "color": "#335159",
+   "font_size": 24
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

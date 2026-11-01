@@ -35,7 +35,7 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 1 | Plate Read | camera_side | Atlas Camera | built | plate V141 | T2 | vfx_probe/plate_proxy.py |
 | 2 | Tracking Proxy | camera_side | Atlas Camera | built | plate V141 | T2 | vfx_probe/track_proxy.py |
 | 3 | Shot Splitter | camera_side | Atlas Camera | prototype | - | later | vfx_probe/split_analysis.py |
-| 4 | Solve Plate | camera_side | Atlas Camera | scripts | plate script | later | vfx_probe/solve_s1s3.py, vfx_probe/resolve_nodist.py |
+| 4 | Solve Plate | camera_side | Atlas Camera | built | synthetic | Tracker | vfx_probe/solve_s1s3.py, vfx_probe/resolve_nodist.py, tools/rs_clip_solve.py |
 | 5 | Camera Import | camera_side | Atlas Camera | built | plate V141 | T3 | vfx_probe/align_nuke.py (reader) |
 | 6 | Solve Compare | camera_side | Atlas Camera | built | plate V141 | T3 | vfx_probe/align_nuke.py |
 | 7 | Measure & Scale | camera_side | Atlas Camera | built | plate V141 (guessed picks) | T4 | vfx_probe/door_scale3.py, ground_check.py, grid_frames.py, zoom_door.py |
@@ -98,8 +98,11 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 64 | Alpha Return | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
 | 65 | Latent Pre-render | layers | atlas-vfx | built | synthetic | Render queue | |
 | 66 | Guide From Latent | layers | atlas-vfx | built | synthetic; plate V141 | Render queue | |
+| 67 | Solve Mask | camera_side | Atlas Camera | built | synthetic | Tracker | |
+| 68 | Track 2D | camera_side | Atlas Camera | built | synthetic | Tracker | tools/track_picks.py |
+| 69 | Solve View | camera_side | Atlas Camera | built | synthetic | Tracker | |
 
-54 rows are built or deprecated, and those are the 54 nodes that load. Categories: `Atlas VFX/Camera`
+58 rows are built or deprecated, and those are the 58 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
 (layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-66), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
@@ -107,8 +110,6 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 ## Planned and elsewhere
 
 - 3 Shot Splitter: shot boundaries from the proxy; the script exists, no node.
-- 4 Solve Plate: pycolmap solves of DSCF3000 in vfx_probe, `camera_side/rs_solve.py` + `tools/rs_clip_solve.py`
-  for the RS-aware refit. Phase 1 imports Nuke's camera instead; the RS refit is node 47.
 - 11 Clean Plate, 12 Matte, 19 Look Transfer, 22 Edge QC: Phase 2, nothing written.
 - 13 Layer Stack: was "T6-T8 (minimal)"; T8 was accepted without it because the Nuke Builder stacks the layer
   folders itself. Phase 2, only if a ComfyUI-side stack is wanted.
@@ -151,8 +152,9 @@ Payloads (all plain JSON-safe dicts unless said):
 <!-- types:begin (generated) -->
 | Type | Made by | Read by |
 |---|---|---|
-| `ATLAS_PLATE_SEQ` | 1 Plate Read | 2 Tracking Proxy, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview |
-| `ATLAS_TRACKED_CAMERA` | 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky, 53 Relight Transfer, 54 Relight Transfer Files |
+| `ATLAS_PLATE_SEQ` | 1 Plate Read | 2 Tracking Proxy, 4 Solve Plate, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview, 67 Solve Mask, 68 Track 2D |
+| `ATLAS_TRACKED_CAMERA` | 4 Solve Plate, 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky, 53 Relight Transfer, 54 Relight Transfer Files, 69 Solve View |
+| `ATLAS_TRACKS_2D` | 68 Track 2D | 4 Solve Plate |
 | `ATLAS_VFX_ALPHA_PREP` | 63 Alpha Prep | 64 Alpha Return |
 | `ATLAS_VFX_CARD` | 15 Foreground Element, 16 Character Insert | 14 Card Project |
 | `ATLAS_VFX_CHUNK_PLAN` | 50 Chunk Plan | 52 Chunk Stitch |
@@ -189,6 +191,31 @@ Payloads (all plain JSON-safe dicts unless said):
 - licences: `ffmpeg`
 - needs: ffmpeg (run)
 - writes: log-luma + CLAHE PNG proxies under out_dir
+
+### 4 Solve Plate
+`AtlasVFXSolvePlate` · camera_side · Atlas VFX/Camera
+- in: plate_ref ATLAS_PLATE_SEQ, sensor_preset auto|fujifilm_xh2_dci4k_24p_dis_off|custom, sensor_width_mm FLOAT, sensor_height_mm FLOAT, focal_guess_mm FLOAT, solve_focal BOOLEAN, solve_distortion BOOLEAN, lens_model k1 k2 (RADIAL)|k1 (SIMPLE_RADIAL)|k1 k2 p1 p2 (OPENCV), proxy_width INT, max_features INT, overlap INT, reject_px FLOAT, name STRING, out_dir STRING
+- in, optional: masks MASK, mask_dilate_px INT, tracks ATLAS_TRACKS_2D, seed INT
+- out: shot_camera ATLAS_TRACKED_CAMERA, path STRING, report STRING, preview IMAGE
+- test: tests/test_plate_solve.py, tests/test_camera_io.py
+- proof: synthetic (dolly: focal 0.1 % and k1/k2 from an 8 % wrong guess, all frames; moving board: its points
+  dropped or masked out; nodal pan: rotation-only fallback with the focal solved)
+- licences: `pycolmap`, `opencv-python`, `scipy`, `numpy`
+- needs: pycolmap, opencv, scipy
+- writes: tracking proxies, the COLMAP database + model (sparse/0), solve_report.json, the shot camera + sidecar
+  under out_dir (default atlas-vfx-work/<plate>/solve/<name>)
+- notes: the 3D camera tracker (`camera_side/plate_solve.py`, the DSCF3000 S1-S3 recipe from tools/rs_clip_solve.py
+  with the lens solved instead of locked). SIFT on log-luma proxies, sequential matching, incremental SfM with focal
+  and k1/k2 (RADIAL; SIMPLE_RADIAL or OPENCV on the widget) refined in the bundle adjust on the raw features, so the
+  lens is solved with the poses rather than undistorted first. Frames the first pass drops are mapped onto the
+  model again; points whose worst reprojection is over reject_px are dropped and the solve re-adjusted (things that
+  moved). A shot whose matched pairs are mostly rotation-only, or where SfM can't start, is solved nodal
+  (`camera_side/nodal_solve.py`: rotations + focal + distortion, points on a sphere 100 units out; no depth, so
+  Measure & Scale can't scale it). The camera is unscaled and keeps the longest run of registered frames; its lens
+  block is `brown` [k1 k2 p1 p2 k3] and `project()` applies it, so Lock Check and Card Project draw on the plate as
+  shot; Sensor Lens Maps (29) turns it into undistort / redistort STMaps for Nuke. Masks: Solve Mask (67) or any
+  MASK batch, one per plate frame, 1 = no features. Tracks: Track 2D (68), added as matches between consecutive
+  frames. Chain RS Solve (47) for a rolling-shutter plate (it undistorts the observations first).
 
 ### 5 Camera Import
 `AtlasVFXCameraImport` · camera_side · Atlas VFX/Camera
@@ -850,3 +877,43 @@ Payloads (all plain JSON-safe dicts unless said):
 - writes: nothing
 - notes: LTX's "Add Video IC-LoRA Guide" for a reference already encoded by Latent Pre-render (65): it skips the encode and runs LTX's own resolve_frame_idx, LTXVAddGuide.append_keyframe and append_guide_attention_entry from the loaded pack, so the conditioning is the same by construction. Synthetic test against LTX's node on the same frames: identical keyframe tensors, attention entries, latent and noise mask. Live on V141 (DSCF3000 relight preview, 17 frames, seed 42): LTX Return's EXRs bit-identical to the image-guided run. Whole clip from frame 0 and latent_downscale_factor 1 only (the Relight and Alpha-Gen LoRAs declare 1); a guide whose latent size differs from the job's is refused. The guide goes in at the VAE's output dtype, as the image path would.
 
+### 67 Solve Mask
+`AtlasVFXSolveMask` · camera_side · Atlas VFX/Camera
+- in: plate_ref ATLAS_PLATE_SEQ, classes STRING, window INT, box_threshold FLOAT, text_threshold FLOAT, dilate_px INT, proxy_width INT
+- out: masks MASK, preview IMAGE, report STRING
+- test: tests/test_solve_mask.py
+- proof: synthetic (SAM 2.1 on a moving block; the detector run on a real frame when the weights are there)
+- licences: `transformers`, `grounding-dino-base`, `sam2.1-hiera-large`, `torch`
+- needs: transformers 5.x, the two model folders (tools/fetch_solve_models.py)
+- writes: nothing (masks out)
+- notes: masks of things that move, for Solve Plate. Grounding DINO boxes the classes you name on the middle frame
+  of each window, SAM 2.1 tracks them forwards and backwards through the window, windows unioned, dilated. Both
+  transformers-native classes from local safetensors folders, never remote code. Masks at proxy_width; the plate is
+  seen through the shipped OCIO display view.
+
+### 68 Track 2D
+`AtlasVFXTrack2D` · camera_side · Atlas VFX/Camera
+- in: plate_ref ATLAS_PLATE_SEQ, seeds STRING, scale FLOAT, span INT, fb_px FLOAT, window INT, levels INT
+- out: tracks ATLAS_TRACKS_2D, preview IMAGE, summary STRING
+- test: tests/test_tracks2d.py
+- proof: synthetic
+- licences: `opencv-python`
+- needs: opencv
+- writes: nothing
+- notes: pyramidal Lucas-Kanade from seeds (label, plate frame index, plate px), forwards and backwards, kept while
+  the forward-backward error is under fb_px (`camera_side/tracks2d.py`, ported from tools/track_picks.py). Seeds are
+  untrusted JSON: labels are word characters, at most 500. Solve View writes seeds when you click a plate frame.
+
+### 69 Solve View
+`AtlasVFXSolveView` · camera_side · Atlas VFX/Camera
+- in: shot_camera ATLAS_TRACKED_CAMERA, max_points INT, plate_frames INT, seeds STRING
+- out: seeds STRING
+- test: tests/test_solve_view.py
+- proof: synthetic
+- licences: `three-js`
+- needs: web/atlas_vfx_solve_view.js (display only)
+- writes: a few proxy JPEGs into ComfyUI's temp folder for the panel
+- notes: a three.js panel: points coloured by worst reprojection (green < 0.5 px, yellow < 2, red beyond, plate px,
+  through the camera's lens), camera path, frustum at the scrubbed frame, median error per frame, and plate frames
+  with the points drawn on them. Clicking a plate frame appends a Track 2D seed to the seeds widget, which the node
+  passes out. Proxies are read only from a folder outputs may be written to (the camera is graph data).

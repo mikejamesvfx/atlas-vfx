@@ -378,7 +378,7 @@ def points_for_camera(cam: sc.ShotCamera, folder: str = "", max_reproj_px: float
     for f in cam.frames[:: max(1, len(cam.frames) // 10)]:
         if f in pts["observations"] and len(pts["observations"][f][0]):
             k, xy = pts["observations"][f]
-            uv, _ = cam.project(f, pts["xyz"][k], ignore_distortion=True)
+            uv, _ = cam.project(f, pts["xyz"][k])
             errs.append(np.median(np.linalg.norm(uv - xy, axis=1)))
     if not errs:
         raise ValueError(f"solve points in {folder} share no frames with {cam.name}")
@@ -404,7 +404,7 @@ def points_in_camera(cam: sc.ShotCamera, solve_folder: str = "", points_camera: 
         for f in cam.frames[:: max(1, len(cam.frames) // 10)]:
             if f in pts["observations"] and len(pts["observations"][f][0]):
                 k, xy = pts["observations"][f]
-                uv, _ = cam.project(f, pts["xyz"][k], ignore_distortion=True)
+                uv, _ = cam.project(f, pts["xyz"][k])
                 errs.append(float(np.median(np.linalg.norm(uv - xy, axis=1))))
         if not errs or np.median(errs) > max_reproj_px:
             raise ValueError(f"{who}: {pcam.name}'s points do not reproject through {cam.name} "

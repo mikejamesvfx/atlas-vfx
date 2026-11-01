@@ -166,6 +166,32 @@ def test_intrinsics_project(cam):
     print(f"ok intrinsics/project: fx {k.fx:.3f} px, axes and principal point checked on {len(cam.frames)} frames")
 
 
+def test_lens_project(cam):
+    """project() applies the lens block (brown / simple_radial, OpenCV order, as sensor/lens.py); undistort_pixels
+    is its inverse; ignore_distortion gives the pinhole pixel; nuke_classic still refuses."""
+    from atlas_vfx.sensor import lens as ln
+
+    pts = [[0.3, 1.9, -6], [-2.0, 0.4, -5], [1.5, 0.2, -4], [0, 1.6, -10]]
+    for model, prm in (("brown", [-0.08, 0.012, 0.0004, -0.0003, 0.002]), ("simple_radial", [-0.05])):
+        d = sc.ShotCamera({**cam.data, "lens": {"distortion_model": model, "distortion_params": prm}})
+        pin, _ = d.project(1001, pts, ignore_distortion=True)
+        dist, _ = d.project(1001, pts)
+        bc = ln.BrownConrady.from_camera(d, 1001)
+        ref = np.stack(bc.distort(pin[:, 0], pin[:, 1]), axis=1)
+        assert np.allclose(dist, ref, atol=1e-6), (model, dist, ref)
+        assert np.allclose(dist[3], pin[3]) and not np.allclose(dist[1], pin[1])   # centre fixed, edge moves
+        back = d.undistort_pixels(1001, dist)
+        assert np.allclose(back, pin, atol=1e-6), (model, back - pin)
+        assert np.allclose(cam.undistort_pixels(1001, pin), pin)                 # no lens: identity
+    bad = sc.ShotCamera({**cam.data, "lens": {"distortion_model": "nuke_classic", "distortion_params": [0.1]}})
+    try:
+        bad.project(1001, pts)
+        raise AssertionError("nuke_classic should refuse")
+    except NotImplementedError:
+        pass
+    print("ok lens project: brown + simple_radial match sensor/lens.py, undistort_pixels inverts, nuke_classic refuses")
+
+
 def parse_chan(text):
     rows = []
     for ln in text.strip().splitlines():
@@ -225,6 +251,7 @@ def main() -> int:
     test_round_trip(cam)
     test_rejects(cam)
     test_intrinsics_project(cam)
+    test_lens_project(cam)
     test_chan(cam)
     test_real_chan()
     return 0

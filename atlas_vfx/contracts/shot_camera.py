@@ -225,24 +225,62 @@ class ShotCamera:
             cx=float(pp[0]), cy=float(pp[1]),
         )
 
-    def _check_distortion(self, ignore: bool):
+    def _distortion(self, ignore: bool):
+        """(model, params) to apply, or None for pinhole. simple_radial [k1] and brown [k1, k2, p1, p2, k3] (OpenCV
+        order, normalised by focal, y down: the same as sensor/lens.py and COLMAP RADIAL/OPENCV)."""
         lens = self.data.get("lens", {})
         model = lens.get("distortion_model", "none")
-        if not ignore and model != "none" and any(abs(p) > 0 for p in lens.get("distortion_params", [])):
-            raise NotImplementedError(f"project() is pinhole only; lens has {model} distortion. "
+        prm = [float(p) for p in lens.get("distortion_params", [])]
+        if ignore or model == "none" or not any(abs(p) > 0 for p in prm):
+            return None
+        if model not in ("simple_radial", "brown"):
+            raise NotImplementedError(f"project() does not apply {model} distortion. "
                                       "Undistort first or pass ignore_distortion=True.")
+        return model, prm
+
+    def undistort_pixels(self, frame: int, uv) -> np.ndarray:
+        """Plate-as-shot pixels (N,2) -> the pinhole pixels the same rays would hit with no lens distortion (the
+        inverse of project's distortion, fixed-point to ~1e-12 in normalised units). Identity with no lens."""
+        uv = np.atleast_2d(np.asarray(uv, float))
+        dist = self._distortion(False)
+        if dist is None:
+            return uv.copy()
+        k = self.intrinsics(frame)
+        model, p = dist
+        xd, yd = (uv[:, 0] - k.cx) / k.fx, (uv[:, 1] - k.cy) / k.fy
+        x, y = xd.copy(), yd.copy()
+        k1, k2, p1, p2, k3 = (p + [0.0] * 5)[:5] if model == "brown" else (p[0], 0.0, 0.0, 0.0, 0.0)
+        for _ in range(30):
+            r2 = x * x + y * y
+            rad = 1 + r2 * (k1 + r2 * (k2 + r2 * k3))
+            dx = 2 * p1 * x * y + p2 * (r2 + 2 * x * x)
+            dy = p1 * (r2 + 2 * y * y) + 2 * p2 * x * y
+            x, y = (xd - dx) / rad, (yd - dy) / rad
+        return np.stack([k.cx + k.fx * x, k.cy + k.fy * y], axis=1)
 
     def project(self, frame: int, points_world, ignore_distortion: bool = False):
-        """World points (N,3) metres -> (pixels (N,2), depth (N,) metres in front of the camera; <= 0 is behind)."""
-        self._check_distortion(ignore_distortion)
+        """World points (N,3) metres -> (pixels (N,2), depth (N,) metres in front of the camera; <= 0 is behind).
+        Pixels are on the plate as shot: the lens block's distortion is applied unless ignore_distortion."""
+        dist = self._distortion(ignore_distortion)
         P = np.atleast_2d(np.asarray(points_world, float))
         W2C = self.world_to_cam(frame)
         pc = P @ W2C[:3, :3].T + W2C[:3, 3]
         depth = -pc[:, 2]
         k = self.intrinsics(frame)
         with np.errstate(divide="ignore", invalid="ignore"):
-            u = k.cx + k.fx * pc[:, 0] / depth
-            v = k.cy - k.fy * pc[:, 1] / depth
+            x, y = pc[:, 0] / depth, -pc[:, 1] / depth
+            if dist is not None:
+                model, p = dist
+                r2 = x * x + y * y
+                if model == "simple_radial":
+                    x, y = x * (1 + p[0] * r2), y * (1 + p[0] * r2)
+                else:
+                    k1, k2, p1, p2, k3 = (p + [0.0] * 5)[:5]
+                    rad = 1 + r2 * (k1 + r2 * (k2 + r2 * k3))
+                    x, y = (x * rad + 2 * p1 * x * y + p2 * (r2 + 2 * x * x),
+                            y * rad + p1 * (r2 + 2 * y * y) + 2 * p2 * x * y)
+            u = k.cx + k.fx * x
+            v = k.cy + k.fy * y
         return np.stack([u, v], axis=1), depth
 
     def nuke_chan_rows(self, units_per_m: float = 1.0) -> list[tuple]:

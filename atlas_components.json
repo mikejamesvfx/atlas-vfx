@@ -127,6 +127,39 @@
       ]
     },
     {
+      "id": "transformers",
+      "usage": "runtime",
+      "note": "Hugging Face transformers, Apache-2.0 (github.com/huggingface/transformers LICENSE). 5.20.1 in V141. Native GroundingDinoForObjectDetection and Sam2VideoModel classes only, never trust_remote_code. Used by Solve Mask (catalogue 67)."
+    },
+    {
+      "id": "grounding-dino-base",
+      "usage": "model",
+      "note": "IDEA-Research Grounding DINO base, Apache-2.0 (huggingface.co/IDEA-Research/grounding-dino-base licence tag apache-2.0, safetensors, checked 2026-11-01). Text-prompted boxes ('person. car. tree.') on keyframes for Solve Mask (catalogue 67); the boxes prompt SAM 2.1. Folder models/detection/grounding-dino-base (tools/fetch_solve_models.py fetches it); hashes added when fetched.",
+      "files": [
+        {
+          "name": "grounding-dino-base/model.safetensors",
+          "bytes": 933400872,
+          "sha256": "5548f844c928c4b6f411fa8cbcc2bfa8dbbba437cb1d513975519f93c2a9ed21",
+          "folder": "detection",
+          "hashed": "2026-11-01"
+        }
+      ]
+    },
+    {
+      "id": "sam2.1-hiera-large",
+      "usage": "model",
+      "note": "Meta SAM 2.1 Hiera Large, Apache-2.0 (huggingface.co/facebook/sam2.1-hiera-large licence tag apache-2.0, safetensors, transformers Sam2VideoModel, checked 2026-11-01; code github.com/facebookresearch/sam2 Apache-2.0). Tracks Grounding DINO's boxes through the clip for Solve Mask (catalogue 67). Folder models/sam2/sam2.1-hiera-large (tools/fetch_solve_models.py); hashes added when fetched.",
+      "files": [
+        {
+          "name": "sam2.1-hiera-large/model.safetensors",
+          "bytes": 897897416,
+          "sha256": "dc407dce21301fd94abb395c5099b4f2c455fdc8a8f261ac3d0ea6d4cd197230",
+          "folder": "sam2",
+          "hashed": "2026-11-01"
+        }
+      ]
+    },
+    {
       "id": "minimax-h3-ref2va",
       "usage": "dropped",
       "note": "DROPPED 2026-10-24 (owner): excluded in the US/EU/UK/KR by its licence. No workflow, tool or demo uses it or its outputs; kept only so Character Insert can still warn. Was: MiniMax H3 Community Licence (huggingface.co/MiniMaxAI/MiniMax-H3 LICENSE): commercial use allowed below USD 20M revenue; EXCLUDES use in the US, EU, UK and Korea; outputs may not train other models. Comfy-Org repack minimax_h3_ref2va_pruned_int8_convrot + qwen3vl_32b_minimax_h3_nvfp4_awq + minimax_h3 VAEs. Never on client work."

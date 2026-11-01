@@ -218,3 +218,19 @@ Rules for the whole phase:
 
 S1, S2, S3 and S5 pass; S6 passes or Mike parks it; catalogue and NOTES updated. Then draft the Sensor Pass part of
 ADR-022 Amendment 3. Don't start lens fitting beyond k1 k2, depth bokeh or LoRA work without Mike.
+
+## Tracker. Solve Plate (4), Solve Mask (67), Track 2D (68), Solve View (69) (built 2026-11-01, synthetic)
+
+- Plate to camera inside ComfyUI, in camera_side so it moves to Atlas Camera at the split (ADR-022 decision 2,
+  Amendment 2). Owner calls (2026-11-01): pycolmap first, lens always solved, a built-in auto mask
+  (Grounding DINO + SAM 2.1), manual 2D tracks and a three.js viewer.
+- Engine `camera_side/plate_solve.py`: the DSCF3000 S1-S3 recipe with focal + k1/k2 refined on the raw features,
+  bridging, motion rejection, degeneracy report; panoramic shots and failed starts go to `nodal_solve.py`.
+- The contract's `project()` applies the lens block (brown / simple_radial) so the QC nodes draw on the plate as
+  shot; RS Solve undistorts its observations first.
+- **Tests:** `tests/test_plate_solve.py` (rendered courtyard, known camera + lens: dolly with manual tracks, a moving
+  board masked and unmasked, a nodal pan), `tests/test_solve_mask.py`, `tests/test_tracks2d.py`,
+  `tests/test_solve_view.py`, `tests/test_shot_camera.py` (lens projection).
+- **Next (live):** DSCF3000 S1-S3 through the GUI workflow, compared with `solve_s1s3_f16` and Mike's Nuke camera
+  (Solve Compare), the free-focal delta reported; Solve Mask on a shot with people; Lock Check + Camera Export to Nuke.
+

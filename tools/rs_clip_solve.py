@@ -3,7 +3,7 @@ readout free -> readout profile (how deep the valley is). Same recipe as DSCF300
 tools/rs_solve_dscf3000.py, tools/rs_readout_profile.py), wrapped so a new clip is one command.
 
   proxies   1024 px log luma + CLAHE, decoded with the stream's range (these clips are FULL range)
-  GS solve  SIMPLE_RADIAL, single camera, focal starts at 717.7 px @1024 (16.47 mm on 23.5 mm), refined unless
+  GS solve  camera_side/plate_solve.py (Solve Plate's engine): SIMPLE_RADIAL, single camera, focal starts at 717.7 px @1024 (16.47 mm on 23.5 mm), refined unless
             --fix-focal; distortion pinned at 0 and principal point fixed (XF video is corrected in camera)
   camera    the longest run of registered frames without gaps (rs_solve needs contiguous frames), frame 1001 = 0
   RS        free readout from 0.3 frames (12.5 ms); then the profile re-solves at fixed readouts
@@ -19,9 +19,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import shutil
-import sqlite3
 import subprocess
 import sys
 import time
@@ -34,6 +31,7 @@ sys.path.insert(0, str(ROOT))
 
 from atlas_vfx.camera_side import camera_io as cio  # noqa: E402
 from atlas_vfx.camera_side import measure, rs_solve, sensors  # noqa: E402
+from atlas_vfx.camera_side import plate_solve as ps  # noqa: E402
 from atlas_vfx.camera_side.plate import fuji_recording_mode  # noqa: E402
 from atlas_vfx.contracts import shot_camera as sc  # noqa: E402
 
@@ -92,64 +90,25 @@ def proxies(mov: Path, out: Path, info: dict, first: int, last: int) -> list[str
 
 
 def gs_solve(track: Path, out: Path, names: list[str], fix_focal: bool):
-    import pycolmap
-
-    out.mkdir(parents=True, exist_ok=True)
-    db = out / "database.db"
-    if not db.is_file():
-        ro = pycolmap.ImageReaderOptions()
-        ro.camera_model = "SIMPLE_RADIAL"
-        eo = pycolmap.FeatureExtractionOptions()
-        eo.max_image_size = PROXY_W
-        eo.sift.max_num_features = 8192
-        pycolmap.extract_features(str(db), str(track), image_names=names, camera_mode=pycolmap.CameraMode.SINGLE,
-                                  reader_options=ro, extraction_options=eo)
-        log("features", len(names))
-        con = sqlite3.connect(db)
-        for cid, prm in con.execute("SELECT camera_id, params FROM cameras").fetchall():
-            p = np.frombuffer(prm, np.float64).copy()
-            p[0], p[3] = F16_PX_1024, 0.0
-            con.execute("UPDATE cameras SET params = ?, prior_focal_length = 1 WHERE camera_id = ?", (p.tobytes(), cid))
-        con.commit()
-        con.close()
-        po = pycolmap.SequentialPairingOptions()
-        po.overlap = 15
-        po.quadratic_overlap = True
-        po.loop_detection = False
-        pycolmap.match_sequential(str(db), pairing_options=po)
-        log("matched")
-    sparse = out / "sparse"
-    shutil.rmtree(sparse, ignore_errors=True)
-    sparse.mkdir()
-    opts = pycolmap.IncrementalPipelineOptions()
-    opts.ba_refine_extra_params = False
-    opts.ba_refine_principal_point = False
-    opts.ba_refine_focal_length = not fix_focal
-    recs = pycolmap.incremental_mapping(str(db), str(track), str(sparse), options=opts)
-    if not recs:
-        raise SystemExit("no reconstruction")
-    key, rec = max(recs.items(), key=lambda kv: kv[1].num_reg_images())
-    cam = next(iter(rec.cameras.values()))
-    frames = sorted(int(i.name[6:10]) for i in rec.images.values() if getattr(i, "has_pose", True))
-    rep = {"models": {int(k): r.num_reg_images() for k, r in recs.items()}, "chosen": int(key),
-           "registered": len(frames), "of": len(names), "points3D": rec.num_points3D(),
-           "mean_reproj_px_1024": float(rec.compute_mean_reprojection_error()),
-           "focal_px_1024": float(cam.params[0]), "focal_mm": float(cam.params[0] * 23.5 / cam.width)}
-    log("GS", json.dumps(rep))
-    if rep["points3D"] < 500 or rep["registered"] < 0.5 * len(names):
-        raise SystemExit(f"GS solve too weak for an RS test ({rep['registered']} frames, {rep['points3D']} points); "
-                         "a pan with no baseline needs --fix-focal")
-    return sparse / str(key), frames, rep
+    """The GS solve, through camera_side/plate_solve.py (Solve Plate's engine) with this tool's recipe kept as it
+    was for the RS evidence: SIMPLE_RADIAL with k1 held at 0, focal seeded at 16.47 mm, no gap bridging, no
+    motion rejection, no nodal fallback."""
+    opts = ps.SolveOptions(camera_model="SIMPLE_RADIAL", focal_px=F16_PX_1024, refine_focal=not fix_focal,
+                           refine_distortion=False, max_image_size=PROXY_W, bridge_gaps=False, reject_rounds=0,
+                           nodal_fallback=False, min_points=500)
+    try:
+        res = ps.solve_folder(track, names, out, opts, log=log)
+    except ps.SolveError as e:
+        raise SystemExit(f"GS solve too weak for an RS test ({e}); a pan with no baseline needs --fix-focal")
+    r = res.report
+    rep = {"registered": r["registered"], "of": r["of"], "points3D": r["points3D"],
+           "mean_reproj_px_1024": r["mean_reproj_px"], "focal_px_1024": r["camera"]["focal_px"],
+           "focal_mm": r["camera"]["focal_px"] * 23.5 / r["image_size"][0], "passes": r["passes"]}
+    log("GS", json.dumps(rep, default=str))
+    return res.model_dir, res.frames, rep
 
 
-def longest_run(frames: list[int]) -> tuple[int, int]:
-    best, start = (frames[0], frames[0]), frames[0]
-    for a, b in zip(frames, frames[1:] + [None]):
-        if b != a + 1:
-            if a - start > best[1] - best[0]:
-                best = (start, a)
-            start = b
-    return best
+longest_run = ps.longest_run
 
 
 def main() -> int:

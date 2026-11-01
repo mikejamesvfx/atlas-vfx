@@ -527,6 +527,18 @@ def readout_profile(cam, pts: dict, readouts_ms, *, frames=None, max_points: int
     return rows
 
 
+def undistorted_points(cam, pts: dict) -> dict:
+    """The RS model is pinhole: observations on a camera with a lens block are moved to pinhole pixels first, so
+    the lens is taken out rather than soaked up by the poses. The output camera keeps the lens block. Row times
+    use the pinhole row (sub-pixel off the sensor row near the corners for a mild lens)."""
+    if not (cam.data.get("lens") or {}).get("distortion_params"):
+        return pts
+    have = set(cam.frames)
+    obs = {f: (k, cam.undistort_pixels(f, xy) if len(k) else xy) for f, (k, xy) in pts["observations"].items()
+           if f in have}
+    return {**pts, "observations": obs}
+
+
 def solve_shot(cam, pts: dict, *, readout_ms: float, solve_readout: bool, frames=None, max_points: int | None = None,
                max_iter: int = 100, profile_ms=(), profile_points: int | None = 8000, name: str | None = None,
                verbose: int = 0, log=None) -> dict:
@@ -535,6 +547,7 @@ def solve_shot(cam, pts: dict, *, readout_ms: float, solve_readout: bool, frames
     added to the profile when it was solved). pts: {"xyz", "observations"} in cam's world (measure.points_for_camera).
     Returns {"camera": ShotCamera, "report": solve report, "profile": rows}."""
     fps = float(cam.data["shot"]["fps"])
+    pts = undistorted_points(cam, pts)
     res = solve(cam, pts["xyz"], pts["observations"], readout_frames=readout_ms / 1000.0 * fps,
                 solve_readout=solve_readout, frames=frames, max_points=max_points, max_iter=max_iter, verbose=verbose)
     rep = res["report"]
