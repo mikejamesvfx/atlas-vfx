@@ -317,3 +317,117 @@ def node_classes_used(text: str) -> set[str]:
     for group in re.findall(r"make\(\[([^\]]*)\]", text):
         found |= set(re.findall(r"['\"](\w+)['\"]", group))
     return found
+
+
+# --------------------------------------------------------------------------------------------- .nk text (Indie)
+# Nuke Indie lets Python create or touch only 10 nodes per session (live 2026-11-01: the clean + STMaps build needs
+# 13). Pasting script text into the Node Graph has no such limit, so the same graph is also written as .nk text:
+# open it in a text editor, copy everything, click in the Node Graph, Ctrl+V. Every value goes through
+# camera_side/nuke_text (nk_str / nk_name), never pasted raw.
+# Stack convention (confirmed empirically in Atlas Camera's exporters/nuke_exporter.py): the LAST push becomes
+# input 0. So a Merge2 (B = 0, A = 1) is "push A; push B", an STMap (src = 0, stmap = 1) is "push map; push src".
+
+def _nk_node(cls: str, name: str, knobs: list[tuple[str, str]], x: int, y: int, inputs: int = 0) -> str:
+    body = [f" inputs {int(inputs)}"] + [f" {k} {v}" for k, v in knobs]
+    body += [f" name {nt.nk_name(name)}", f" xpos {int(x)}", f" ypos {int(y)}"]
+    return f"{cls} {{\n" + "\n".join(body) + "\n}"
+
+
+def _curve(values, first: int) -> str:
+    return "{curve x%d %s}" % (first, " ".join(f"{v:.9g}" for v in values))
+
+
+def nk_text(data: dict) -> str:
+    """The build as Nuke script text, for pasting into Indie's Node Graph (same nodes as the Python build, except
+    the Root settings, which a paste can't set: they are listed in the header comment)."""
+    from atlas_vfx.camera_side import camera_export as ce
+
+    P = data["prefix"]
+    q = nt.nk_str
+    first, last = data["frames"]
+    w, h, pa = data["format"]
+    out = ["# atlas-vfx Nuke build for Indie: copy ALL of this, click in the Node Graph, Ctrl+V.",
+           f"# Set by hand (a paste can't): Project Settings > frame range {first}-{last}, fps {data['fps']:g}, "
+           f"format {w}x{h}, colour management OCIO, config {data['ocio_config']}, working space "
+           f"{data['working_space']}.",
+           f"# shot {data['shot']}; camera units {data['camera'].get('units', 'metres')}"]
+    sets = []
+
+    def put(text, var):
+        out.append(text)
+        out.append(f"set N_{var} [stack 0]")
+        sets.append(var)
+
+    pl = data["plate"]
+    knobs = [("file", q(pl["file"])), ("colorspace", q(pl["colorspace"])), ("before", "hold"), ("after", "hold"),
+             ("label", q(f"{pl['kind']}\n{pl['range_note']}"))]
+    if pl["start_at"] is None:
+        knobs += [("first", str(first)), ("last", str(last)), ("origfirst", str(first)), ("origlast", str(last))]
+    else:
+        knobs += [("frame_mode", q("start at")), ("frame", q(str(pl["start_at"])))]
+    put(_nk_node("Read", P + "Plate", knobs, 0, 0), "plate")
+    for i, L in enumerate(data["layers"]):
+        put(_nk_node("Read", P + "Layer_" + L["name"], [
+            ("file", q(L["pattern"].replace("%04d", "####"))), ("first", str(L["first"])), ("last", str(L["last"])),
+            ("origfirst", str(L["first"])), ("origlast", str(L["last"])), ("colorspace", q(L["colorspace"])),
+            ("premultiplied", "true" if L["premultiplied"] else "false"), ("before", "black"), ("after", "black"),
+            ("label", q(L.get("version", "plate")))], 180 * (i + 1), -200), f"L{i}")
+    lens = data.get("lens")
+    top = "plate"
+    if lens:
+        stack = None
+        for i, _L in enumerate(data["layers"]):
+            if stack is None:
+                stack = f"L{i}"
+                continue
+            out += [f"push $N_L{i}", f"push $N_{stack}"]          # A = this layer, B = the stack below
+            put(_nk_node("Merge2", P + f"Stack_{data['layers'][i]['name']}", [("operation", "over")], 180 * (i + 1),
+                         -80, inputs=2), f"S{i}")
+            stack = f"S{i}"
+        for nm, path, x in (("redistort", lens["redistort"], 0), ("undistort", lens["undistort"], -180)):
+            put(_nk_node("Read", P + f"Read_{nm}", [("file", q(path)), ("colorspace", q("Raw")), ("raw", "true"),
+                                                     ("label", q("STMap (Raw)"))], x, -80), nm)
+        out += ["push $N_undistort", "push $N_plate"]
+        put(_nk_node("STMap", P + "Undistort_plate", [("uv", "rgb"),
+                                                      ("label", q("plate -> clean (line up the camera here)"))],
+                     -180, 120, inputs=2), "ud")
+        if stack is not None:
+            out += ["push $N_redistort", f"push $N_{stack}"]
+            put(_nk_node("STMap", P + "Redistort_layers", [("uv", "rgb"), ("label", q("clean layers -> plate as shot"))],
+                         180, 40, inputs=2), "rd")
+            out += ["push $N_rd", "push $N_plate"]
+            put(_nk_node("Merge2", P + "Over_layers", [("operation", "over")], 0, 120, inputs=2), "over")
+            top = "over"
+    else:
+        for i, L in enumerate(data["layers"]):
+            out += [f"push $N_L{i}", f"push $N_{top}"]
+            put(_nk_node("Merge2", P + "Over_" + L["name"], [("operation", "over")], 0, 120 * (i + 1), inputs=2),
+                f"O{i}")
+            top = f"O{i}"
+    out.append(f"push $N_{top}")
+    wr = data["write"]
+    out.append(_nk_node("Write", P + "Write_comp", [("file", q(wr["file"].replace("%04d", "####"))),
+                                                    ("file_type", "exr"), ("colorspace", q(wr["colorspace"])),
+                                                    ("channels", "rgba"), ("create_directories", "true")],
+                        0, 120 * (len(data["layers"]) + 2), inputs=1))
+    c = data["camera"]
+    rows = ce.read_chan(c["chan"])
+    fr = sorted(rows)
+    t = [_curve([rows[f][i] for f in fr], fr[0]) for i in range(3)]
+    r = [_curve([rows[f][3 + i] for f in fr], fr[0]) for i in range(3)]
+    out.append(_nk_node("Camera3", P + "Camera", [
+        ("rot_order", "ZXY"), ("translate", "{" + " ".join(t) + "}"), ("rotate", "{" + " ".join(r) + "}"),
+        ("focal", "{" + _curve([rows[f][6] for f in fr], fr[0]) + "}"),
+        ("haperture", f"{c['haperture']:.9g}"), ("vaperture", f"{c['vaperture']:.9g}"),
+        ("win_translate", "{%s %s}" % tuple(f"{v:.9g}" for v in c["win_translate"])),
+        ("label", q(f"{c.get('units', 'metres')}, ZXY, {len(fr)} frames"))], -300, 0))
+    if data.get("set_proxy_obj"):
+        out.append(_nk_node("ReadGeo2", P + "SetProxy", [("file", q(data["set_proxy_obj"]))], -300, 150))
+    return "\n".join(out) + "\n"
+
+
+def write_nk(data: dict, path) -> Path:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(nk_text(data), encoding="utf-8")
+    return p

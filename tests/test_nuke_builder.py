@@ -286,6 +286,73 @@ def test_lens_delivery(tmp: Path, cam_res: dict, layer_pattern: str):
           "an old folder is both")
 
 
+def nk_graph(text: str) -> dict:
+    """Wire a .nk paste the way Nuke does (Atlas Camera's verified convention: the LAST push is input 0):
+    {node name: (class, [input names])}."""
+    import re as _re
+
+    stack, sets, nodes = [], {}, {}
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        if ln.startswith("#") or not ln.strip():
+            i += 1
+            continue
+        m = _re.match(r"push \$(\w+)", ln)
+        if m:
+            stack.append(sets[m.group(1)])
+            i += 1
+            continue
+        m = _re.match(r"set (\w+) \[stack 0\]", ln)
+        if m:
+            sets[m.group(1)] = stack[-1]
+            i += 1
+            continue
+        m = _re.match(r"(\w+) \{$", ln)
+        assert m, ln
+        cls, body = m.group(1), []
+        i += 1
+        while lines[i] != "}":
+            body.append(lines[i])
+            i += 1
+        i += 1
+        k = int(next(b for b in body if b.startswith(" inputs ")).split()[1])
+        name = next(b for b in body if b.startswith(" name ")).split(None, 1)[1]
+        ins = [stack.pop() for _ in range(k)]                  # input 0 = the last push
+        nodes[name] = (cls, ins)
+        stack.append(name)
+    return nodes
+
+
+def test_nk_paste(tmp: Path, cam_res: dict, layer_pattern: str):
+    """The Indie paste (.nk text): same wiring as the Python build, both lens modes, no NukeX-only nodes."""
+    lf = tmp / "lens"
+    base = make_shot(tmp / "nkshot", cam_res, layer_pattern)
+    plate_data = nb.build_data(shot="SYN_S1", plate=base["plate"], plate_colorspace="F-Log2 F-Gamut",
+                               plate_frames=(1130, 1159), fmt=(4096, 2160, 1.0), ocio_config=OCIO,
+                               camera_chan=cam_res["chan"], camera_settings=cam_res["settings"], layers=base["layers"],
+                               write_pattern=str(tmp / "comp.%04d.exr"))
+    g = nk_graph(nb.nk_text(plate_data))
+    o1, o2 = g["AVFX_Over_element"], g["AVFX_Over_grass"]
+    assert o1 == ("Merge2", ["AVFX_Plate", "AVFX_Layer_element"]) and o2 == ("Merge2", ["AVFX_Over_element",
+                                                                                        "AVFX_Layer_grass"]), (o1, o2)
+    assert g["AVFX_Write_comp"][1] == ["AVFX_Over_grass"] and "AVFX_Camera" in g
+    lens_data = dict(plate_data, lens={"undistort": (lf / "undistort_g.exr").as_posix(),
+                                       "redistort": (lf / "redistort_g.exr").as_posix()})
+    text = nb.nk_text(lens_data)
+    g = nk_graph(text)
+    assert g["AVFX_Stack_grass"] == ("Merge2", ["AVFX_Layer_element", "AVFX_Layer_grass"]), g["AVFX_Stack_grass"]
+    assert g["AVFX_Redistort_layers"] == ("STMap", ["AVFX_Stack_grass", "AVFX_Read_redistort"])
+    assert g["AVFX_Undistort_plate"] == ("STMap", ["AVFX_Plate", "AVFX_Read_undistort"])
+    assert g["AVFX_Over_layers"] == ("Merge2", ["AVFX_Plate", "AVFX_Redistort_layers"])
+    assert g["AVFX_Write_comp"][1] == ["AVFX_Over_layers"]
+    assert not (set(c for c, _ in g.values()) & set(nb.NUKEX_ONLY))
+    assert text.count("raw true") == 2 and "curve x" in text and "rot_order ZXY" in text
+    print(f"ok nk paste (Indie): {len(g)} nodes, both lens modes wired as the Python build (B/A, src/stmap), "
+          f"STMap Reads raw, camera as curves")
+
+
 def main() -> int:
     cam = camera()
     with tempfile.TemporaryDirectory() as t:
@@ -294,6 +361,7 @@ def main() -> int:
         cam_res = test_camera_export(cam, tmp)
         test_builder(tmp, cam, cam_res, layer_pattern)
         test_lens_delivery(tmp, cam_res, layer_pattern)
+        test_nk_paste(tmp, cam_res, layer_pattern)
     return 0
 
 

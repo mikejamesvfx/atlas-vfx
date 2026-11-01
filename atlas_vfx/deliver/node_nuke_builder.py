@@ -93,13 +93,16 @@ class AtlasVFXNukeBuilder:
             set_proxy_obj=pl.clean_path(set_proxy_obj) or None, prefix=prefix, set_root=set_root, x_offset=x_offset,
             fps=plate_ref["fps"][0] / plate_ref["fps"][1], lens_maps=lens_maps)
         path = nb.write_script(data, out / f"build_{shot}.py")
+        nk = nb.write_nk(data, out / f"build_{shot}.nk")         # Indie: paste this (Python may touch 10 nodes)
         pl.write_sidecar(out / f"build_{shot}.sidecar.json", "AtlasVFXNukeBuilder",
                          inputs={"camera": nuke_camera_json, "layers": [L["pattern"] for L in layers],
                                  "plate_kind": plate_kind, "set_root": set_root},
-                         outputs={"script": str(path), "layer_checks": checks, "reads": data["reads"]})
+                         outputs={"script": str(path), "nk_paste": str(nk), "layer_checks": checks,
+                                  "reads": data["reads"]})
         text = path.read_text(encoding="utf-8")
         line = (f"{path}: {len(layers)} layers ({', '.join(L['name'] for L in layers)}), plate {plate_kind}, frames "
-                f"{f0}-{f1}. Paste into Nuke: exec(open(r'{path.as_posix()}').read())")
+                f"{f0}-{f1}. Nuke (full): exec(open(r'{path.as_posix()}').read()). Nuke Indie (Python may touch only "
+                f"10 nodes): open {nk.as_posix()} in a text editor, copy all, Ctrl+V in the Node Graph")
         return {"ui": {"text": [line]}, "result": (str(path), text)}
 
 
