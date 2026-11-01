@@ -51,7 +51,22 @@ try {
   const gl = m.gl, w = m.canvas.width, h = m.canvas.height;
   const px = new Uint8Array(w * h * 4);
   gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-  window.RESULT = { w, h, px: Array.from(px), renderer: gl.getParameter(gl.RENDERER) };
+  // playback cache: a held frame set draws exactly like the uploaded one, and release frees it
+  const set = { under: parseFrame(await get("under.f16")), over: parseFrame(await get("over.f16")), takes };
+  const held = m.hold("proxy|1", set);
+  m.upload({ under: null, over: null, takes: [] });
+  m.draw();
+  const px2 = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px2);
+  const shown = m.show("proxy|1");
+  m.draw();
+  const px3 = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px3);
+  const bytes = m.heldBytes;
+  m.release();
+  const cache = { held, shown, bytes, released: m.heldBytes === 0 && !m.isHeld("proxy|1"),
+    swapped_differs: px2.some((v, i) => v !== px[i]), same: px3.every((v, i) => v === px[i]) };
+  window.RESULT = { w, h, px: Array.from(px), renderer: gl.getParameter(gl.RENDERER), cache };
 } catch (e) { window.RESULT = { error: String(e && e.stack || e) }; }
 </script>"""
 
@@ -172,6 +187,10 @@ def main() -> int:
     check(within >= 0.999 and int(diff.max()) <= 3,
           "GPU mix + OCIO GPU view = mix_frame + OCIO CPU view (8 bit)",
           f"{within * 100:.3f} % within 1 code, max {int(diff.max())}, {res.get('renderer')}")
+    c = res.get("cache", {})
+    check(c.get("held") and c.get("shown") and c.get("bytes", 0) > 0, "playback cache holds a frame set", f"{c}")
+    check(c.get("swapped_differs") and c.get("same"), "a held frame draws exactly like the uploaded one")
+    check(c.get("released"), "release frees every held frame")
     print("PASS" if not FAILS else f"FAILED {len(FAILS)}")
     return 1 if FAILS else 0
 

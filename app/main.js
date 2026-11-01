@@ -2,7 +2,7 @@
 // State lives on disk (the server); this page only shows it and asks for changes. DOM is built with
 // createElement + textContent: nothing from the server is ever parsed as HTML.
 import { api, frameURL, listen } from "/atlas/app/api.js";
-import { FrameStore, LightMixer } from "/atlas/app/lightmix.js";
+import { FrameStore, LightMixer, preload } from "/atlas/app/lightmix.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -182,16 +182,50 @@ async function enterLight(layerName) {
   S.light.mixer.set({ versions: S.light.versions, mix: m, blend: l.blend || "over", opacity: l.opacity ?? 1,
     exposure: S.exposure });
   S.light.store.clear();
+  S.light.mixer.release();
   api.warmCache(S.shot.name, l.name, "proxy").catch((e) => status(e.message, true));
   S.room = "light";
   render();
   refreshFrame();
+  startPreload();
 }
 
 function leaveLight() {
+  if (S.light) { S.light.preloadRun = (S.light.preloadRun || 0) + 1; S.light.mixer.release(); cacheBar(); }
   S.room = "comp";
   render();
   refreshFrame();
+}
+
+// Playback cache: every proxy frame set of the shot loaded onto the graphics card, from the playhead on, so play
+// only switches textures. The bar under the viewer shows how much is loaded.
+function startPreload() {
+  const L = S.light, shot = S.shot, run = (L.preloadRun = (L.preloadRun || 0) + 1);
+  L.held = 0;
+  L.total = shot.last - shot.first + 1;
+  cacheBar();
+  preload(api, L.mixer, { shot: shot.name, layer: L.layer, versions: L.versions, first: shot.first, last: shot.last,
+    from: S.frame,
+    onProgress: (n) => { if (run === L.preloadRun) { L.held = n; cacheBar(); } },
+    cancelled: () => run !== L.preloadRun || S.room !== "light" || S.shot?.name !== shot.name })
+    .then((r) => {
+      if (run === L.preloadRun && r.full) status(`Playback cache is full at ${r.held} of ${r.total} frames; the rest plays from the server.`);
+    })
+    .catch((e) => status(`Playback cache: ${e.message}`, true));
+}
+
+function cacheBar() {
+  const L = S.light, on = S.room === "light" && !!L && !!L.total;
+  $("light-cache-wrap").hidden = !on;
+  if (!on) return;
+  $("light-cache").value = L.held / L.total;
+  $("light-cache-out").textContent = L.held >= L.total ? "all frames on the GPU" : `${L.held} of ${L.total} frames`;
+}
+
+function shotFps() {
+  const f = S.shot?.fps;
+  const v = Array.isArray(f) ? f[0] / (f[1] || 1) : Number(f);
+  return v > 0 ? v : 24;
 }
 
 function lightDraw() { if (S.room === "light" && S.light) S.light.mixer.draw(); }
@@ -203,15 +237,26 @@ async function lightFrame() {
     catch (e) { status(`view: ${e.message}`, true); }
   }
   try {
-    const set = await L.store.get(shot, L.layer, L.versions, "proxy", f);
-    if (token !== L.token) return;
-    L.mixer.upload(set);
+    if (!L.mixer.show(`proxy|${f}`)) {                     // not in the playback cache (yet): fetch it
+      if (S.playing) {                                     // and read a few frames ahead
+        for (let k = 1; k <= 4; k++) {
+          const n = f + k;
+          if (n <= S.shot.last && !L.mixer.isHeld(`proxy|${n}`)) L.store.get(shot, L.layer, L.versions, "proxy", n).catch(() => {});
+        }
+      }
+      const set = await L.store.get(shot, L.layer, L.versions, "proxy", f);
+      if (token !== L.token) return;
+      L.mixer.upload(set);
+    }
     L.mixer.set({ exposure: S.exposure });
     L.mixer.draw();
     $("readout").textContent = `${f} · light mix · proxy · ${S.exposure > 0 ? "+" : ""}${S.exposure.toFixed(2)} EV · ${S.view}`;
   } catch (e) { status(`Light room: ${e.message}`, true); }
-  if (S.playing) {
-    requestAnimationFrame(() => setFrame(S.frame >= S.shot.last ? S.shot.first : S.frame + 1));
+  if (S.playing) {                                         // paced to the shot's frame rate
+    const step = 1000 / shotFps(), t = performance.now();
+    L.due = L.due && t - L.due < step ? L.due + step : t + step;
+    setTimeout(() => { if (S.playing && S.room === "light") setFrame(S.frame >= S.shot.last ? S.shot.first : S.frame + 1); },
+      Math.max(0, L.due - performance.now()));
     return;
   }
   clearTimeout(L.rest);
@@ -601,6 +646,7 @@ function togglePlay() {
   $("play").setAttribute("aria-pressed", String(S.playing));
   $("play").setAttribute("aria-label", S.playing ? "Pause" : "Play");
   if (S.playing) setFrame(S.frame >= S.shot.last ? S.shot.first : S.frame + 1);
+  else if (S.room === "light" && S.light) { S.light.due = 0; lightFrame(); }   // paused: the full-size swap
 }
 
 // ---------------------------------------------------------------------------------------------------- presets

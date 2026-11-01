@@ -6,10 +6,15 @@
 // Frames come from the server's cache (atlas_vfx/comp/cache.py) as half-float RGBA: the takes, plus "under" (plate
 // and lower layers) and "over" (higher layers). Proxy frames (1024 wide) while scrubbing and playing; the full-size
 // set replaces them once the playhead rests.
+//
+// Playback cache: every proxy frame set of the shot is loaded once into textures on the graphics card (preload).
+// Playing then only points the shader at the next frame's textures: no download, no upload. What does not fit in
+// the budget (or before it has loaded) falls back to fetching, with a few frames read ahead.
 
 const MAX_TAKES = 8;
 const MAGIC = "ATLF16\n";
 const BLEND_MODES = { over: 0, plus: 1, multiply: 2, screen: 3 };
+export const GPU_BUDGET = 6 * 1024 ** 3;     // bytes of playback textures (97 frames x 7 proxies is about 3 GB)
 
 const VERT = `#version 300 es
 in vec2 p;
@@ -108,6 +113,19 @@ export function takeUniforms(mix, versions) {
   });
 }
 
+// One frame set from the server cache: { under, over, takes: [..] } of parseFrame results (null where missing).
+export async function fetchSet(api, shot, layer, versions, level, frame) {
+  const takes = await Promise.all(versions.map((v) => api.cacheTake(shot, layer, v, level, frame)
+    .then((b) => (b ? parseFrame(b) : null))));
+  const ref = takes.find(Boolean);
+  const w = ref ? ref.head.width : 1024, h = ref ? ref.head.height : 540;
+  const [under, over] = await Promise.all(["under", "over"].map((side) =>
+    api.cacheStack(shot, layer, side, level, frame, w, h).then((b) => (b ? parseFrame(b) : null))));
+  return { under, over, takes };
+}
+
+const setBytes = (set) => [set.under, set.over, ...set.takes].reduce((s, f) => s + (f ? f.px.byteLength : 0), 0);
+
 export class LightMixer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -116,7 +134,12 @@ export class LightMixer {
     this.gl = gl;
     this.floatLinear = !!gl.getExtension("OES_texture_float_linear");
     this.prog = null;
+    this.blank = this._tex();
     this.tex = { under: this._tex(), over: this._tex(), takes: Array.from({ length: MAX_TAKES }, () => this._tex()) };
+    this.cur = this.tex;               // the textures draw() reads: the upload slots, or a held playback frame
+    this.held = new Map();             // key -> {under, over, takes, size, bytes, own: [textures]}
+    this.heldBytes = 0;
+    this.budget = GPU_BUDGET;
     this.ocioTex = [];
     this.size = [0, 0];
     const buf = gl.createBuffer();
@@ -135,6 +158,14 @@ export class LightMixer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, new Uint16Array(4));
     return t;
+  }
+
+  _fill(tex, f) {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (!f) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, new Uint16Array(4)); return; }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, f.head.width, f.head.height, 0, gl.RGBA, gl.HALF_FLOAT, f.px);
   }
 
   // The view: OCIO's GLSL ES 3.0 (from /atlas/api/view_shader) compiled into the mix program, its tables uploaded.
@@ -173,20 +204,58 @@ export class LightMixer {
     if (payload.textures3d?.length) throw new Error("this view needs 3D lookup tables, not handled yet");
   }
 
-  // One frame set: { under, over, takes: [..] } of parseFrame results, all the same size.
+  // One frame set into the upload slots (the full-size frame on pause, or a frame not held): draw() shows it.
   upload(set) {
-    const gl = this.gl;
-    const put = (tex, f) => {
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-      if (!f) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, new Uint16Array(4)); return; }
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, f.head.width, f.head.height, 0, gl.RGBA, gl.HALF_FLOAT, f.px);
-    };
-    put(this.tex.under, set.under);
-    put(this.tex.over, set.over);
-    for (let i = 0; i < MAX_TAKES; i++) put(this.tex.takes[i], set.takes[i] || null);
+    this._fill(this.tex.under, set.under);
+    this._fill(this.tex.over, set.over);
+    for (let i = 0; i < MAX_TAKES; i++) this._fill(this.tex.takes[i], set.takes[i] || null);
+    this.cur = this.tex;
     const any = set.under || set.takes.find(Boolean);
     if (any) this.size = [any.head.width, any.head.height];
+  }
+
+  // Playback cache: keep a frame set in its own textures. False when it does not fit the budget (or the card
+  // refuses the memory); the frame then plays through upload() instead.
+  hold(key, set) {
+    if (this.held.has(key)) return true;
+    const bytes = setBytes(set);
+    if (this.heldBytes + bytes > this.budget) return false;
+    const gl = this.gl;
+    const own = [];
+    const make = (f) => { if (!f) return this.blank; const t = this._tex(); own.push(t); this._fill(t, f); return t; };
+    const entry = { under: make(set.under), over: make(set.over), takes: [], bytes, own };
+    for (let i = 0; i < MAX_TAKES; i++) entry.takes.push(make(set.takes[i] || null));
+    const any = set.under || set.takes.find(Boolean);
+    entry.size = any ? [any.head.width, any.head.height] : [0, 0];
+    if (gl.getError() === gl.OUT_OF_MEMORY) {
+      own.forEach((t) => gl.deleteTexture(t));
+      this.budget = this.heldBytes;                  // the card is full: hold no more
+      return false;
+    }
+    this.held.set(key, entry);
+    this.heldBytes += bytes;
+    return true;
+  }
+
+  isHeld(key) { return this.held.has(key); }
+
+  // Point draw() at a held frame. False when it is not held.
+  show(key) {
+    const e = this.held.get(key);
+    if (!e) return false;
+    this.cur = e;
+    this.size = e.size;
+    return true;
+  }
+
+  // Free every held frame (a new layer, or the comp under / over it changed).
+  release() {
+    const gl = this.gl;
+    for (const e of this.held.values()) e.own.forEach((t) => gl.deleteTexture(t));
+    this.held.clear();
+    this.heldBytes = 0;
+    this.budget = GPU_BUDGET;
+    this.cur = this.tex;
   }
 
   set(patch) { Object.assign(this.state, patch); }
@@ -207,9 +276,10 @@ export class LightMixer {
       if (loc) gl.uniform1i(loc, unit);
       unit++;
     };
-    bind("under_t", this.tex.under);
-    bind("over_t", this.tex.over);
-    this.tex.takes.forEach((t, i) => bind(`take_t[${i}]`, t));
+    const c = this.cur;
+    bind("under_t", c.under);
+    bind("over_t", c.over);
+    c.takes.forEach((t, i) => bind(`take_t[${i}]`, t));
     this.ocioTex.forEach((t) => bind(t.sampler, t.tex));
     const tu = takeUniforms(st.mix, st.versions).slice(0, MAX_TAKES);
     const wts = new Float32Array(MAX_TAKES), gains = new Float32Array(MAX_TAKES * 3);
@@ -229,6 +299,32 @@ export class LightMixer {
   }
 }
 
+// Load a range of proxy frame sets into the mixer's playback cache, `inflight` fetches at a time, starting at
+// `from` and wrapping. onProgress(held, total) after each frame; stops when cancelled() is true or the card is full.
+export async function preload(api, mixer, { shot, layer, versions, first, last, from = first, level = "proxy",
+  inflight = 4, onProgress = () => {}, cancelled = () => false }) {
+  const total = last - first + 1;
+  const order = [];
+  for (let i = 0; i < total; i++) order.push(first + ((from - first + i) % total));
+  let next = 0, held = 0, full = false;
+  const worker = async () => {
+    while (next < order.length && !full && !cancelled()) {
+      const f = order[next++];
+      const key = `${level}|${f}`;
+      if (!mixer.isHeld(key)) {
+        let set;
+        try { set = await fetchSet(api, shot, layer, versions, level, f); } catch { continue; }
+        if (cancelled()) return;
+        if (!mixer.hold(key, set)) { full = true; return; }
+      }
+      held++;
+      onProgress(held, total, f);
+    }
+  };
+  await Promise.all(Array.from({ length: inflight }, worker));
+  return { held, total, full };
+}
+
 // Frame sets fetched from the cache and kept within a memory budget (bytes), least recently used dropped first.
 export class FrameStore {
   constructor(api, budget = 2 * 1024 ** 3) {
@@ -245,14 +341,8 @@ export class FrameStore {
     const hit = this.map.get(k);
     if (hit) { this.map.delete(k); this.map.set(k, hit); return hit.promise; }
     const promise = (async () => {
-      const takes = await Promise.all(versions.map((v) => this.api.cacheTake(shot, layer, v, level, frame)
-        .then((b) => (b ? parseFrame(b) : null))));
-      const ref = takes.find(Boolean);
-      const w = ref ? ref.head.width : 1024, h = ref ? ref.head.height : 540;
-      const [under, over] = await Promise.all(["under", "over"].map((side) =>
-        this.api.cacheStack(shot, layer, side, level, frame, w, h).then((b) => (b ? parseFrame(b) : null))));
-      const set = { under, over, takes };
-      const bytes = [under, over, ...takes].reduce((s, f) => s + (f ? f.px.byteLength : 0), 0);
+      const set = await fetchSet(this.api, shot, layer, versions, level, frame);
+      const bytes = setBytes(set);
       const entry = this.map.get(k);
       if (entry) { entry.bytes = bytes; this.used += bytes; }
       while (this.used > this.budget && this.map.size > 1) {
