@@ -2,6 +2,35 @@
 
 Running log for whoever works here. Newest at the top. Keep it short: what was decided, what was learned, what broke.
 
+## 2026-11-01 (3D camera tracker, flow review; branch feat/tracker)
+
+- Built: Solve Plate (4), Solve Mask (67), Track 2D (68), Solve View (69) in camera_side. pycolmap SfM with focal +
+  k1 k2 solved on the raw features, a rotation-only (nodal) solver for real pans, Grounding DINO + SAM 2.1 masks.
+- DSCF3000 0-296, free lens: 297/297, 0.43 px at 1024, focal 16.55-16.67 mm (run to run: the multithreaded mapper
+  isn't bit-identical), k1 k2 ~0 (in-camera correction). Against Mike's NukeX Camera1: view angle median 0.28 /
+  0.47 / 0.65 deg (S1 / S2 / S3), centre residual 0.12 % of path. The old pycolmap f16 solve is 6-10x further from
+  NukeX (median 3.5 / 2.5 / 3.1 deg, rotation up to 12.8 deg): the Measure / depth work built on f16 is worth redoing.
+- DSCF2977 (walk + pan), NukeX retrack by Mike (1.04 px, focal 15.52 mm, distortion1 -0.021). The first rule (go
+  nodal when most matched pairs look rotation-only) sent it nodal: focal 18.05 mm, k1 +0.056, wrong. Pairs are
+  frames up to `overlap` apart and look rotation-only on a walk too. Rule now: nodal only if SfM can't solve the
+  shot or its lens is impossible (|k| > 0.25, focal 2x off; synthetic pure pan: focal +98 %, k1 +0.61). Free SfM:
+  focal 15.80 mm, k1 -0.025. Against the pixels themselves (essential matrix on 164 pairs 6-12 frames apart):
+  free SfM 0.16 deg median, NukeX 1.00 (1.09 over the walk): NukeX drifts in the walk, ours doesn't.
+- Speed: nodal solve of 336 frames took 70 min, free SfM of the same clip 38 min (rotation-heavy shots make the
+  mapper retry); DSCF3000 297 frames 8-9 min. On the speed-pass list.
+- Lens policy (Mike: both, a switch): layers are written clean and plate (redistorted); Nuke Builder lens_delivery
+  plate | clean + STMaps; overscan (Sensor Lens Maps) keeps barrel corners. The contract's project() applies the lens.
+- Nuke Indie: Python may create or touch only 10 nodes per session. The builder also writes build_<shot>.nk to paste
+  (Atlas Camera's verified stack order: the last push is input 0). The atlas OCIO config (OCIO 2.5) did not load in
+  Mike's Indie (F-Log missing from the colorspace list); parked, Mike: "let's worry about comfy".
+- Colour: generated elements now come in through the inverse of LTX Prep's ACES view (the old sRGB texture path came
+  back 0.12 darker in the mids after LTX). Relight Transfer has the same option for raw LTX takes.
+- Golden graph (tracker -> metres -> lens -> cards -> LTX clean loop -> Return -> Nuke) ran on V141 in 76.5 min after
+  two live bugs (Card Project preview variable clash; a point behind the camera crashing the motion test).
+- Tracked relight (relight a comp: Physical Sky sun at the capture time, seen from the tracked camera, picks the
+  Relight LoRA's direction; Latent Pre-render encodes the reference once): built, queued. Heading of DSCF3000 frame
+  1001 unknown (180 placeholder).
+
 ## 2026-10-30 (Relight Transfer, catalogue 53; branch feat/relight-transfer)
 
 - Why: LTX relight IC-LoRAs run at their own size (2.3 Relight 1280x704, single-stage: LTX's stage 2 drops the
