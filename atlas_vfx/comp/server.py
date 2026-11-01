@@ -393,6 +393,18 @@ def build_routes():
         return web.json_response(cc.status(request.match_info["shot"], request.match_info["layer"],
                                            request.query.get("level", "proxy")))
 
+    @routes.get("/atlas/api/cache/usage")
+    @guard
+    async def cache_usage(request):
+        return web.json_response(await off_loop(cc.usage))
+
+    @routes.post("/atlas/api/shots/{shot}/cache/clear")
+    @guard
+    async def cache_clear(request):
+        name = request.match_info["shot"]
+        sh.load_shot(name)                                   # refuses an unknown shot
+        return web.json_response(await off_loop(lambda: cc.clear(name)))
+
     @routes.get("/atlas/api/view_shader")
     @guard
     async def view_shader(request):

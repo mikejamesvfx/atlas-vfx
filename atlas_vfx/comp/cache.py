@@ -6,10 +6,12 @@ browser uploads straight to the GPU (WebGL2 RGBA16F), at two levels:
 
 A frame file is  b"ATLF16\\n" + uint32 header length + header JSON + float16 RGBA rows (top row first, little
 endian). The header names its source key: sha1 of (source file, mtime_ns, size, level, width). A changed source no
-longer matches and the file is remade on the next request; stale files are only ever overwritten, never deleted.
-Read back with numpy frombuffer, never pickle.
+longer matches and the file is remade on the next request. Read back with numpy frombuffer, never pickle.
 
-Files live in <work>/comp/<shot>/cache/ and are only ever served from there."""
+Files live in <work>/comp/<shot>/cache/ and are only ever served from there. A full 4K frame is ~71 MB, so the cache
+keeps to a size budget across every shot (ATLAS_VFX_CACHE_GB, default 12): past it, the least recently used frames go,
+full-size ones first (cheap to remake from the EXR; the proxies are what playback needs). Only this cache's own .f16
+files (and stale temp files) inside cache folders are ever removed. clear() empties one shot's cache."""
 from __future__ import annotations
 
 import hashlib
@@ -32,8 +34,12 @@ from . import shot as sh
 MAGIC = b"ATLF16\n"
 LEVELS = ("proxy", "full")
 PROXY_W = 1024
+BUDGET_GB_DEFAULT = 12.0
+SCAN_EVERY_BYTES = 512 << 20        # check the budget after this much has been written since the last check
 STATUS: dict = {}               # (shot, layer, level) -> {"state", "done", "of", "error"}
 _lock = threading.Lock()
+_evict_lock = threading.Lock()
+_written_since_scan = 0
 _pool = ThreadPoolExecutor(max(2, min(8, (os.cpu_count() or 4) // 3)), thread_name_prefix="atlas-cache")
 
 
@@ -79,8 +85,11 @@ def source_key(src: Path, level: str, width: int) -> str:
 
 
 def _inside(path: Path, root: Path) -> Path:
-    rp, rr = path.resolve(), root.resolve()
-    if rr not in rp.parents:
+    """path must sit under root. Lexical (abspath + normcase), not resolve(): every part is a safe_name, and
+    resolve() raced while warm() created folders in parallel."""
+    rp = os.path.normcase(os.path.abspath(path))
+    rr = os.path.normcase(os.path.abspath(root))
+    if not rp.startswith(rr.rstrip("\/") + os.sep):
         raise ValueError("cache path outside the cache folder")
     return path
 
@@ -97,10 +106,115 @@ def _read_header(path: Path) -> dict | None:
 
 
 def _write(path: Path, data: bytes) -> None:
+    global _written_since_scan
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(f".tmp{threading.get_ident()}")
     tmp.write_bytes(data)
     tmp.replace(path)
+    with _evict_lock:
+        _written_since_scan += len(data)
+        due = _written_since_scan >= SCAN_EVERY_BYTES
+        if due:
+            _written_since_scan = 0
+    if due:
+        evict()
+
+
+def _read(path: Path) -> bytes:
+    """A cache file's bytes; its mtime is bumped so eviction sees it as recently used."""
+    data = path.read_bytes()
+    try:
+        os.utime(path, None)
+    except OSError:
+        pass
+    return data
+
+
+def budget_bytes() -> int:
+    try:
+        gb = float(os.environ.get("ATLAS_VFX_CACHE_GB", BUDGET_GB_DEFAULT))
+    except ValueError:
+        gb = BUDGET_GB_DEFAULT
+    return int(max(0.0, gb) * (1 << 30))
+
+
+def _cache_files() -> list[tuple[float, int, bool, Path]]:
+    """(mtime, bytes, is_full, path) of every cache frame file under <work>/comp/*/cache (and stale temp files)."""
+    out = []
+    comp = sh.root()
+    if not comp.is_dir():
+        return out
+    for shot_dir in comp.iterdir():
+        root = shot_dir / "cache"
+        if not root.is_dir():
+            continue
+        for f in root.rglob("*"):
+            if not f.is_file() or not (f.suffix == ".f16" or ".tmp" in f.suffix):
+                continue
+            try:
+                st = f.stat()
+            except OSError:
+                continue
+            out.append((st.st_mtime, st.st_size, f.parent.name == "full", f))
+    return out
+
+
+def usage() -> dict:
+    files = _cache_files()
+    return {"bytes": sum(b for _, b, _, _ in files), "files": len(files), "budget_bytes": budget_bytes(),
+            "full_bytes": sum(b for _, b, full, _ in files if full)}
+
+
+def evict(budget: int | None = None) -> dict:
+    """Bring the cache under its budget (down to 90 % of it): least recently used first, full-size frames before
+    proxies, stale temp files (older than an hour) always. Returns what went."""
+    import time
+
+    budget = budget_bytes() if budget is None else int(budget)
+    files = _cache_files()
+    total = sum(b for _, b, _, _ in files)
+    gone, freed = 0, 0
+    now = time.time()
+    for m, b, _full, f in files:                      # temp files a crashed write left behind
+        if ".tmp" in f.suffix and now - m > 3600:
+            try:
+                f.unlink()
+                total -= b
+                freed += b
+                gone += 1
+            except OSError:
+                pass
+    if total > budget:
+        target = int(budget * 0.9)
+        order = sorted((x for x in files if x[3].suffix == ".f16"), key=lambda x: (not x[2], x[0]))
+        for _m, b, _full, f in order:
+            if total <= target:
+                break
+            try:
+                f.unlink()
+                total -= b
+                freed += b
+                gone += 1
+            except OSError:
+                pass
+    return {"removed_files": gone, "freed_bytes": freed, "bytes": total, "budget_bytes": budget}
+
+
+def clear(name: str) -> dict:
+    """Empty one shot's Light room cache (its .f16 frame files and temp files only)."""
+    root = cache_root(name)
+    gone, freed = 0, 0
+    if root.is_dir():
+        for f in root.rglob("*"):
+            if f.is_file() and (f.suffix == ".f16" or ".tmp" in f.suffix):
+                try:
+                    b = f.stat().st_size
+                    f.unlink()
+                    gone += 1
+                    freed += b
+                except OSError:
+                    pass
+    return {"removed_files": gone, "freed_bytes": freed}
 
 
 # ------------------------------------------------------------------------------------------------ takes
@@ -132,7 +246,7 @@ def take_bytes(name: str, layer: str, version: str, level: str, frame: int) -> b
     path = take_file(name, layer, version, level, frame)
     head = _read_header(path)
     if head is not None and head.get("key") == source_key(src, level, head.get("width", 0)):
-        return path.read_bytes()
+        return _read(path)
     img = vw.read_frame(str(src), int(frame))
     W, H = size_for(img.shape[1], img.shape[0], level)
     data = encode(fr._resize(img, (W, H)), {"key": source_key(src, level, W), "frame": int(frame),
@@ -223,7 +337,7 @@ def stack_bytes(name: str, layer: str, side: str, level: str, frame: int, size: 
     path = _inside(root / "_stack" / pl.safe_name(layer, "layer name") / side / level / f"{int(frame):06d}.f16", root)
     head = _read_header(path)
     if head is not None and head.get("key") == key and [head["width"], head["height"]] == list(size):
-        return path.read_bytes()
+        return _read(path)
     W, H = size
     canvas = np.zeros((H, W, 4), np.float32)
     if side == "under":

@@ -473,6 +473,16 @@ function lightMix(l) {
   if (on) box.append(...rows);
   box.append(start);
   if (on) box.append(bake);
+  if (S.room === "light" && S.light?.layer === l.name) {
+    const usage = el("span", { class: "muted" });
+    api.cacheUsage().then((u) => { usage.textContent = ` cache ${(u.bytes / 2 ** 30).toFixed(1)} of ${(u.budget_bytes / 2 ** 30).toFixed(0)} GB`; })
+      .catch(() => {});
+    box.append(el("button", { type: "button", text: "Clear frame cache", title: "Remove this shot's Light room frames (remade on demand)",
+      onclick: async () => {
+        try { const r = await api.clearCache(S.shot.name); S.light.store.clear(); status(`Cache cleared: ${(r.freed_bytes / 2 ** 30).toFixed(1)} GB`); }
+        catch (e) { status(e.message, true); }
+      } }), usage);
+  }
   return box;
 }
 

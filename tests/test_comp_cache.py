@@ -6,6 +6,8 @@
   4. warm builds every frame of the mixed takes in the background.
   5. under / over: the plate and lower layers / higher layers at the takes' size, equal to the comp's own blend.
   6. view_shader: OCIO's GLSL ES 3.0 for the default ACES 2.0 view, with its lookup tables.
+  7. The size budget: past it, least recently used frames go, full-size first; only cache files; clear() empties a
+     shot's cache and leaves everything else.
 Run: <V141 python> tests/test_comp_cache.py
 """
 from __future__ import annotations
@@ -90,10 +92,14 @@ def test_takes(H, W):
     check(px.shape == (136, 1024, 4) and head["level"] == "proxy" and np.allclose(px, fr._resize(src, (1024, 136)),
                                                                               atol=2e-3),
           "proxy level is 1024 wide, the area-resized take", str(px.shape))
-    f = cc.take_file("C", "rl", "v002", "proxy", 1002)
-    t1 = f.stat().st_mtime_ns
-    cc.take_bytes("C", "rl", "v002", "proxy", 1002)
-    check(f.stat().st_mtime_ns == t1, "an unchanged source is served from the cache file")
+    reads = []
+    real = cc.vw.read_frame
+    cc.vw.read_frame = lambda *a: reads.append(a) or real(*a)
+    try:
+        cc.take_bytes("C", "rl", "v002", "proxy", 1002)
+    finally:
+        cc.vw.read_frame = real
+    check(not reads, "an unchanged source is served from the cache file (no EXR read)")
     exr = sh.layer_dir("C", "rl") / "v002" / "rl.1002.exr"
     exr_io.write_rgba(exr, ramp(H, W, 5), half=False)
     os.utime(exr, None)
@@ -147,12 +153,45 @@ def test_shader():
           "view shader: GLSL ES 3.0 function + its tables", f"{len(s['shader'])} chars, {len(s['textures'])} tables")
 
 
+def test_budget():
+    for f in (1001, 1002, 1003):                                   # full-size frames of two takes
+        for v in ("v001", "v002"):
+            cc.take_bytes("C", "rl", v, "full", f)
+    u = cc.usage()
+    full = sorted(cc.cache_root("C").rglob("full/*.f16"), key=lambda p: p.stat().st_mtime)
+    os.utime(full[-1], (time.time() + 10, time.time() + 10))      # the newest-used full frame
+    keep = full[-1]
+    proxies = list(cc.cache_root("C").rglob("proxy/*.f16"))
+    exr = list(sh.layer_dir("C", "rl").rglob("*.exr"))
+    one_full = full[0].stat().st_size
+    budget = u["bytes"] - u["full_bytes"] + 2 * one_full         # room for the proxies and ~2 full frames
+    r = cc.evict(budget)
+    left_full = list(cc.cache_root("C").rglob("full/*.f16"))
+    check(r["bytes"] <= budget and r["removed_files"] > 0, "over budget: frames removed until under it",
+          f"{r['removed_files']} files, {r['freed_bytes'] / 2**20:.1f} MB freed")
+    check(all(p.exists() for p in proxies) and keep.exists() and len(left_full) < len(full),
+          "full-size frames go first, least recently used first; proxies kept")
+    check(all(p.exists() for p in exr), "the layers' own EXRs are never touched")
+    stray = cc.cache_root("C") / "rl" / "v001" / "proxy" / "001001.tmp99"
+    stray.write_bytes(b"x")
+    old = time.time() - 7200
+    os.utime(stray, (old, old))
+    cc.evict(10 ** 12)
+    check(not stray.exists(), "a temp file a crashed write left behind is removed")
+    note = cc.cache_root("C") / "README.txt"
+    note.write_text("not a cache frame")
+    c = cc.clear("C")
+    check(c["removed_files"] > 0 and not list(cc.cache_root("C").rglob("*.f16")) and note.exists()
+          and all(p.exists() for p in exr), "clear empties the shot's cache frames, nothing else")
+
+
 def main() -> int:
     H, W = setup()
     test_takes(H, W)
     test_warm()
     test_stack(H, W)
     test_shader()
+    test_budget()
     print("PASS" if not FAILS else f"FAILED {len(FAILS)}")
     return 1 if FAILS else 0
 

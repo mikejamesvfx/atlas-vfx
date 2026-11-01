@@ -47,6 +47,8 @@ export const api = {
   warmCache: (shot, layer, level) => call("POST", `/atlas/api/shots/${enc(shot)}/cache/${enc(layer)}/warm`, { level }),
   cacheStatus: (shot, layer, level) => call("GET", `/atlas/api/shots/${enc(shot)}/cache/${enc(layer)}/status?level=${enc(level)}`),
   viewShader: (view) => call("GET", `/atlas/api/view_shader?view=${enc(view)}`),
+  cacheUsage: () => call("GET", "/atlas/api/cache/usage"),
+  clearCache: (shot) => call("POST", `/atlas/api/shots/${enc(shot)}/cache/clear`, {}),
   bakeMix: (shot, layer) => call("POST", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}/bake_mix`, {}),
   bakeStatus: (shot, layer) => call("GET", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}/bake_mix`),
   presets: () => call("GET", "/atlas/api/presets"),
