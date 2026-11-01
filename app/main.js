@@ -2,6 +2,7 @@
 // State lives on disk (the server); this page only shows it and asks for changes. DOM is built with
 // createElement + textContent: nothing from the server is ever parsed as HTML.
 import { api, frameURL, listen } from "/atlas/app/api.js";
+import { FrameStore, LightMixer } from "/atlas/app/lightmix.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -64,8 +65,14 @@ function localSet(k, v) { try { localStorage.setItem(`atlas-comp:${k}`, v); } ca
 // ---------------------------------------------------------------------------------------------------- render
 function render() {
   const has = !!S.shot;
+  const light = has && S.room === "light" && !!S.light;
   $("empty").hidden = has;
-  $("frame-img").hidden = !has;
+  $("frame-img").hidden = !has || light;
+  $("light-canvas").hidden = !light;
+  $("room-comp").setAttribute("aria-current", light ? "false" : "page");
+  $("room-light").setAttribute("aria-current", light ? "page" : "false");
+  const sel = has && S.shot.layers.find((x) => x.name === S.selected);
+  $("room-light").disabled = !(sel && mixRecord(sel.mix));
   $("add-layer").disabled = !has;
   $("presets-btn").disabled = !has;
   if (!has) {
@@ -156,8 +163,73 @@ function abList(v) {
   return S.shot.plate ? `plate,${v}` : v;     // a layer is seen over the plate
 }
 
+// ---------------------------------------------------------------------------------------------------- Light room
+// The selected layer's takes mixed on the GPU (app/lightmix.js) from the server's half-float cache: proxy frames
+// while scrubbing or playing, the full-size set once the playhead rests. Sliders only redraw; the mix is saved
+// to shot.json in the background.
+const REST_MS = 250;
+
+async function enterLight(layerName) {
+  const l = S.shot?.layers.find((x) => x.name === layerName);
+  const m = l && mixRecord(l.mix);
+  if (!m) { status("Turn on the light mix for this layer first (Inspector).", true); return; }
+  try {
+    if (!S.light) S.light = { mixer: new LightMixer($("light-canvas")), store: new FrameStore(api) };
+    S.light.mixer.setView(await api.viewShader(S.view));
+    S.light.viewLoaded = S.view;
+  } catch (e) { status(`Light room: ${e.message}`, true); S.light = null; return; }
+  Object.assign(S.light, { layer: l.name, versions: Object.keys(m.takes).sort(), token: 0 });
+  S.light.mixer.set({ versions: S.light.versions, mix: m, blend: l.blend || "over", opacity: l.opacity ?? 1,
+    exposure: S.exposure });
+  S.light.store.clear();
+  api.warmCache(S.shot.name, l.name, "proxy").catch((e) => status(e.message, true));
+  S.room = "light";
+  render();
+  refreshFrame();
+}
+
+function leaveLight() {
+  S.room = "comp";
+  render();
+  refreshFrame();
+}
+
+function lightDraw() { if (S.room === "light" && S.light) S.light.mixer.draw(); }
+
+async function lightFrame() {
+  const L = S.light, shot = S.shot.name, f = S.frame, token = ++L.token;
+  if (L.viewLoaded !== S.view) {
+    try { L.mixer.setView(await api.viewShader(S.view)); L.viewLoaded = S.view; }
+    catch (e) { status(`view: ${e.message}`, true); }
+  }
+  try {
+    const set = await L.store.get(shot, L.layer, L.versions, "proxy", f);
+    if (token !== L.token) return;
+    L.mixer.upload(set);
+    L.mixer.set({ exposure: S.exposure });
+    L.mixer.draw();
+    $("readout").textContent = `${f} · light mix · proxy · ${S.exposure > 0 ? "+" : ""}${S.exposure.toFixed(2)} EV · ${S.view}`;
+  } catch (e) { status(`Light room: ${e.message}`, true); }
+  if (S.playing) {
+    requestAnimationFrame(() => setFrame(S.frame >= S.shot.last ? S.shot.first : S.frame + 1));
+    return;
+  }
+  clearTimeout(L.rest);
+  L.rest = setTimeout(async () => {                       // the playhead rests: swap in the full-size frame set
+    if (token !== L.token || S.playing) return;
+    try {
+      const full = await L.store.get(shot, L.layer, L.versions, "full", f);
+      if (token !== L.token || S.playing) return;
+      L.mixer.upload(full);
+      L.mixer.draw();
+      $("readout").textContent = $("readout").textContent.replace("proxy", "full");
+    } catch (e) { status(`Light room (full size): ${e.message}`, true); }
+  }, REST_MS);
+}
+
 function refreshFrame() {
   if (!S.shot) return;
+  if (S.room === "light" && S.light) { lightFrame(); return; }
   if (S.frameBusy) { S.frameAgain = true; return; }
   S.frameBusy = true;
   const img = $("frame-img");
@@ -308,11 +380,17 @@ function renderInspector() {
   renderJob(l.name);
 }
 
-// Light mix: a recipe layer's renders blended in linear, one slider per version (0-200 %). Light adds, so 70 % of a
-// left-sun take plus 30 % of a right-sun take is a believable two-light look. Saved on the layer as mix, so the
-// viewer, the timeline and a later Nuke handoff all see the same blend. Empty = the chosen version alone.
 // Light mix v2 (atlas_vfx/comp/mix.py): each render is a take; blend = weights as proportions (relit takes),
 // sum = weights add (light passes, and every mix saved before v2). Stops and mute/solo per take.
+// Warm/cool and green/magenta as an RGB tint scaled to luminance 1 in ACEScg (comp/mix.py tint_unit), so a tint
+// changes the colour of a take, not its exposure.
+const LUMA_AP1 = [0.2722287, 0.6740818, 0.0536895];
+function tintRGB(warm, green) {
+  const rgb = [1 + 0.35 * warm, 1 + 0.25 * green, 1 - 0.35 * warm];
+  const y = rgb[0] * LUMA_AP1[0] + rgb[1] * LUMA_AP1[1] + rgb[2] * LUMA_AP1[2];
+  return rgb.map((c) => Math.round((c / y) * 1e6) / 1e6);
+}
+
 function mixRecord(raw) {
   if (!raw || !Object.keys(raw).length) return null;
   if (raw.takes) return { mode: raw.mode || "blend", takes: structuredClone(raw.takes) };
@@ -329,9 +407,13 @@ function lightMix(l) {
   const save = () => {
     clearTimeout(timer);
     timer = setTimeout(async () => {
-      try { await api.patchLayer(S.shot.name, l.name, { mix: structuredClone(m) }); l.mix = structuredClone(m); refreshFrame(); }
-      catch (e) { status(e.message, true); }
-    }, 120);
+      try {
+        await api.patchLayer(S.shot.name, l.name, { mix: structuredClone(m) });
+        l.mix = structuredClone(m);
+        if (!(S.room === "light" && S.light?.layer === l.name)) refreshFrame();
+      } catch (e) { status(e.message, true); }
+    }, S.room === "light" ? 400 : 120);
+    if (S.room === "light" && S.light?.layer === l.name) { S.light.mixer.set({ mix: m }); lightDraw(); }
   };
   const wmax = m && m.mode === "sum" ? 200 : 100;
   const rows = on ? versions.map((v) => {
@@ -351,8 +433,18 @@ function lightMix(l) {
       b.addEventListener("change", () => { t[key] = b.checked; save(); });
       return el("label", { class: "flag", title: key }, b, document.createTextNode(label));
     };
-    return el("div", { class: "mixrow" }, el("span", { class: "num", text: v }), w, pct, st, ev, flag("mute", "M"),
-      flag("solo", "S"));
+    const row = el("div", { class: "mixrow" }, el("span", { class: "num", text: v }), w, pct, st, ev,
+      flag("mute", "M"), flag("solo", "S"));
+    if (!(S.room === "light" && S.light?.layer === l.name)) return row;
+    t.warm = t.warm ?? 0; t.green = t.green ?? 0;
+    const tint = () => { t.tint = tintRGB(t.warm, t.green); save(); };
+    const warm = el("input", { type: "range", min: -1, max: 1, step: 0.02, value: t.warm, "aria-label": `${v} warm/cool` });
+    warm.addEventListener("input", () => { t.warm = Number(warm.value); tint(); });
+    const green = el("input", { type: "range", min: -1, max: 1, step: 0.02, value: t.green, "aria-label": `${v} green/magenta` });
+    green.addEventListener("input", () => { t.green = Number(green.value); tint(); });
+    return el("div", { class: "takebox" }, row, el("div", { class: "tintrow" },
+      el("span", { class: "muted", text: "cool" }), warm, el("span", { class: "muted", text: "warm" }),
+      el("span", { class: "muted", text: "mag" }), green, el("span", { class: "muted", text: "grn" })));
   }) : [];
   const start = el("button", { type: "button", text: on ? "Mix off" : "Mix these renders", onclick: async () => {
     const next = on ? {} : { mode: "blend", takes: Object.fromEntries(versions.map((v, i) =>
@@ -667,8 +759,11 @@ function wire() {
   $("a-pick").addEventListener("change", (e) => { S.a = e.target.value; refreshFrame(); });
   $("b-pick").addEventListener("change", (e) => { S.b = e.target.value; $("wipe-wrap").hidden = !S.b; refreshFrame(); });
   $("wipe").addEventListener("input", (e) => { S.wipe = Number(e.target.value); refreshFrame(); });
+  $("room-comp").addEventListener("click", leaveLight);
+  $("room-light").addEventListener("click", () => enterLight(S.selected));
   $("exposure").addEventListener("input", (e) => {
     S.exposure = Number(e.target.value);
+    if (S.room === "light" && S.light) { S.light.mixer.set({ exposure: S.exposure }); lightDraw(); }
     $("exposure-out").textContent = (S.exposure > 0 ? "+" : "") + S.exposure;
     refreshFrame();
   });

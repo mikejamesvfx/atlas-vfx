@@ -12,7 +12,8 @@
     <nav id="rooms" aria-label="Rooms">
       <button type="button" disabled title="The Camera room comes with the desktop app (Phase 1.5)">01 CAMERA</button>
       <button type="button" disabled title="The Scene room comes with the desktop app (Phase 1.5)">02 SCENE</button>
-      <button type="button" aria-current="page">03 COMP</button>
+      <button type="button" id="room-comp" aria-current="page">03 COMP</button>
+      <button type="button" id="room-light" disabled title="Mix the selected layer&#39;s takes on the GPU (turn its light mix on first)">04 LIGHT</button>
     </nav>
     <label>Shot <select id="shot-pick"></select></label>
     <button id="new-shot" type="button">New shot</button>
@@ -36,6 +37,7 @@
       <div id="stage">
         <img id="frame-img" alt="The composited frame">
         <img id="live-img" alt="" hidden>
+        <canvas id="light-canvas" hidden aria-label="Light mix, mixed on the GPU"></canvas>
         <div id="empty" hidden></div>
       </div>
       <div id="viewer-tools">

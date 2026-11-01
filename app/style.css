@@ -70,7 +70,8 @@ output, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 #viewer-head { display: flex; flex-wrap: wrap; gap: 14px; align-items: baseline; }
 #readout { font: 13px var(--mono); color: var(--pale); font-variant-numeric: tabular-nums; }
 #stage { position: relative; display: grid; place-items: center; min-height: 0; overflow: hidden; border: 1px solid var(--frame); background: #0f0d0b; }
-#stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
+#stage img, #stage canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+#stage canvas[hidden] { display: none; }
 #live-img { position: absolute; right: 12px; bottom: 12px; width: 30%; border: 1px solid var(--bone); }
 #empty { max-width: 480px; text-align: center; color: var(--ash); padding: 24px; }
 #empty h2 { color: var(--bone); font: 700 40px/1.05 var(--display); margin: 8px 0 12px; }
@@ -156,3 +157,8 @@ fieldset.modes label { display: flex; gap: 8px; align-items: baseline; flex-wrap
 fieldset.modes small { color: var(--ash); font-size: 12px; }
 #frame-wrap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 #frame-wrap[hidden] { display: none; }
+
+/* Light room: a take's row plus its tint */
+.takebox { border-bottom: 1px solid var(--frame); padding-bottom: 6px; margin-bottom: 6px; }
+.tintrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto minmax(0, 1fr) auto; gap: 4px; align-items: center; font-size: 11px; }
+.tintrow input[type=range] { accent-color: var(--bone); width: 100%; }

@@ -21,6 +21,18 @@ async function call(method, path, body) {
 
 const enc = encodeURIComponent;
 
+// Binary frames from the Light room cache: an ArrayBuffer, or null when the take has no such frame (404).
+async function bin(path) {
+  const r = await fetch(path);
+  if (r.status === 404) return null;
+  if (!r.ok) {
+    let msg = `${r.status} ${r.statusText}`;
+    try { msg = (await r.json()).error || msg; } catch { /* not JSON */ }
+    throw new Error(msg);
+  }
+  return r.arrayBuffer();
+}
+
 export const api = {
   shots: () => call("GET", "/atlas/api/shots"),
   createShot: (d) => call("POST", "/atlas/api/shots", d),
@@ -29,6 +41,12 @@ export const api = {
   addLayer: (shot, d) => call("POST", `/atlas/api/shots/${enc(shot)}/layers`, d),
   patchLayer: (shot, layer, d) => call("PATCH", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}`, d),
   recipes: () => call("GET", "/atlas/api/recipes"),
+  cacheTake: (shot, layer, v, level, f) => bin(`/atlas/api/shots/${enc(shot)}/cache/${enc(layer)}/${enc(v)}/${enc(level)}/${f}`),
+  cacheStack: (shot, layer, side, level, f, w, h) =>
+    bin(`/atlas/api/shots/${enc(shot)}/stack/${enc(layer)}/${enc(side)}/${enc(level)}/${f}?w=${w}&h=${h}`),
+  warmCache: (shot, layer, level) => call("POST", `/atlas/api/shots/${enc(shot)}/cache/${enc(layer)}/warm`, { level }),
+  cacheStatus: (shot, layer, level) => call("GET", `/atlas/api/shots/${enc(shot)}/cache/${enc(layer)}/status?level=${enc(level)}`),
+  viewShader: (view) => call("GET", `/atlas/api/view_shader?view=${enc(view)}`),
   bakeMix: (shot, layer) => call("POST", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}/bake_mix`, {}),
   bakeStatus: (shot, layer) => call("GET", `/atlas/api/shots/${enc(shot)}/layers/${enc(layer)}/bake_mix`),
   presets: () => call("GET", "/atlas/api/presets"),
