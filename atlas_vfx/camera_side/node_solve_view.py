@@ -38,8 +38,86 @@ def _point_errors(cam: sc.ShotCamera, pts: dict) -> tuple[np.ndarray, dict]:
     return worst, per_frame
 
 
-def _proxy_images(cam: sc.ShotCamera, pts: dict | None, count: int) -> list[dict]:
-    """Up to `count` tracking proxies written into ComfyUI's temp folder as JPEG, with the plate-px points each saw."""
+def display_frame(cam: sc.ShotCamera, xyz) -> dict | None:
+    """How the panel levels a solve that Measure & Scale has not oriented (a raw solve keeps COLMAP's world, often
+    upside down in a Y-up viewer): up = the cameras' mean up, the first camera's forward (flattened) -> -Z, origin
+    under the first camera at the points' low ground. Display only: the camera data is not changed. None when the
+    camera is already gravity aligned."""
+    if "atlas_vfx_measure" in (cam.data.get("extensions") or {}):
+        return None
+    ups = np.array([cam.cam_to_world(f)[:3, 1] for f in cam.frames])
+    up = ups.mean(0)
+    if np.linalg.norm(up) < 1e-6:
+        return None
+    up /= np.linalg.norm(up)
+    fwd = -cam.cam_to_world(cam.frames[0])[:3, 2]
+    flat = fwd - (fwd @ up) * up
+    if np.linalg.norm(flat) < 1e-6:
+        flat = np.cross(up, [1.0, 0, 0]) if abs(up[0]) < 0.9 else np.cross(up, [0, 0, 1.0])
+    z = -flat / np.linalg.norm(flat)
+    R = np.stack([np.cross(up, z), up, z])
+    C0 = cam.position(cam.frames[0])
+    xyz = np.asarray(xyz, float).reshape(-1, 3)
+    ground = float(np.percentile((xyz - C0) @ up, 5)) if len(xyz) else 0.0
+    return {"R": R, "origin": C0 + min(ground, 0.0) * up}
+
+
+HAND_HEIGHT_M = 1.6          # an unscaled solve's metres guessed from a handheld camera this far above the ground
+
+
+def check_cube(cam: sc.ShotCamera, disp: dict | None, xyz) -> dict | None:
+    """A 1 m check cube standing on a solve point where it stays in view longest, in the panel's (display) world, with its
+    8 corners in the camera's world for projecting onto the plate. Size from the camera's scale; an unscaled solve
+    guesses it from a handheld camera height (HAND_HEIGHT_M above the ground), and says so."""
+    xyz = np.asarray(xyz, float).reshape(-1, 3)
+    if not len(xyz):
+        return None
+    if disp is None:
+        if disp is None and cam.data.get("scale", {}).get("method") not in (None, "unscaled"):
+            R, o = np.eye(3), np.zeros(3)                       # Measure & Scale: metres, Y up, ground y = 0
+        else:
+            return None
+    else:
+        R, o = disp["R"], disp["origin"]
+    d = (xyz - o) @ R.T                                         # display world: Y up, ground near y = 0
+    scale = cam.data.get("scale", {})
+    if scale.get("method") not in (None, "unscaled"):
+        side, how = 1.0 / float(scale.get("m_per_source_unit", 1.0) or 1.0), "1 m (scaled camera)"
+        side = 1.0 if disp is None else side
+    else:
+        h = float(np.median([(R @ (cam.position(f) - o))[1] for f in cam.frames]))
+        if h <= 0:
+            return None
+        side, how = h / HAND_HEIGHT_M, f"1 m if the camera was {HAND_HEIGHT_M} m above the ground (unscaled solve)"
+    unit = np.array([[x, y, z] for x in (-.5, .5) for y in (0, 1) for z in (-.5, .5)]) * side
+    W, H = cam.data["plate"]["width"], cam.data["plate"]["height"]
+
+    def seen(c):                       # frames that show the whole cube, standing at c (display world)
+        world = (unit + c) @ R + o
+        n = 0
+        for f in cam.frames[:: max(1, len(cam.frames) // 24)]:
+            M = cam.cam_to_world(f)
+            if not (((world - M[:3, 3]) @ M[:3, :3])[:, 2] < 0).all():
+                continue
+            uv, _ = cam.project(f, world)
+            n += bool(((uv[:, 0] > 0) & (uv[:, 0] < W) & (uv[:, 1] > 0) & (uv[:, 1] < H)).all())
+        return n
+
+    # standing on a solve point (the ground, a step, the deck), wherever it stays whole in view longest
+    cands = d[np.random.default_rng(0).choice(len(d), min(300, len(d)), replace=False)]
+    c = max(cands, key=seen)
+    corners = unit + c
+    world = corners @ R + o                                     # back to the camera's world
+    return {"centre": c.tolist(), "side": float(side), "note": how, "corners_disp": corners.tolist(),
+            "corners_world": world}
+
+
+CUBE_EDGES = [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)]
+
+
+def _proxy_images(cam: sc.ShotCamera, pts: dict | None, count: int, cube: dict | None = None) -> list[dict]:
+    """Up to `count` tracking proxies written into ComfyUI's temp folder as JPEG, with the plate-px points each saw.
+    Many frames (playback in the panel) carry fewer points each, so the payload stays small."""
     import cv2
 
     ext = (cam.data.get("extensions") or {}).get("atlas_vfx_solve_plate") or {}
@@ -71,9 +149,16 @@ def _proxy_images(cam: sc.ShotCamera, pts: dict | None, count: int) -> list[dict
             k, xy = pts["observations"][f]
             uv, _ = cam.project(f, pts["xyz"][k])
             e = np.linalg.norm(uv - xy, axis=1)
-            sel = np.arange(len(k))[:: max(1, len(k) // 1500)]
+            sel = np.arange(len(k))[:: max(1, len(k) // (1500 if len(pick) <= 48 else 400))]
             obs = [[round(float(uv[i, 0]), 1), round(float(uv[i, 1]), 1), round(float(e[i]), 2)] for i in sel]
-        out.append({"frame": f, "filename": name, "subfolder": sub, "type": "temp", "points": obs})
+        box = None
+        if cube is not None:
+            M = cam.cam_to_world(f)
+            zc = (cube["corners_world"] - M[:3, 3]) @ M[:3, :3]
+            if (zc[:, 2] < 0).all():                            # every corner in front of the camera
+                uv, _ = cam.project(f, cube["corners_world"])
+                box = [[round(float(a), 1), round(float(b), 1)] for a, b in uv]
+        out.append({"frame": f, "filename": name, "subfolder": sub, "type": "temp", "points": obs, "cube": box})
     return out
 
 
@@ -84,7 +169,7 @@ def payload(cam: sc.ShotCamera, max_points: int = 20000, images: int = 6, seed: 
         else (None, "no solve points")
     body = {
         "name": cam.name, "plate": [W, H], "frame_offset": int(cam.data["shot"].get("plate_frame_offset", 1001)), "fov_x_deg": float(np.degrees(2 * np.arctan(W / 2 / k.fx))),
-        "frames": [{"f": f, "m": [round(v, 6) for v in cam.cam_to_world(f).ravel().tolist()]} for f in cam.frames],
+        "frames": [],
         "scale": cam.data.get("scale", {}), "points_note": note, "points": [], "err": [], "frame_err": {},
         "report": ((cam.data.get("extensions") or {}).get("atlas_vfx_solve_plate") or {}),
     }
@@ -96,7 +181,25 @@ def payload(cam: sc.ShotCamera, max_points: int = 20000, images: int = 6, seed: 
         body["points"] = [round(float(v), 4) for v in pts["xyz"][idx].ravel()]
         body["err"] = [round(float(v), 2) for v in worst[idx]]
         body["frame_err"] = {str(f): round(v, 3) for f, v in per_frame.items()}
-    body["images"] = _proxy_images(cam, pts, images)
+    disp = display_frame(cam, pts["xyz"] if pts is not None else [])
+    mats = {f: cam.cam_to_world(f) for f in cam.frames}
+    if disp is not None:
+        R, o = disp["R"], disp["origin"]
+        for f, M in mats.items():
+            N = np.eye(4)
+            N[:3, :3] = R @ M[:3, :3]
+            N[:3, 3] = R @ (M[:3, 3] - o)
+            mats[f] = N
+        if body["points"]:
+            xyz = (np.array(body["points"]).reshape(-1, 3) - o) @ R.T
+            body["points"] = [round(float(v), 4) for v in xyz.ravel()]
+        body["display"] = "levelled for display by the cameras' up (Measure & Scale orients the camera itself)"
+    body["frames"] = [{"f": f, "m": [round(v, 6) for v in M.ravel().tolist()]} for f, M in mats.items()]
+    cube = check_cube(cam, disp, pts["xyz"] if pts is not None else [])
+    if cube is not None:
+        body["cube"] = {k: cube[k] for k in ("centre", "side", "note", "corners_disp")}
+        body["cube_edges"] = CUBE_EDGES
+    body["images"] = _proxy_images(cam, pts, images, cube)
     return body
 
 
@@ -117,7 +220,9 @@ class AtlasVFXSolveView:
             "required": {
                 "shot_camera": ("ATLAS_TRACKED_CAMERA",),
                 "max_points": ("INT", {"default": 20000, "min": 100, "max": 200000}),
-                "plate_frames": ("INT", {"default": 6, "min": 0, "max": 48}),
+                "plate_frames": ("INT", {"default": 6, "min": 0, "max": 2000,
+                                         "tooltip": "tracking proxies sent to the Plate tab; the shot's frame count "
+                                                    "plays the whole shot (Play button)"}),
                 "seeds": ("STRING", {"default": "[]", "multiline": True}),
             }
         }

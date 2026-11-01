@@ -23,6 +23,7 @@ GRAPH["1"]["inputs"].update(first=129, last=225, preview_every=24)
 GRAPH["3"]["inputs"].update(name=NAME, focal_guess_mm=16.42, solve_focal=False)   # 97 frames of this move leave
 # focal loose (a free solve gave 12.0 mm); 16.42 mm is the lens as NukeX and the 297-frame solves measure it
 GRAPH["10"]["inputs"]["name"] = NAME
+GRAPH["4"]["inputs"]["plate_frames"] = 97                         # every frame: the Plate tab plays
 spw.GRAPH = GRAPH
 
 if __name__ == "__main__":

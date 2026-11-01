@@ -55,7 +55,7 @@ function buildPanel(node, THREE) {
     bar.appendChild(b);
     return b;
   };
-  const tab3d = mkBtn("3D"), tabPlate = mkBtn("Plate"), prevB = mkBtn("<"), nextB = mkBtn(">");
+  const tab3d = mkBtn("3D"), tabPlate = mkBtn("Plate"), prevB = mkBtn("<"), playB = mkBtn("Play"), nextB = mkBtn(">");
   const info = document.createElement("span");
   info.style.cssText = "flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.8";
   bar.appendChild(info);
@@ -90,7 +90,16 @@ function buildPanel(node, THREE) {
   let frustum = null;
   const orbit = { target: new THREE.Vector3(), r: 10, az: 0.6, el: 0.4 };
 
-  const st = { p: null, idx: 0, tab: "3d", img: 0, images: [], disposed: false };
+  const st = { p: null, idx: 0, tab: "3d", img: 0, images: [], disposed: false, playing: false, due: 0 };
+
+  // the plate image nearest the scrubbed frame (all frames when plate_frames covers the shot)
+  function syncImage() {
+    if (!st.p || !st.images.length) return;
+    const f = st.p.frames[st.idx].f;
+    let best = 0;
+    st.images.forEach((im, i) => { if (Math.abs(im.frame - f) < Math.abs(st.images[best].frame - f)) best = i; });
+    st.img = best;
+  }
 
   function placeCamera() {
     const { target, r, az, el } = orbit;
@@ -145,6 +154,13 @@ function buildPanel(node, THREE) {
     }
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(centres),
       new THREE.LineBasicMaterial({ color: 0xff66cc })));
+    if (p.cube) {                                               // the check cube (orange)
+      const v = p.cube.corners_disp.map((c) => new THREE.Vector3(...c));
+      const seg = [];
+      for (const [a, b] of p.cube_edges) seg.push(v[a], v[b]);
+      group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(seg),
+        new THREE.LineBasicMaterial({ color: 0xff9900 })));
+    }
     const size = box.getSize(new THREE.Vector3()).length() || 1;
     box.getCenter(orbit.target);
     orbit.r = size * 1.2;
@@ -174,8 +190,9 @@ function buildPanel(node, THREE) {
     const e = p.frame_err[String(f.f)];
     const rep = p.report || {};
     info.textContent = `${p.name} · frame ${f.f} · ${e !== undefined ? e.toFixed(2) + " px" : "-"} · ` +
-      `${p.err.length} pts` + (rep.warnings && rep.warnings.length ? ` · ${rep.warnings.length} warning(s)` : "");
+      `${p.err.length} pts` + (p.cube ? ` · orange cube: ${p.cube.note}` : "") + (rep.warnings && rep.warnings.length ? ` · ${rep.warnings.length} warning(s)` : "");
     info.title = (rep.warnings || []).join("\n") || p.points_note;
+    syncImage();
     drawStrip();
     draw2d();
   }
@@ -225,6 +242,15 @@ function buildPanel(node, THREE) {
       c.fillStyle = `rgb(${r * 255},${g * 255},${b * 255})`;
       c.fillRect(ox + x * k - 1, oy + y * k - 1, 2, 2);
     }
+    if (im.cube && st.p.cube_edges) {                           // the check cube through this frame's camera
+      c.strokeStyle = "#ff9900"; c.lineWidth = 2;
+      c.beginPath();
+      for (const [a, b] of st.p.cube_edges) {
+        c.moveTo(ox + im.cube[a][0] * k, oy + im.cube[a][1] * k);
+        c.lineTo(ox + im.cube[b][0] * k, oy + im.cube[b][1] * k);
+      }
+      c.stroke(); c.lineWidth = 1;
+    }
     let seeds = [];
     try { seeds = JSON.parse(seedsW?.value || "[]"); } catch { seeds = []; }
     c.strokeStyle = "#0ff";
@@ -241,8 +267,9 @@ function buildPanel(node, THREE) {
   // ------------------------------------------------------------------ input
   tab3d.onclick = () => { st.tab = "3d"; draw2d(); };
   tabPlate.onclick = () => { st.tab = "plate"; draw2d(); };
-  prevB.onclick = () => { if (st.tab === "plate") { st.img = Math.max(0, st.img - 1); draw2d(); } else step(-1); };
-  nextB.onclick = () => { if (st.tab === "plate") { st.img = Math.min(st.images.length - 1, st.img + 1); draw2d(); } else step(1); };
+  prevB.onclick = () => step(-1);
+  nextB.onclick = () => step(1);
+  playB.onclick = () => { st.playing = !st.playing; playB.textContent = st.playing ? "Pause" : "Play"; st.due = 0; };
   function step(d) { if (!st.p) return; st.idx = Math.max(0, Math.min(st.p.frames.length - 1, st.idx + d)); slider.value = String(st.idx); update(); }
   slider.oninput = () => { st.idx = Number(slider.value); update(); };
   strip.onclick = (ev) => {
@@ -287,6 +314,17 @@ function buildPanel(node, THREE) {
 
   function frame() {
     if (st.disposed) return;
+    if (st.playing && st.p) {                                   // 24 fps, looping
+      const t = performance.now();
+      if (!st.due) st.due = t;
+      if (t >= st.due) {
+        st.idx = st.idx >= st.p.frames.length - 1 ? 0 : st.idx + 1;
+        slider.value = String(st.idx);
+        update();
+        st.due += 1000 / 24;
+        if (t - st.due > 200) st.due = t;                       // fell behind (tab hidden): don't race to catch up
+      }
+    }
     if (st.tab === "3d") {
       const w = view.clientWidth || 300, h = view.clientHeight || 200;
       if (canvas3d.width !== w || canvas3d.height !== h) {
