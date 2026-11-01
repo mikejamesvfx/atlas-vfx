@@ -84,6 +84,7 @@ def setup():
 
 
 def test_takes(H, W):
+    cc.PROXY_W = 1024                                              # the checks below are written at 1024
     src = ramp(H, W, 1)
     cap = cc.FULL_MAX_W                                            # the paused frame is capped at HD by default
     hd, hd_head = cc.decode(cc.take_bytes("C", "rl", "v002", "full", 1002))

@@ -4,7 +4,7 @@
 // together.
 //
 // Frames come from the server's cache (atlas_vfx/comp/cache.py) as half-float RGBA: the takes, plus "under" (plate
-// and lower layers) and "over" (higher layers). Proxy frames (1024 wide) while scrubbing and playing; the full-size
+// and lower layers) and "over" (higher layers). Proxy frames (HD by default) while scrubbing and playing; the full-size
 // set replaces them once the playhead rests.
 //
 // Playback cache: every proxy frame set of the shot is loaded once into textures on the graphics card (preload).
@@ -14,7 +14,7 @@
 const MAX_TAKES = 8;
 const MAGIC = "ATLF16\n";
 const BLEND_MODES = { over: 0, plus: 1, multiply: 2, screen: 3 };
-export const GPU_BUDGET = 6 * 1024 ** 3;     // bytes of playback textures (97 frames x 7 proxies is about 3 GB)
+export const GPU_BUDGET = 14 * 1024 ** 3;    // bytes of playback textures (97 frames x 7 HD images is about 10.5 GB)
 
 const VERT = `#version 300 es
 in vec2 p;

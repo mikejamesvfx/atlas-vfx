@@ -262,9 +262,14 @@ async function lightFrame() {
   clearTimeout(L.rest);
   L.rest = setTimeout(async () => {                       // the playhead rests: swap in the full-size frame set
     if (token !== L.token || S.playing) return;
+    if (L.fullW && L.fullW <= L.mixer.size[0]) {             // playback frames are already the paused size
+      $("readout").textContent = $("readout").textContent.replace("proxy", "full");
+      return;
+    }
     try {
       const full = await L.store.get(shot, L.layer, L.versions, "full", f);
       if (token !== L.token || S.playing) return;
+      L.fullW = (full.under || full.takes.find(Boolean))?.head.width || 0;
       L.mixer.upload(full);
       L.mixer.draw();
       $("readout").textContent = $("readout").textContent.replace("proxy", "full");

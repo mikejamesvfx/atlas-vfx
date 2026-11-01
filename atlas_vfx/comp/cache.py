@@ -1,7 +1,8 @@
 """The Light room's frame cache: every take, and what sits under and over the mixed layer, as half-float RGBA files the
 browser uploads straight to the GPU (WebGL2 RGBA16F), at two levels:
 
-    proxy  PROXY_W wide, for scrubbing and playback (all frames of five takes fit in a few GB)
+    proxy  PROXY_W wide (HD, 1920, by default; ATLAS_VFX_PLAY_W), for scrubbing and playback: the browser holds every
+           frame of the shot on the graphics card (97 frames of five takes + under/over at HD is about 10.5 GB)
     full   the paused frame: the source size capped at FULL_MAX_W wide (HD, 1920, by default: a 4K set of seven
            images is ~500 MB to read and upload; ATLAS_VFX_VIEW_MAX_W=0 keeps the source size)
 
@@ -10,7 +11,7 @@ endian). The header names its source key: sha1 of (source file, mtime_ns, size, 
 longer matches and the file is remade on the next request. Read back with numpy frombuffer, never pickle.
 
 Files live in <work>/comp/<shot>/cache/ and are only ever served from there. A full 4K frame is ~71 MB, so the cache
-keeps to a size budget across every shot (ATLAS_VFX_CACHE_GB, default 12): past it, the least recently used frames go,
+keeps to a size budget across every shot (ATLAS_VFX_CACHE_GB, default 40): past it, the least recently used frames go,
 full-size ones first (cheap to remake from the EXR; the proxies are what playback needs). Only this cache's own .f16
 files (and stale temp files) inside cache folders are ever removed. clear() empties one shot's cache."""
 from __future__ import annotations
@@ -34,9 +35,9 @@ from . import shot as sh
 
 MAGIC = b"ATLF16\n"
 LEVELS = ("proxy", "full")
-PROXY_W = 1024
+PROXY_W = int(os.environ.get("ATLAS_VFX_PLAY_W", "1920") or 1920)
 FULL_MAX_W = int(os.environ.get("ATLAS_VFX_VIEW_MAX_W", "1920") or 0)
-BUDGET_GB_DEFAULT = 12.0
+BUDGET_GB_DEFAULT = 40.0
 SCAN_EVERY_BYTES = 512 << 20        # check the budget after this much has been written since the last check
 STATUS: dict = {}               # (shot, layer, level) -> {"state", "done", "of", "error"}
 _lock = threading.Lock()
