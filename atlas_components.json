@@ -359,6 +359,27 @@
       ]
     },
     {
+      "id": "ltx-2.5-ic-lora-sdr-to-hdr",
+      "usage": "model",
+      "note": "ltx-2.5-22b-ic-lora-sdr-to-hdr-1.0.safetensors (D:/models/loras/ltx25) + ltx-2.5-22b-ic-lora-sdr-to-hdr-scene-emb.safetensors (D:/models/embeddings, precomputed scene embedding; a copy sits in loras/ltx25): Lightricks LTX-2.5 SDR-to-HDR IC-LoRA (huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-SDR-to-HDR, licence tag ltx-2.x-community-license, checked 2026-11-01). LTX-2.x Community License Agreement, licence date 2026-08-11, embedded in the file's metadata (model_version 2.5, reference_downscale_factor 1); the same terms as the Day-to-Night entry: entities with annual revenues of at least $10,000,000 need a paid licence beyond a Non-Commercial Purpose. Run through ComfyUI-LTXVideo's hdr_nodes (LTXVSDRToHDRWorkingSpace, LTXVHDRDecodePostprocess; the comfyui-ltxvideo entry). For the flow review's HDR spike: an SDR LTX take -> scene-linear ACEScg highlights.",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-ic-lora-sdr-to-hdr-1.0.safetensors",
+          "bytes": 1308787472,
+          "sha256": "0b39eac09672c18d0d10f401d5e71a68a73225f1169df826b092b7e5ef489675",
+          "folder": "loras/ltx25",
+          "hashed": "2026-11-01"
+        },
+        {
+          "name": "ltx-2.5-22b-ic-lora-sdr-to-hdr-scene-emb.safetensors",
+          "bytes": 12614165,
+          "sha256": "63c03987a1984f6d4b3d3440c15deee66b0310c01950496329f983f5dc8c88bd",
+          "folder": "embeddings",
+          "hashed": "2026-11-01"
+        }
+      ]
+    },
+    {
       "id": "ltx-2.5-ic-lora-alpha-gen",
       "usage": "model",
       "note": "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors (D:/models/loras/ltx25; Lightricks LTX-2.5 Alpha-Gen IC-LoRA): a matte (white = foreground, soft edges as real alpha) from any RGB clip, no green screen, no mask or prompt. LTX-2.x Community License Agreement, licence date 2026-08-11, embedded in the file's metadata (model_version 2.5, reference_downscale_factor 1); the same terms as the Day-to-Night entry: entities with annual revenues of at least $10,000,000 need a paid licence beyond a Non-Commercial Purpose. Model-card settings (from the owner's 2026-10-26 graph): distilled base, LoRA 1.0, empty prompt, reference strength 1.0, single stage at native res, <= 1920x1088 padded never stretched, <= 145 frames 8n+1. Used by Alpha Prep / Alpha Return (catalogue 63-64); verified and hashed 2026-10-31.",
