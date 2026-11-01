@@ -412,7 +412,8 @@ def test_source_rules():
     check(SRC.index("node.addDOMWidget(") < hide_at and SRC.index("new THREE.WebGLRenderer(") < hide_at,
           "widgets are hidden only after the renderer and the DOM widget exist")
     js_files = sorted(p.relative_to(WEB).as_posix() for p in WEB.rglob("*.js"))
-    check(js_files == ["atlas_vfx_sun_globe.js", "lib/atlas-three.bundle.js"], "web/ holds only these scripts "
+    check(js_files == ["atlas_vfx_solve_view.js", "atlas_vfx_sun_globe.js", "lib/atlas-three.bundle.js"],
+          "web/ holds only these scripts "
           "(ComfyUI loads every .js under WEB_DIRECTORY)", js_files)
     init = (ROOT / "__init__.py").read_text(encoding="utf-8")
     check('WEB_DIRECTORY = "./web"' in init and '"WEB_DIRECTORY"' in init, "root __init__ exports WEB_DIRECTORY")
