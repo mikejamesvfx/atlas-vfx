@@ -201,6 +201,14 @@ def _map(db: Path, image_dir: Path, out: Path, opts, input_path: Path | None = N
     return rec, {int(k): r.num_reg_images() for k, r in recs.items()}
 
 
+def _project(cam, x) -> tuple[float, float]:
+    """pycolmap img_from_cam, or NaN when the point is behind the camera (pycolmap returns None there)."""
+    if x[2] <= 1e-9:
+        return (np.nan, np.nan)
+    uv = cam.img_from_cam(x)
+    return (np.nan, np.nan) if uv is None else (float(uv[0]), float(uv[1]))
+
+
 def observation_errors(rec) -> dict[int, float]:
     """Worst reprojection error (px, at the solver's image size) per 3D point."""
     worst: dict[int, float] = {}
@@ -218,8 +226,9 @@ def observation_errors(rec) -> dict[int, float]:
             continue
         X = np.array([rec.points3D[i].xyz for i in ids], float)
         Xc = (np.asarray(pose.rotation.matrix()) @ X.T).T + np.asarray(pose.translation)
-        uv = np.array([cam.img_from_cam(x) for x in Xc], float)
+        uv = np.array([_project(cam, x) for x in Xc], float)
         e = np.linalg.norm(uv - np.asarray(xy, float), axis=1)
+        e = np.where(np.isfinite(e), e, np.inf)                       # behind the camera: as wrong as it gets
         for i, v in zip(ids, e):
             if v > worst.get(i, -1.0):
                 worst[i] = float(v)
@@ -453,7 +462,9 @@ def preview(model_dir, image_dir, count: int = 4, max_px: float = 2.0) -> list[n
         for p in img.points2D:
             if not p.has_point3D():
                 continue
-            uv = np.asarray(cam.img_from_cam(R @ rec.points3D[p.point3D_id].xyz + t), float)
+            uv = np.asarray(_project(cam, R @ rec.points3D[p.point3D_id].xyz + t), float)
+            if not np.all(np.isfinite(uv)):
+                continue
             e = float(np.linalg.norm(uv - np.asarray(p.xy)))
             col = (0, 220, 0) if e < 0.5 else (230, 200, 0) if e < max_px else (230, 0, 0)
             cv2.circle(rgb, (int(round(uv[0])), int(round(uv[1]))), 2, col, -1, cv2.LINE_AA)

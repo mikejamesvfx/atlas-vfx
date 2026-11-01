@@ -294,6 +294,12 @@ def main() -> int:
         check(ps.longest_run([3, 4, 5, 9, 10]) == (3, 5) and ps.gaps([1, 2, 4], 1, 5) == [3, 5],
               "longest_run / gaps")
         check(ps.frame_of("plate_0042.png") == 42, "frame_of")
+        import pycolmap
+
+        pc = pycolmap.Camera.create_from_model_name(1, "RADIAL", 500.0, 960, 540)
+        check(ps._project(pc, np.array([0.1, 0.2, 2.0])) == (505.0, 320.0)
+              and np.isnan(ps._project(pc, np.array([0.1, 0.2, -2.0]))[0]),
+              "a point behind the camera projects to NaN (pycolmap gives None), not a crash")
         case_dolly()
         case_mover()
         case_nodal()
