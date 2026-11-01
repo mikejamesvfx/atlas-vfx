@@ -206,7 +206,9 @@ Rules for the whole phase:
 
 ## S6. RS back on in the LTX clean loop
 
-- Only after S5 passes. `tools/ltx_clean_loop_workflow.py` `USE_RS = True` with the S3 camera and the S1 readout;
+- Only after S5 passes. In `workflows/golden_dscf3000_s2s3.json` (tools/golden_shot_workflow.py; the old
+  `tools/ltx_clean_loop_workflow.py` was deleted 2026-10-24) give LTX Prep `sensor_rs_folder` from RS Maps on the RS
+  Solve camera at the S1 readout;
   the demo's RS Maps on the preset rule instead of "measured if connected".
 - Visible proof needs a rigid element generated in clean space (a box or a sign), where straight verticals make the
   lean measurable to 0.001 px/row; the test character's silhouette was 14x too noisy (2026-10-21).
@@ -233,4 +235,18 @@ ADR-022 Amendment 3. Don't start lens fitting beyond k1 k2, depth bokeh or LoRA 
   `tests/test_solve_view.py`, `tests/test_shot_camera.py` (lens projection).
 - **Next (live):** DSCF3000 S1-S3 through the GUI workflow, compared with `solve_s1s3_f16` and Mike's Nuke camera
   (Solve Compare), the free-focal delta reported; Solve Mask on a shot with people; Lock Check + Camera Export to Nuke.
+
+## Flow review (2026-11-01): one lens policy, guards, overscan, the golden graph
+
+- Phases A-C of the flow review (commits d8ee2c1, aec9cbe, 8a43015): correctness fixes, camera guards
+  (`camera_side/camera_checks.py`), layers delivered clean + plate with a Nuke Builder switch, overscan (Sensor Lens
+  Maps `overscan`, `camera_side/clean_space.py`).
+- **Golden graph** `workflows/golden_dscf3000_s2s3.json` (`tools/golden_shot_workflow.py`, built from the DEMO and
+  clean-loop workflows with `tools/ui_workflow.to_api`): Solve Mask -> Solve Plate (0-296) -> Measure & Scale (S2-S3
+  picks) -> Sensor Lens Maps (auto overscan) -> cards (clean + plate) -> LTX clean loop -> LTX Return -> Comp Preview
+  and Nuke Builder (clean + STMaps). The element card has no depth holdout (refused with a lens folder until Plate
+  Depth works in clean space). Pick the element clip in LoadVideo before queueing.
+- **Open:** colour pairs (Character Insert / Foreground Element / Relight Transfer decode generated clips with plain
+  sRGB, LTX Prep re-encodes with the ACES 2.0 view); depth holdout in clean space; the HDR spike (LTX-2.5 SDR->HDR
+  IC-LoRA) with numbers to Mike before a node; a live golden run and Nuke Indie check of both lens modes.
 

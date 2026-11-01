@@ -31,7 +31,8 @@ def parse_folders(text: str) -> list[Path]:
 
 
 def layer_frames(folder: Path) -> tuple[str, dict[int, Path]]:
-    """(layer name, {nuke frame: exr path}) from render.json's pattern, or from the files present."""
+    """(layer name, {nuke frame: exr path}) from render.json's pattern, or from the files present. The preview is
+    over the plate as shot, so a layer with versions shows its 'plate' one (its clean frames are undistorted)."""
     folder = Path(folder)
     if not folder.is_dir():
         raise FileNotFoundError(f"layer folder not found: {folder}")
@@ -40,6 +41,13 @@ def layer_frames(folder: Path) -> tuple[str, dict[int, Path]]:
     if reports:
         r = json.loads(reports[0].read_text(encoding="utf-8"))
         name = r.get("card") or reports[0].name.split(".")[0]
+        versions = r.get("versions") or {}
+        if versions and "plate" not in versions:
+            raise ValueError(f"Comp Preview: layer {name} has only {sorted(versions)} frames (its camera has a lens); "
+                             "give Card Project the Sensor Lens Maps folder so it writes the plate version")
+        sub = Path(versions["plate"]).parent if versions else Path(".")
+        if str(sub) not in ("", "."):
+            folder = folder / sub
     else:
         name = None
     rx = re.compile(r"^(?P<name>.+)\.(?P<f>\d+)\.exr$", re.I)
