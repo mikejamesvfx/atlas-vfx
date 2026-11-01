@@ -237,7 +237,10 @@ def build_routes():
     async def create(request):
         d = await body(request)
         s = sh.create_shot(d.get("name", ""), d.get("plate", ""), _int(d, "first", 1001, 0, 10 ** 6),
-                           _int(d, "last", 1001, 0, 10 ** 6), _int(d, "frame_offset", pl.NUKE_FRAME_OFFSET, 0, 10 ** 6))
+                           _int(d, "last", 1001, 0, 10 ** 6), _int(d, "frame_offset", pl.NUKE_FRAME_OFFSET, 0, 10 ** 6),
+                           mode=str(d.get("mode", "plate")), screen=str(d.get("screen", "green")),
+                           width=_int(d, "width", 0, 0, 16384), height=_int(d, "height", 0, 0, 16384),
+                           fps=str(d.get("fps", "24"))[:16])
         _start_proxy(s)
         return web.json_response(_shot_json(s["name"]))
 
@@ -282,7 +285,8 @@ def build_routes():
     @routes.get("/atlas/api/recipes")
     @guard
     async def recipes(request):
-        return web.json_response({"recipes": rc.list_recipes()})
+        mode = request.query.get("mode")                      # a shot's mode: only its recipes
+        return web.json_response({"recipes": rc.list_recipes(mode or None)})
 
     @routes.get("/atlas/api/presets")
     @guard

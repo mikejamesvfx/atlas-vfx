@@ -37,8 +37,16 @@ def load_recipe(name: str) -> dict:
     return json.loads((RECIPES / f"{name}.json").read_text(encoding="utf-8"))
 
 
-def list_recipes() -> list[dict]:
-    return [{k: v for k, v in load_recipe(n).items() if k != "graph"} for n in _names()]
+def list_recipes(mode: str | None = None) -> list[dict]:
+    """Every recipe (without its graph), or only those offered for a shot mode (layers/shot_mode.py): a recipe
+    lists its modes; one that lists none is offered everywhere."""
+    out = [{k: v for k, v in load_recipe(n).items() if k != "graph"} for n in _names()]
+    if mode is None:
+        return out
+    from atlas_vfx.layers import shot_mode as sm
+
+    mode = sm.check_mode(mode)
+    return [r for r in out if mode in r.get("modes", sm.MODES)]
 
 
 def list_presets() -> list[dict]:

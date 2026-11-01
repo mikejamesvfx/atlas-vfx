@@ -82,8 +82,9 @@ class AtlasVFXNukeBuilder:
         checks = [exr_io.check_sequence(L["pattern"], L["first"], L["last"], *(L["size"] or (w, h)), every=24)
                   for L in layers]
         f0, f1 = plate_ref["nuke_first"], plate_ref["nuke_last"]
-        plate = nb.plate_source(plate_ref["path"], plate_kind, plate_ref["frame_offset"])
-        stem = Path(plate_ref["path"]).stem
+        plate = (nb.plate_source("", "virtual") if pl.is_virtual(plate_ref)
+                 else nb.plate_source(plate_ref["path"], plate_kind, plate_ref["frame_offset"]))
+        stem = pl.plate_stem(plate_ref)
         out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / stem / "nuke")
         data = nb.build_data(
             shot=shot, plate=plate, plate_colorspace=plate_ref["colorspace"], plate_frames=(f0, f1),

@@ -4,7 +4,6 @@ layer. Writes a comp preview and a sidecar with the colour round-trip report."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import numpy as np
 
@@ -58,7 +57,7 @@ class AtlasVFXLTXReturn:
         if ltx_prep.get("mirror"):
             ltx = li.mirror(ltx)                            # Prep mirrored the frames LTX saw: flip the take back
         fwd, inv = li.prep_processors(ltx_prep)          # the exact view Prep applied, from its record
-        stem = Path(ref["path"]).stem
+        stem = pl.plate_stem(ref)
         name = pl.safe_name(name)
         out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / stem / "layers" / name)
         off = ref["frame_offset"]
@@ -80,7 +79,7 @@ class AtlasVFXLTXReturn:
                                      "replaces": ltx_prep["layer"]})
             cover.append(float((rgba[..., 3] > 0.5).mean()))
             if i % preview_every == 0:
-                _, img = next(pl.decode_rgb(ref, n - off, n - off, width=1024))
+                _, img = next(pl.decode_rgb_or_black(ref, n - off, n - off, width=1024))
                 lin = pl.to_working(img, ref)
                 small = cv2.resize(rgba, (lin.shape[1], lin.shape[0]), interpolation=cv2.INTER_AREA)
                 previews.append(li.to_view(cp.over(small, lin), fwd))

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 
 import numpy as np
 
@@ -58,7 +57,7 @@ class AtlasVFXPlateDepth:
         f1 = min(plate_ref["last"], cam.frames[-1] - off)
         if f1 < f0:
             raise ValueError("camera and plate frames do not overlap")
-        out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / Path(plate_ref["path"]).stem / "depth" / cam.name)
+        out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / pl.plate_stem(plate_ref) / "depth" / cam.name)
         units = "m" if cam.data["scale"]["method"] != "unscaled" else "solve units"
 
         depths, masks, stats, previews = {}, {}, [], []

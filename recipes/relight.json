@@ -1,6 +1,11 @@
 {
  "name": "relight",
  "label": "Relight (LTX-2.3 + 4K transfer)",
+ "modes": [
+  "plate",
+  "foreground",
+  "generate"
+ ],
  "description": "Relights the element layer with the LTX-2.3 Relight IC-LoRA from the sun you pick, then carries the light onto the full-res element. A sun on the left is done mirrored.",
  "graph": {
   "70": {

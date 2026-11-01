@@ -1,6 +1,11 @@
 {
  "name": "matte",
  "label": "Matte (Alpha-Gen)",
+ "modes": [
+  "plate",
+  "foreground",
+  "generate"
+ ],
  "description": "A matte for the element layer from LTX Alpha-Gen: no green screen, soft edges kept. Writes RGB + alpha EXRs.",
  "graph": {
   "1": {

@@ -353,6 +353,23 @@ def test_nk_paste(tmp: Path, cam_res: dict, layer_pattern: str):
           f"STMap Reads raw, camera as curves")
 
 
+def test_virtual_plate(tmp: Path, cam_res: dict, layer_pattern: str):
+    """A shot with no plate (Shot Setup generate): the build starts from a black Constant, Python and .nk alike."""
+    base = make_shot(tmp / "virtual", cam_res, layer_pattern)
+    data = nb.build_data(shot="SYN_GEN", plate=nb.plate_source("", "virtual"), plate_colorspace="ACEScg",
+                         plate_frames=(1001, 1003), fmt=(4096, 2160, 1.0), ocio_config=OCIO,
+                         camera_chan=cam_res["chan"], camera_settings=cam_res["settings"], layers=base["layers"],
+                         write_pattern=str(tmp / "gen.%04d.exr"))
+    assert None not in data["reads"] and all(data["reads"])
+    fake = fake_nuke(("Constant", "Read", "Merge2", "Write", "Camera3"))
+    run_in_fake(nb.script_text(data), fake)
+    by = {n.name(): n for n in fake.all}
+    assert by["AVFX_Plate"].cls == "Constant" and by["AVFX_Over_element"].inputs[0] is by["AVFX_Plate"]
+    g = nk_graph(nb.nk_text(data))
+    assert g["AVFX_Plate"] == ("Constant", []) and g["AVFX_Over_element"][1][0] == "AVFX_Plate", g["AVFX_Plate"]
+    print("ok virtual plate: Python build and .nk paste start from a black Constant under the layers")
+
+
 def main() -> int:
     cam = camera()
     with tempfile.TemporaryDirectory() as t:
@@ -362,6 +379,7 @@ def main() -> int:
         test_builder(tmp, cam, cam_res, layer_pattern)
         test_lens_delivery(tmp, cam_res, layer_pattern)
         test_nk_paste(tmp, cam_res, layer_pattern)
+        test_virtual_plate(tmp, cam_res, layer_pattern)
     return 0
 
 

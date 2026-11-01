@@ -3664,6 +3664,109 @@
    }
   ]
  },
+ "AtlasVFXShotSetup": {
+  "folder": "layers",
+  "category": "Atlas VFX/Layers",
+  "inputs": [
+   {
+    "name": "mode",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "plate",
+     "foreground",
+     "generate"
+    ]
+   },
+   {
+    "name": "path",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "first",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "last",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "screen",
+    "type": "COMBO",
+    "group": "required",
+    "options": [
+     "green",
+     "blue"
+    ]
+   },
+   {
+    "name": "width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "height",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "fps",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "frames",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "ocio_config",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "input_space",
+    "type": "STRING",
+    "group": "required"
+   },
+   {
+    "name": "frame_offset",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "preview_width",
+    "type": "INT",
+    "group": "required"
+   },
+   {
+    "name": "preview_every",
+    "type": "INT",
+    "group": "required"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "plate_ref",
+    "type": "ATLAS_PLATE_SEQ"
+   },
+   {
+    "name": "shot",
+    "type": "ATLAS_VFX_SHOT"
+   },
+   {
+    "name": "preview",
+    "type": "IMAGE"
+   },
+   {
+    "name": "info",
+    "type": "STRING"
+   }
+  ]
+ },
  "AtlasVFXSolveCompare": {
   "folder": "camera_side",
   "category": "Atlas VFX/Camera",

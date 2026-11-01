@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import numpy as np
 
@@ -75,7 +74,7 @@ class AtlasVFXLockCheck:
             points = cam.data["extensions"]["atlas_vfx_measure"].get("points_m", {})
         c, how = _centre(cam, centre, points)
         lines = lc.card_lines(cam, c, orientation, width_m, height_m, divisions)
-        out = pl.resolve_out_dir(out_path, pl.WORK_ROOT / Path(plate_ref["path"]).stem / "lock_check" /
+        out = pl.resolve_out_dir(out_path, pl.WORK_ROOT / pl.plate_stem(plate_ref) / "lock_check" /
                                  f"{cam.name}_{orientation}.mp4", plate_path=plate_ref["path"], what="out_path")
         path, kept = lc.render(plate_ref, cam, out, lines=lines, marks=points, width=proxy_width,
                                keep_every=preview_every)

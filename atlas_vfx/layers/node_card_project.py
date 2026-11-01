@@ -3,7 +3,6 @@ premultiplied ACEScg RGBA EXR sequence (Nuke frame numbers) + a comp-over-plate 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import numpy as np
 
@@ -84,7 +83,7 @@ class AtlasVFXCardProject:
         f0 = max(plate_ref["nuke_first"], cam.frames[0])
         f1 = min(plate_ref["nuke_last"], cam.frames[-1])
         name = pl.safe_name(card["name"], "card name")
-        out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / Path(plate_ref["path"]).stem / "layers" / f"{cam.name}_{name}")
+        out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / pl.plate_stem(plate_ref) / "layers" / f"{cam.name}_{name}")
         written, coverage, previews = [], [], []
         hd = pl.clean_path(holdout_depth)
         depth = ho.depth_frames(hd) if hd else {}
@@ -110,7 +109,7 @@ class AtlasVFXCardProject:
             written.append(p.name)
             coverage.append(float((img[..., 3] > 0.5).mean()))
             if (n - f0) % preview_every == 0:
-                i, frame = next(pl.decode_rgb(plate_ref, n - off, n - off, width=preview_width))
+                i, frame = next(pl.decode_rgb_or_black(plate_ref, n - off, n - off, width=preview_width))
                 lin = pl.to_working(frame, plate_ref)
                 small = cv2.resize(plate_img, (lin.shape[1], lin.shape[0]), interpolation=cv2.INTER_AREA)
                 comp = np.ascontiguousarray(cp.over(small, lin))

@@ -105,7 +105,7 @@ def render(plate_ref: dict, folders: list[Path], width: int = 1280, step: int = 
     i0, i1 = plate_ref["first"], plate_ref["last"]
     out, used = [], {name: 0 for name, _ in layers}
     total = len(range(i0, i1 + 1, max(1, step)))
-    for k, (i, img) in enumerate(pl.decode_rgb(plate_ref, i0, i1, width=width, step=step)):
+    for k, (i, img) in enumerate(pl.decode_rgb_or_black(plate_ref, i0, i1, width=width, step=step)):
         n = i + off
         bg = pl.to_working(img, plate_ref)
         Ls = []

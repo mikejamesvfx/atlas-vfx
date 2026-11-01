@@ -57,7 +57,11 @@ def find_layer(folder, version: str = "plate") -> dict:
 
 
 def plate_source(plate_path, kind: str = "dpx", frame_offset: int = 1001) -> dict:
-    """Where the plate conversions live (next to the original, as Mike made them)."""
+    """Where the plate conversions live (next to the original, as Mike made them). kind 'virtual': a shot with no
+    plate (Shot Setup generate mode); the script starts from a black Constant instead of a Read."""
+    if kind == "virtual":
+        return {"kind": "virtual", "file": None, "probe": None, "start_at": None,
+                "range_note": "no plate: generated shot (black under the layers)"}
     p = Path(plate_path)
     if kind == "dpx":
         d = p.parent / f"{p.stem}_dpx"
@@ -70,7 +74,7 @@ def plate_source(plate_path, kind: str = "dpx", frame_offset: int = 1001) -> dic
     if kind == "original":
         return {"kind": "original", "file": _fwd(p), "probe": _fwd(p), "start_at": frame_offset,
                 "range_note": "HEVC full range: check Nuke reads it as full range before trusting it"}
-    raise ValueError(f"plate kind {kind!r}: dpx, prores or original")
+    raise ValueError(f"plate kind {kind!r}: dpx, prores, original or virtual")
 
 
 def build_data(*, shot: str, plate: dict, plate_colorspace: str, plate_frames: tuple[int, int], fmt: tuple,
@@ -87,7 +91,7 @@ def build_data(*, shot: str, plate: dict, plate_colorspace: str, plate_frames: t
         raise ValueError(f"prefix {prefix!r}: letters, digits and _ only, not empty (a re-run deletes every node "
                          f"whose name starts with it)")
     layers = [dict(l, name=safe_name(l["name"], "layer name")) for l in layers]
-    reads = [plate["probe"], _fwd(camera_chan), _fwd(ocio_config)] + [l["pattern"] % l["first"] for l in layers]
+    reads = ([plate["probe"]] if plate.get("probe") else []) + [_fwd(camera_chan), _fwd(ocio_config)] +         [l["pattern"] % l["first"] for l in layers]
     if lens_maps:
         reads += [lens_maps["undistort"], lens_maps["redistort"]]
     if set_proxy_obj:
@@ -171,19 +175,24 @@ if DATA["set_root"]:
 
 # 3. plate
 pl = DATA["plate"]
-plate = make(["Read"], "Plate", 0, 0)
-setk(plate, "file", pl["file"])
-if pl["start_at"] is None:                      # numbered sequence in Nuke frames
-    setk(plate, "first", first)
-    setk(plate, "last", last)
-    setk(plate, "origfirst", first)
-    setk(plate, "origlast", last)
-else:                                           # movie: its frame 1 is Nuke frame start_at
-    setk(plate, "frame_mode", "start at")
-    setk(plate, "frame", str(pl["start_at"]))
-setk(plate, "colorspace", pl["colorspace"])
-setk(plate, "before", "hold")
-setk(plate, "after", "hold")
+if pl["kind"] == "virtual":                     # no plate: black under the layers, the script's format
+    plate = make(["Constant"], "Plate", 0, 0)
+    setk(plate, "channels", "rgba")
+    setk(plate, "color", [0, 0, 0, 0])
+else:
+    plate = make(["Read"], "Plate", 0, 0)
+    setk(plate, "file", pl["file"])
+    if pl["start_at"] is None:                  # numbered sequence in Nuke frames
+        setk(plate, "first", first)
+        setk(plate, "last", last)
+        setk(plate, "origfirst", first)
+        setk(plate, "origlast", last)
+    else:                                       # movie: its frame 1 is Nuke frame start_at
+        setk(plate, "frame_mode", "start at")
+        setk(plate, "frame", str(pl["start_at"]))
+    setk(plate, "colorspace", pl["colorspace"])
+    setk(plate, "before", "hold")
+    setk(plate, "after", "hold")
 setk(plate, "label", "%s\n%s" % (pl["kind"], pl["range_note"]))
 
 # 4. layers, back to front. lens 'plate': each (redistorted) layer straight over the plate. lens 'clean + STMaps':
@@ -359,13 +368,18 @@ def nk_text(data: dict) -> str:
         sets.append(var)
 
     pl = data["plate"]
-    knobs = [("file", q(pl["file"])), ("colorspace", q(pl["colorspace"])), ("before", "hold"), ("after", "hold"),
-             ("label", q(f"{pl['kind']}\n{pl['range_note']}"))]
-    if pl["start_at"] is None:
-        knobs += [("first", str(first)), ("last", str(last)), ("origfirst", str(first)), ("origlast", str(last))]
+    if pl["kind"] == "virtual":                  # no plate: a black Constant in the script's format
+        put(_nk_node("Constant", P + "Plate", [("channels", "rgba"), ("color", "{0 0 0 0}"),
+                                               ("label", q(f"{pl['kind']}\n{pl['range_note']}"))], 0, 0), "plate")
     else:
-        knobs += [("frame_mode", q("start at")), ("frame", q(str(pl["start_at"])))]
-    put(_nk_node("Read", P + "Plate", knobs, 0, 0), "plate")
+        knobs = [("file", q(pl["file"])), ("colorspace", q(pl["colorspace"])), ("before", "hold"),
+                 ("after", "hold"), ("label", q(f"{pl['kind']}\n{pl['range_note']}"))]
+        if pl["start_at"] is None:
+            knobs += [("first", str(first)), ("last", str(last)), ("origfirst", str(first)),
+                      ("origlast", str(last))]
+        else:
+            knobs += [("frame_mode", q("start at")), ("frame", q(str(pl["start_at"])))]
+        put(_nk_node("Read", P + "Plate", knobs, 0, 0), "plate")
     for i, L in enumerate(data["layers"]):
         put(_nk_node("Read", P + "Layer_" + L["name"], [
             ("file", q(L["pattern"].replace("%04d", "####"))), ("first", str(L["first"])), ("last", str(L["last"])),

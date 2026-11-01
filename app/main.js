@@ -85,7 +85,7 @@ function render() {
         try { S.shot = await api.retryProxy(S.shot.name); render(); } catch (e) { status(e.message, true); } } }));
   } else {
     proxy.textContent = p === "building" ? "Making the plate proxy (once per shot, about a minute)..." :
-      p === "none" ? "No plate" : "";
+      p === "none" ? (S.shot.mode === "generate" ? "Create both: no plate, black under the layers" : "No plate") : "";
   }
   const scrub = $("scrub");
   scrub.min = S.shot.first; scrub.max = S.shot.last; scrub.value = S.frame;
@@ -588,15 +588,32 @@ function openPresets() {
   $("presets-dialog").showModal();
 }
 
+// The choice before anything else (layers/shot_mode.py): what the shot starts from decides the fields asked.
+function shotModeFields() {
+  const mode = new FormData($("shot-form")).get("mode") || "plate";
+  $("screen-wrap").hidden = mode !== "foreground";
+  $("frame-wrap").hidden = mode !== "generate";
+  $("plate-wrap").hidden = mode === "generate";
+  $("plate-label").textContent = mode === "foreground" ? "Screen plate (movie file)" : "Plate (movie file, optional)";
+  $("shot-form").elements.plate.required = mode === "foreground";
+}
+
 function openShotDialog() {
   $("shot-error").textContent = "";
+  shotModeFields();
   $("shot-dialog").showModal();
+}
+
+// Recipes offered for the open shot's mode (a recipe without modes is offered everywhere).
+function shotRecipes() {
+  const mode = S.shot?.mode || "plate";
+  return S.recipes.filter((r) => !r.modes || r.modes.includes(mode));
 }
 
 function openLayerDialog() {
   const what = $("layer-what");
   what.replaceChildren(el("option", { value: "sequence", text: "An EXR sequence I have" }),
-    ...S.recipes.map((r) => el("option", { value: `recipe:${r.name}`, text: r.label })));
+    ...shotRecipes().map((r) => el("option", { value: `recipe:${r.name}`, text: r.label })));
   $("source-wrap").hidden = false;
   $("layer-error").textContent = "";
   $("layer-dialog").showModal();
@@ -605,6 +622,7 @@ function openLayerDialog() {
 function wire() {
   $("shot-pick").addEventListener("change", (e) => openShot(e.target.value));
   $("new-shot").addEventListener("click", openShotDialog);
+  $("shot-mode").addEventListener("change", shotModeFields);
   $("presets-btn").addEventListener("click", openPresets);
   $("queue-btn").addEventListener("click", openQueue);
   $("add-layer").addEventListener("click", openLayerDialog);
@@ -633,8 +651,13 @@ function wire() {
     e.preventDefault();
     const f = new FormData(e.target);
     try {
-      const s = await api.createShot({ name: f.get("name"), plate: f.get("plate"), first: Number(f.get("first")),
-        last: Number(f.get("last")) });
+      const mode = String(f.get("mode") || "plate");
+      const d = { name: f.get("name"), mode, first: Number(f.get("first")), last: Number(f.get("last")) };
+      if (mode !== "generate") d.plate = f.get("plate");
+      if (mode === "foreground") d.screen = f.get("screen");
+      if (mode === "generate") Object.assign(d, { width: Number(f.get("width")), height: Number(f.get("height")),
+        fps: String(f.get("fps")) });
+      const s = await api.createShot(d);
       $("shot-dialog").close();
       await loadShots(s.name);
     } catch (err) { $("shot-error").textContent = err.message; }

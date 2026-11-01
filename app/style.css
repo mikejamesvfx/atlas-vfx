@@ -147,3 +147,11 @@ menu { display: flex; flex-direction: row-reverse; justify-content: flex-start; 
 #queue-count:not(:empty) { color: var(--amber); margin-left: 4px; }
 .qjob .confirm { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; color: var(--bone); }
 .qjob.confirm { border-color: var(--amber); }
+
+/* New shot: what the shot starts from (layers/shot_mode.py) */
+fieldset.modes { border: 1px solid var(--frame); border-radius: var(--r); padding: 10px; margin: 0 0 10px; display: grid; gap: 6px; }
+fieldset.modes legend { color: var(--ash); padding: 0 4px; font-size: 13px; }
+fieldset.modes label { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+fieldset.modes small { color: var(--ash); font-size: 12px; }
+#frame-wrap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+#frame-wrap[hidden] { display: none; }

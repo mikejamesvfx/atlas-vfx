@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 from atlas_vfx.camera_side import plate as pl
+from atlas_vfx.layers import shot_mode as sm
 
 COMP = "comp"
 PREVIEW = "preview"
@@ -57,18 +58,36 @@ def save_shot(shot: dict) -> None:
 
 
 def create_shot(name: str, plate: str, first: int, last: int, frame_offset: int = pl.NUKE_FRAME_OFFSET,
-                ocio_config: str = "") -> dict:
+                ocio_config: str = "", mode: str = "plate", screen: str = "green", width: int = 0, height: int = 0,
+                fps: str = "24") -> dict:
+    """mode (layers/shot_mode.py): plate (a background plate; blank = no plate yet, as before), foreground (an
+    actor plate shot on a green or blue screen; the plate is required) or generate (no plate: width, height and fps
+    describe the virtual plate the background is made for)."""
     name = pl.safe_name(name, "shot name")
     first, last, frame_offset = int(first), int(last), int(frame_offset)
+    mode = sm.check_mode(mode)
     if last < first:
         raise ValueError(f"last {last} is before first {first}")
     if _file(name).exists():
         raise ValueError(f"shot {name!r} exists")
     plate = pl.clean_path(plate)
-    if plate and not Path(plate).is_file():
-        raise ValueError(f"plate {Path(plate).name!r} not found")
-    shot = {"name": name, "plate": plate, "first": first, "last": last, "frame_offset": frame_offset,
+    if mode == "generate":
+        if plate:
+            raise ValueError("a generate shot has no plate: its background is made (leave the plate blank)")
+        # a shot's first/last are Nuke frames here: the virtual plate is just those frames (checks size and fps)
+        ref = pl.virtual_plate_ref(width, height, fps, last - first + 1, 0, None, ocio_config, first, name)
+    else:
+        if mode == "foreground" and not plate:
+            raise ValueError("a foreground shot needs its screen plate")
+        if plate and not Path(plate).is_file():
+            raise ValueError(f"plate {Path(plate).name!r} not found")
+    shot = {"name": name, "mode": mode, "plate": plate, "first": first, "last": last, "frame_offset": frame_offset,
             "ocio_config": str(ocio_config or ""), "layers": []}
+    if mode == "foreground":
+        shot["screen"] = sm.check_screen(screen)
+    if mode == "generate":
+        shot["size"] = [ref["width"], ref["height"]]
+        shot["fps"] = list(ref["fps"])
     save_shot(shot)
     return load_shot(name)
 
@@ -92,6 +111,7 @@ def load_shot(name: str) -> dict:
     if not p.is_file():
         raise ValueError(f"no shot {pl.safe_name(name, 'shot name')!r}")
     shot = json.loads(p.read_text(encoding="utf-8"))
+    shot.setdefault("mode", "plate")                        # shots made before the mode existed
     for lay in shot["layers"]:
         vs = versions(shot["name"], lay["name"])
         full = [v for v in vs if _pattern_in(layer_dir(shot["name"], lay["name"]) / v)]

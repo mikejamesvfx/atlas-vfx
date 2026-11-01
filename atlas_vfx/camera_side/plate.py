@@ -298,6 +298,61 @@ def plate_ref(path: str | os.PathLike, first: int = 0, last: int | None = None,
     }
 
 
+def virtual_plate_ref(width: int, height: int, fps=24, frame_count: int = 1, first: int = 0, last: int | None = None,
+                      ocio_config_path: str | os.PathLike | None = None, frame_offset: int = NUKE_FRAME_OFFSET,
+                      name: str = "virtual") -> dict:
+    """A plate_ref with no file: the size, frame rate, frame range and colour of a shot whose picture is made, not
+    shot (Shot Setup's generate mode). Nodes that only need the frame (cameras, Card Project, LTX sizes) take it as
+    a plate; nodes that read plate pixels refuse it (decode) or use black (is_virtual)."""
+    width, height, frame_count = int(width), int(height), int(frame_count)
+    if width < 16 or height < 16 or width % 2 or height % 2:
+        raise PlateError(f"virtual plate {width}x{height}: even sizes of at least 16 px")
+    if frame_count < 1:
+        raise PlateError("virtual plate: at least one frame")
+    if isinstance(fps, (list, tuple)):
+        f = Fraction(int(fps[0]), int(fps[1]))
+    else:
+        f = Fraction(str(fps).strip()) if isinstance(fps, str) else Fraction(fps).limit_denominator(1001)
+        for ntsc in (24, 30, 60):                       # 23.976 / 29.97 / 59.94 typed as decimals
+            if abs(float(f) - ntsc * 1000 / 1001) < 2e-3:
+                f = Fraction(ntsc * 1000, 1001)
+    if f <= 0:
+        raise PlateError(f"virtual plate: frame rate {fps!r}")
+    last = frame_count - 1 if last is None or last < 0 else int(last)
+    first = int(first)
+    if not (0 <= first <= last < frame_count):
+        raise PlateError(f"frames {first}-{last} outside the virtual plate's 0-{frame_count - 1}")
+    cfg_path = ocio_path(ocio_config_path)
+    return {
+        "kind": "atlas_vfx.plate_ref", "version": 1, "virtual": True, "name": safe_name(name, "plate name"),
+        "path": "", "quick_sha256": None, "size_bytes": 0, "codec": None, "profile": None, "pix_fmt": None,
+        "width": width, "height": height, "fps": [f.numerator, f.denominator], "frame_count": frame_count,
+        "range": "full", "range_source": "virtual", "color_matrix": None, "color_matrix_source": "virtual",
+        "chroma_location": None, "stream_color_tags": {},
+        "colorspace": WORKING_SPACE, "colorspace_source": "virtual (made in the working space)",
+        "ocio_config": cfg_path, "working_space": WORKING_SPACE, "camera_body": None, "timecode": None,
+        "first": first, "last": last, "frame_offset": int(frame_offset),
+        "nuke_first": first + int(frame_offset), "nuke_last": last + int(frame_offset),
+    }
+
+
+def plate_stem(ref: dict) -> str:
+    """The plate's file stem, or a virtual plate's name: what default output folders are named after."""
+    return (ref.get("name") or "virtual") if is_virtual(ref) else Path(ref["path"]).stem
+
+
+def is_virtual(ref: dict | None) -> bool:
+    """True for a plate_ref with no picture behind it (virtual_plate_ref)."""
+    return bool(ref and ref.get("virtual"))
+
+
+def _require_picture(ref: dict) -> None:
+    if is_virtual(ref):
+        raise PlateError(f"plate {ref.get('name', 'virtual')!r} is virtual (Shot Setup generate mode): there is no "
+                         "picture to read. Render the background first and read that, or use a node that takes a "
+                         "virtual plate")
+
+
 # --------------------------------------------------------------------------------------------- decode
 
 def proxy_size(ref: dict, width: int | None) -> tuple[int, int]:
@@ -345,6 +400,7 @@ def _upsample(c: np.ndarray, factor: int, axis: int, offset: float) -> np.ndarra
 def _raw_frames(ref: dict, first: int, last: int, luma_only: bool, step: int = 1):
     """Yields (index, planes) straight from ffmpeg: (Y, Cb, Cr) native integer planes for Y'CbCr, or an
     HxWx3 uint16 array (rgb48le) for RGB formats."""
+    _require_picture(ref)
     W, H = ref["width"], ref["height"]
     lay = _yuv_layout(ref["pix_fmt"])
     if lay is None and not _is_rgb(ref["pix_fmt"]):
@@ -488,6 +544,7 @@ def decode_rgb(ref: dict, first: int | None = None, last: int | None = None, wid
                step: int = 1):
     """Yields (plate frame index, float32 HxWx3 normalised code values in the plate's input space).
     Y'CbCr -> R'G'B' with the plate's range and matrix (H.273), chroma upsampled linearly at its siting."""
+    _require_picture(ref)
     f0 = ref["first"] if first is None else first
     f1 = ref["last"] if last is None else last
     lay = _yuv_layout(ref["pix_fmt"])
@@ -513,9 +570,25 @@ def decode_rgb(ref: dict, first: int | None = None, last: int | None = None, wid
         yield i, _resize(rgb, width, ref)
 
 
+def decode_rgb_or_black(ref: dict, first: int | None = None, last: int | None = None, width: int | None = None,
+                        step: int = 1):
+    """decode_rgb, or black frames of the same size and count for a virtual plate (the background under layers when
+    the shot has no plate: previews and comps over it). A virtual plate's input space is the working space, so
+    to_working leaves black black."""
+    if not is_virtual(ref):
+        yield from decode_rgb(ref, first, last, width, step)
+        return
+    f0 = ref["first"] if first is None else first
+    f1 = ref["last"] if last is None else last
+    W, H = proxy_size(ref, width)
+    for i in range(f0, f1 + 1, max(1, int(step))):
+        yield i, np.zeros((H, W, 3), np.float32)
+
+
 def decode_luma16(ref: dict, first: int | None = None, last: int | None = None, width: int | None = None,
                   step: int = 1):
     """Yields (plate frame index, uint16 HxW luma, range-expanded to 0-65535). For tracking proxies and charts."""
+    _require_picture(ref)
     f0 = ref["first"] if first is None else first
     f1 = ref["last"] if last is None else last
     lay = _yuv_layout(ref["pix_fmt"])
@@ -576,7 +649,7 @@ def tracking_proxy_frame(y16: np.ndarray, clahe) -> np.ndarray:
 
 
 def default_track_dir(ref: dict, width: int) -> Path:
-    return WORK_ROOT / Path(ref["path"]).stem / f"track_{ref['first']:04d}-{ref['last']:04d}_w{width}"
+    return WORK_ROOT / plate_stem(ref) / f"track_{ref['first']:04d}-{ref['last']:04d}_w{width}"
 
 
 def write_tracking_proxies(ref: dict, out_dir: str | os.PathLike | None = None, width: int = 1024,

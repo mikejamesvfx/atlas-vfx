@@ -127,7 +127,7 @@ class AtlasVFXLTXPrep:
         start, rt = None, None
         key_idx = sorted(set(list(range(0, length, keyframe_every)) + [length - 1]))
         keys = []
-        for (i, img), n in zip(pl.decode_rgb(plate_ref, frames[0] - off, frames[-1] - off), frames):
+        for (i, img), n in zip(pl.decode_rgb_or_black(plate_ref, frames[0] - off, frames[-1] - off), frames):
             lin = pl.to_working(img, plate_ref)
             if sensor is not None:
                 lin = li.remove_camera(lin, sensor, n)      # clean space: matches the pinhole card layers

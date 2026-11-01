@@ -101,6 +101,7 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 67 | Solve Mask | camera_side | Atlas Camera | built | synthetic | Tracker | |
 | 68 | Track 2D | camera_side | Atlas Camera | built | synthetic | Tracker | tools/track_picks.py |
 | 69 | Solve View | camera_side | Atlas Camera | built | synthetic | Tracker | |
+| 70 | Shot Setup | layers | atlas-vfx | built | synthetic | Shot mode | |
 
 58 rows are built or deprecated, and those are the 58 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
@@ -152,7 +153,7 @@ Payloads (all plain JSON-safe dicts unless said):
 <!-- types:begin (generated) -->
 | Type | Made by | Read by |
 |---|---|---|
-| `ATLAS_PLATE_SEQ` | 1 Plate Read | 2 Tracking Proxy, 4 Solve Plate, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview, 67 Solve Mask, 68 Track 2D |
+| `ATLAS_PLATE_SEQ` | 1 Plate Read, 70 Shot Setup | 2 Tracking Proxy, 4 Solve Plate, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview, 67 Solve Mask, 68 Track 2D |
 | `ATLAS_TRACKED_CAMERA` | 4 Solve Plate, 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky, 53 Relight Transfer, 54 Relight Transfer Files, 69 Solve View |
 | `ATLAS_TRACKS_2D` | 68 Track 2D | 4 Solve Plate |
 | `ATLAS_VFX_ALPHA_PREP` | 63 Alpha Prep | 64 Alpha Return |
@@ -164,6 +165,7 @@ Payloads (all plain JSON-safe dicts unless said):
 | `ATLAS_VFX_PLATELOCK_RESULT` | 40 Plate Lock | 41 Plate Lock Layer, 42 Plate Lock Write |
 | `ATLAS_VFX_PLATELOCK_TRACK` | 37 Plate Lock Camera | 40 Plate Lock |
 | `ATLAS_VFX_SENSOR_LENS` | 29 Sensor Lens Maps | 30 Sensor RS Maps |
+| `ATLAS_VFX_SHOT` | 70 Shot Setup | - |
 | `ATLAS_VFX_SUN` | 56 Sun Direction | 57 Light Ball |
 | `MOGE_GEOMETRY` | - | 32 Normals, 34 Depth Holdout (element), 53 Relight Transfer |
 | `MOGE_MODEL` | - | 9 Plate Depth, 54 Relight Transfer Files |
@@ -926,3 +928,14 @@ Payloads (all plain JSON-safe dicts unless said):
   through the camera's lens), camera path, frustum at the scrubbed frame, median error per frame, and plate frames
   with the points drawn on them. Clicking a plate frame appends a Track 2D seed to the seeds widget, which the node
   passes out. Proxies are read only from a folder outputs may be written to (the camera is graph data).
+
+### 70 Shot Setup
+`AtlasVFXShotSetup` · layers · Atlas VFX/Layers
+- in: mode plate|foreground|generate, path STRING, first INT, last INT, screen green|blue, width INT, height INT, fps STRING, frames INT, ocio_config STRING, input_space STRING, frame_offset INT, preview_width INT, preview_every INT
+- out: plate_ref ATLAS_PLATE_SEQ, shot ATLAS_VFX_SHOT, preview IMAGE, info STRING
+- test: tests/test_shot_mode.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: the choice before anything else (layers/shot_mode.py, owner call 2026-11-01): plate (a real background plate, read as Plate Read does), foreground (an actor on a green or blue screen; key it, track the screen plate, generate the background behind them through that camera) or generate (create both: no plate, a virtual plate_ref from width, height, fps and frames). Every mode hands on a plate_ref, so the nodes after it work the same; nodes that read plate pixels refuse a virtual plate (plate.is_virtual) and the comp shows black under the layers. Atlas Comp's new-shot form writes the same mode into shot.json.

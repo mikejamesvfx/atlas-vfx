@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 
 from . import camera_io as cio
 from . import plate as pl
@@ -84,7 +83,7 @@ class AtlasVFXSolvePlate:
             raise ValueError(f"Solve Plate: lens_model {lens_model!r}")
         sensor = sensor_block(sensor_preset, sensor_width_mm, sensor_height_mm)
         first, last = plate_ref["first"], plate_ref["last"]
-        stem = Path(plate_ref["path"]).stem
+        stem = pl.plate_stem(plate_ref)
         name = pl.safe_name(name.strip() or f"{stem}_solve_{first:04d}-{last:04d}")
         out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / stem / "solve" / name, plate_path=plate_ref["path"])
         proxy_dir, _ = pl.write_tracking_proxies(plate_ref, out / "proxy", width=proxy_width)

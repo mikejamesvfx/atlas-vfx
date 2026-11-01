@@ -97,8 +97,20 @@
   <dialog id="shot-dialog">
     <form method="dialog" id="shot-form">
       <h2>New shot</h2>
+      <fieldset id="shot-mode" class="modes">
+        <legend>What does the shot start from?</legend>
+        <label><input type="radio" name="mode" value="plate" checked> Background plate <small>a real plate: track it, add layers</small></label>
+        <label><input type="radio" name="mode" value="foreground"> Foreground on a screen <small>an actor on green or blue: generate the background</small></label>
+        <label><input type="radio" name="mode" value="generate"> Create both <small>no plate: background and foreground generated</small></label>
+      </fieldset>
       <label>Name <input name="name" required pattern="[A-Za-z0-9_][A-Za-z0-9_ .\-]*" placeholder="DSCF3000_S2S3"></label>
-      <label>Plate (movie file, optional) <input name="plate" placeholder="~/Videos/atlas-vfx_footage/DSCF3000.MOV"></label>
+      <label id="plate-wrap"><span id="plate-label">Plate (movie file, optional)</span> <input name="plate" placeholder="~/Videos/atlas-vfx_footage/DSCF3000.MOV"></label>
+      <label id="screen-wrap" hidden>Screen <select name="screen"><option value="green">Green</option><option value="blue">Blue</option></select></label>
+      <div id="frame-wrap" hidden>
+        <label>Width <input name="width" type="number" value="4096" min="16" step="2"></label>
+        <label>Height <input name="height" type="number" value="2160" min="16" step="2"></label>
+        <label>FPS <input name="fps" value="24"></label>
+      </div>
       <label>First frame (Nuke) <input name="first" type="number" value="1130" required></label>
       <label>Last frame (Nuke) <input name="last" type="number" value="1226" required></label>
       <p class="error" id="shot-error"></p>

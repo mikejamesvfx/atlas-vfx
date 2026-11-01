@@ -7,4 +7,4 @@ NODE_MODULES: tuple = ("node_set_proxy", "node_foreground_element", "node_card_p
                        "node_relight_transfer", "node_relight_transfer_files", "node_shot_range",
                        "node_sun_direction", "node_light_ball", "node_layer_picker", "node_grade", "node_viewer",
                        "node_notes", "node_tiny_vae", "node_alpha_prep", "node_alpha_return", "node_latent_prerender",
-                       "node_guide_from_latent")
+                       "node_guide_from_latent", "node_shot_setup")

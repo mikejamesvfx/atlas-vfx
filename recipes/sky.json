@@ -1,6 +1,11 @@
 {
  "name": "sky",
  "label": "Sky (physical)",
+ "modes": [
+  "plate",
+  "foreground",
+  "generate"
+ ],
  "description": "A physically based sky and sun for a place and time, as an ACEScg lat-long EXR.",
  "graph": {
   "1": {

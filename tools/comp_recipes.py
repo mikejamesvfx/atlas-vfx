@@ -63,7 +63,7 @@ def matte() -> dict:
         "colorspace": SRGB, "ocio_config": ""}}
     g["65"]["inputs"]["first_frame"] = ["1", 1]
     latent_guide(g)
-    return {"name": "matte", "label": "Matte (Alpha-Gen)",
+    return {"name": "matte", "label": "Matte (Alpha-Gen)", "modes": ["plate", "foreground", "generate"],
             "description": "A matte for the element layer from LTX Alpha-Gen: no green screen, soft edges kept. "
                            "Writes RGB + alpha EXRs.",
             "graph": g,
@@ -86,7 +86,7 @@ def relight() -> dict:
     g = lr.graph_4k()
     del g["71"]                                                     # Layer Picker: the element layer comes instead
     latent_guide(g)
-    return {"name": "relight", "label": "Relight (LTX-2.3 + 4K transfer)",
+    return {"name": "relight", "label": "Relight (LTX-2.3 + 4K transfer)", "modes": ["plate", "foreground", "generate"],
             "description": "Relights the element layer with the LTX-2.3 Relight IC-LoRA from the sun you pick, then "
                            "carries the light onto the full-res element. A sun on the left is done mirrored.",
             "graph": g,
@@ -121,7 +121,7 @@ def sky() -> dict:
     f = lambda key, label, t, d, lo=None, hi=None: {k: v for k, v in {  # noqa: E731
         "key": key, "label": label, "type": t, "default": d, "min": lo, "max": hi,
         "targets": [["1", key]]}.items() if v is not None}
-    return {"name": "sky", "label": "Sky (physical)",
+    return {"name": "sky", "label": "Sky (physical)", "modes": ["plate", "foreground", "generate"],
             "description": "A physically based sky and sun for a place and time, as an ACEScg lat-long EXR.",
             "graph": g,
             "fields": [f("latitude", "Latitude", "float", -34.1906, -90.0, 90.0),
