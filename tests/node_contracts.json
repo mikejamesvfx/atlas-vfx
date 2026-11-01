@@ -3955,6 +3955,21 @@
      "auto",
      "off"
     ]
+   },
+   {
+    "name": "light_rig",
+    "type": "ATLAS_VFX_LIGHT_RIG",
+    "group": "optional"
+   },
+   {
+    "name": "rig_frame",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "middle",
+     "first",
+     "last"
+    ]
    }
   ],
   "outputs": [

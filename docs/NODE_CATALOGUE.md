@@ -158,7 +158,7 @@ Payloads (all plain JSON-safe dicts unless said):
 | `ATLAS_VFX_ALPHA_PREP` | 63 Alpha Prep | 64 Alpha Return |
 | `ATLAS_VFX_CARD` | 15 Foreground Element, 16 Character Insert | 14 Card Project |
 | `ATLAS_VFX_CHUNK_PLAN` | 50 Chunk Plan | 52 Chunk Stitch |
-| `ATLAS_VFX_LIGHT_RIG` | 33 Light From Plate, 48 Physical Sky | 18 Light Probe & Relight |
+| `ATLAS_VFX_LIGHT_RIG` | 33 Light From Plate, 48 Physical Sky | 18 Light Probe & Relight, 56 Sun Direction |
 | `ATLAS_VFX_LTX_PREP` | 44 LTX Prep | 31 Sensor Apply, 45 LTX Return |
 | `ATLAS_VFX_PLATELOCK_PEOPLE` | 38 Plate Lock Person | 38 Plate Lock Person, 39 Plate Lock QC, 40 Plate Lock |
 | `ATLAS_VFX_PLATELOCK_RESULT` | 40 Plate Lock | 41 Plate Lock Layer, 42 Plate Lock Write |
@@ -765,8 +765,9 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 56 Sun Direction
 `AtlasVFXSunDirection` · layers · Atlas VFX/Artist
 - in: direction COMBO, height low|mid|high, look STRING, mirror_trick auto|off
+- in, optional: light_rig ATLAS_VFX_LIGHT_RIG, rig_frame middle|first|last
 - out: mirror BOOLEAN, prompt STRING, sun ATLAS_VFX_SUN
-- test: tests/test_artist_nodes.py
+- test: tests/test_artist_nodes.py, tests/test_sun_rig.py
 - proof: synthetic
 - licences: none beyond the base
 - needs: nothing beyond the base

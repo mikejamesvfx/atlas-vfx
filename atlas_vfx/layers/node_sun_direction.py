@@ -7,11 +7,40 @@ by LTX Return, the sun lands on frame left. mirror_trick auto does that for any 
 from __future__ import annotations
 
 import json
+import math
+
+import numpy as np
 
 DIRECTIONS = ("the front", "the front-right", "the right", "the back-right", "behind", "the back-left", "the left",
               "the front-left")
 HEIGHTS = ("low", "mid", "high")
 BASE = "relight the video to match the light-direction ball."
+
+
+def from_light_rig(rig: dict, which: str = "middle") -> dict:
+    """The LoRA's words for a real sun: a light rig (Physical Sky with the shot camera: the sun's direction in
+    OpenGL camera space per frame, x right, y up, the camera looking down -z) -> direction and height as seen in the
+    finished shot. A sun behind the camera lights the scene from the front; one in view is "behind" (backlight).
+    The 8 sectors are 45 deg wide, clockwise from front to right. Height: the sun's elevation above the horizon
+    (sun_elevation_deg; an older rig without it uses the camera-relative angle)."""
+    dirs = np.asarray(rig.get("sun_dir") or [], np.float64).reshape(-1, 3)
+    if not len(dirs):
+        raise ValueError("light rig has no sun direction")
+    i = {"first": 0, "middle": len(dirs) // 2, "last": len(dirs) - 1}.get(which)
+    if i is None:
+        raise ValueError(f"which {which!r}: first, middle or last")
+    x, y, z = dirs[i]
+    ang = math.degrees(math.atan2(x, z))                      # 0 = behind the camera (front light), +90 = right
+    direction = DIRECTIONS[int(round(ang / 45.0)) % 8]
+    el = rig.get("sun_elevation_deg")
+    if el is None:
+        el = math.degrees(math.asin(max(-1.0, min(1.0, y / max(float(np.linalg.norm(dirs[i])), 1e-12)))))
+    el = float(el)
+    height = "low" if el < 32.5 else "mid" if el < 57.5 else "high"
+    spread = [DIRECTIONS[int(round(math.degrees(math.atan2(d[0], d[2])) / 45.0)) % 8] for d in dirs]
+    return {"direction": direction, "height": height, "elevation_deg": round(el, 2),
+            "azimuth_in_camera_deg": round(ang, 2), "frame_index": i, "frames": len(dirs),
+            "directions_over_shot": sorted(set(spread)), "sun_visible": bool(rig.get("sun_visible", True))}
 
 
 def mirrored(direction: str) -> str:
@@ -59,13 +88,32 @@ class AtlasVFXSunDirection:
                                     "tooltip": "the light, in words; direction and height are added for you"}),
                 "mirror_trick": (["auto", "off"], {"default": "auto",
                                                    "tooltip": "auto: a sun on the left is rendered mirrored"}),
-            }
+            },
+            "optional": {
+                "light_rig": ("ATLAS_VFX_LIGHT_RIG", {"tooltip": (
+                    "Physical Sky's rig (with the shot camera): the real sun, placed relative to the tracked camera, "
+                    "replaces direction and height")}),
+                "rig_frame": (["middle", "first", "last"], {"default": "middle",
+                                                            "tooltip": "which frame of the rig the sun is read at"}),
+            },
         }
 
-    def run(self, direction, height, look, mirror_trick="auto"):
+    def run(self, direction, height, look, mirror_trick="auto", light_rig=None, rig_frame="middle"):
+        rig_info = None
+        if light_rig is not None:
+            rig_info = from_light_rig(light_rig, rig_frame)
+            direction, height = rig_info["direction"], rig_info["height"]
         s = sun(direction, height, look, mirror_trick)
+        if rig_info is not None:
+            s["from_light_rig"] = rig_info
         text = (f"ball: {s['direction']}, {height}" + (" (mirrored: LTX Prep mirror on)" if s["mirror"] else "")
                 + f"\nprompt: {s['prompt']}")
+        if rig_info is not None:
+            text += (f"\nfrom the sky: sun {rig_info['azimuth_in_camera_deg']:+.0f} deg from the camera's back, "
+                     f"{rig_info['elevation_deg']:.0f} deg up -> {rig_info['direction']}, {height}"
+                     + ("" if len(rig_info["directions_over_shot"]) == 1 else
+                        f"; over the shot it moves through {rig_info['directions_over_shot']}")
+                     + ("" if rig_info["sun_visible"] else "; the sun is below the horizon"))
         return {"ui": {"text": [text]}, "result": (s["mirror"], s["prompt"], s)}
 
 

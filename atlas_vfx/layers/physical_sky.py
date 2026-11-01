@@ -493,6 +493,7 @@ def light_rig(sun_dirs_cam, e_sun, e_sky_up, ground_albedo, sun_el, fov_x_deg, a
     colour = e_sun / peak if peak > 0 else np.zeros(3)
     uv, front = project_uv(dirs, fov_x_deg, aspect)
     return {"frames": F, "fov_x": float(fov_x_deg), "aspect": float(aspect),
+            "sun_elevation_deg": round(float(sun_el), 4),          # above the horizon (Sun Direction's height)
             "sun_uv": uv.round(4).tolist(), "sun_in_front": front.tolist(),
             "sun_dir": dirs.round(6).tolist(), "sun_colour": colour.round(6).tolist(),
             "sun_strength": round(peak / math.pi * k, 6),
