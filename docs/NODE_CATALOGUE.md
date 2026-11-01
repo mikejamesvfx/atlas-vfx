@@ -293,8 +293,9 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 15 Foreground Element
 `AtlasVFXForegroundElement` · layers · Atlas VFX/Layers
 - in: image IMAGE, mask MASK, shot_camera ATLAS_TRACKED_CAMERA, batch_index INT, frame INT, distance_m FLOAT, lateral_m FLOAT, height_m FLOAT, ground_y STRING, yaw_deg FLOAT, erode_px INT, mask_is_background BOOLEAN, ocio_config STRING, name STRING, out_dir STRING
+- in, optional: source_colour inverse display view (ACES 2.0 SDR, as LTX)|sRGB texture
 - out: card ATLAS_VFX_CARD, preview IMAGE, report STRING
-- test: tests/test_card_project.py
+- test: tests/test_card_project.py, tests/test_element_colour.py
 - proof: plate V141 (Z-Image grass + BiRefNet matte)
 - licences: `openimageio`, `z-image-turbo` (upstream, in the T6 graph), `birefnet` (upstream)
 - needs: OpenImageIO (run)
@@ -303,9 +304,9 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 16 Character Insert
 `AtlasVFXCharacterInsert` · layers · Atlas VFX/Layers
 - in: images IMAGE, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT, last_frame INT, pick_frame INT, pick_u FLOAT, pick_v FLOAT, deck_y FLOAT, height_m FLOAT, key_lo FLOAT, key_hi FLOAT, erode_px INT, mode billboard|fixed, clip_start INT, end_mode hold|pingpong|loop, source_model STRING, ocio_config STRING, name STRING, out_dir STRING
-- in, optional: mask MASK, exposure_stops FLOAT
+- in, optional: mask MASK, exposure_stops FLOAT, source_colour inverse display view (ACES 2.0 SDR, as LTX)|sRGB texture
 - out: card ATLAS_VFX_CARD, preview IMAGE, report STRING
-- test: tests/test_character_insert.py, tests/test_character_time.py
+- test: tests/test_character_insert.py, tests/test_character_time.py, tests/test_element_colour.py
 - proof: synthetic. The 2026-10-19 plate run used a MiniMax H3 clip and is withdrawn with H3 (2026-10-24); it needs
   a licensed source to re-prove on the plate.
 - licences: `openimageio`; the clip is upstream: source_model names it and the node logs a warning for any model in
@@ -702,10 +703,10 @@ Payloads (all plain JSON-safe dicts unless said):
 
 ### 53 Relight Transfer
 `AtlasVFXRelightTransfer` · layers · Atlas VFX/Layers
-- in: element IMAGE, matte MASK, relit IMAGE, encoding linear|srgb, mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT
+- in: element IMAGE, matte MASK, relit IMAGE, encoding linear|srgb|inverse display view (ACES 2.0 SDR, as LTX), mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT
 - in, optional: normals IMAGE, moge_geometry MOGE_GEOMETRY, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT, relit_mirrored BOOLEAN, holdout MASK, lift_limit FLOAT, holdout_grow INT
 - out: images IMAGE, gain IMAGE, info STRING
-- test: tests/test_relight_transfer.py
+- test: tests/test_relight_transfer.py, tests/test_element_colour.py
 - proof: synthetic
 - licences: none beyond the base
 - needs: nothing beyond the base
@@ -734,10 +735,10 @@ Payloads (all plain JSON-safe dicts unless said):
 
 ### 54 Relight Transfer Files
 `AtlasVFXRelightTransferFiles` · layers · Atlas VFX/Layers
-- in: element_path STRING, relit_path STRING, matte_path STRING, first_frame INT, length INT, relit_numbering frame|sequential, relit_encoding linear|srgb, mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT, lift_limit FLOAT, name STRING, out_dir STRING
+- in: element_path STRING, relit_path STRING, matte_path STRING, first_frame INT, length INT, relit_numbering frame|sequential, relit_encoding linear|srgb|inverse display view (ACES 2.0 SDR, as LTX), mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT, lift_limit FLOAT, name STRING, out_dir STRING
 - in, optional: moge_model MOGE_MODEL, resolution_level INT, refine_steps INT, normals_temporal INT, normals_sigma FLOAT, depth_guide BOOLEAN, shot_camera ATLAS_TRACKED_CAMERA, relit_mirrored BOOLEAN, holdout_path STRING, holdout_grow INT, ocio_config STRING
 - out: images STRING, gain STRING, info STRING
-- test: tests/test_relight_transfer.py
+- test: tests/test_relight_transfer.py, tests/test_element_colour.py
 - proof: synthetic; plate V141
 - licences: none beyond the base (MoGe-3 is in the register)
 - needs: nothing beyond the base

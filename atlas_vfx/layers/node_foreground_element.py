@@ -13,6 +13,7 @@ from atlas_vfx.camera_side import measure as ms
 from atlas_vfx.camera_side import plate as pl
 from atlas_vfx.contracts import shot_camera as sc
 
+from . import element_colour as ec
 from . import foreground_element as fe
 
 
@@ -45,11 +46,14 @@ class AtlasVFXForegroundElement:
                 "ocio_config": ("STRING", {"default": "", "tooltip": "blank = the shipped config"}),
                 "name": ("STRING", {"default": "grass"}),
                 "out_dir": ("STRING", {"default": ""}),
-            }
+            },
+            "optional": {
+                "source_colour": (list(ec.SOURCES), {"default": ec.VIEW_INVERSE, "tooltip": "how the generated (display) picture comes into ACEScg. inverse display view = the inverse of the ACES 2.0 SDR view LTX Prep shows LTX, so the element survives the LTX round trip as it was made. sRGB texture = the old flat texture transform (comes back dimmer after LTX)"}),
+            },
         }
 
     def run(self, image, mask, shot_camera, batch_index, frame, distance_m, lateral_m, height_m, ground_y, yaw_deg,
-            erode_px, mask_is_background, ocio_config, name, out_dir):
+            erode_px, mask_is_background, ocio_config, name, out_dir, source_colour=None):
         import torch
 
         cam = sc.ShotCamera(shot_camera)
@@ -63,7 +67,7 @@ class AtlasVFXForegroundElement:
             m = cv2.resize(m, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
         if mask_is_background:
             m = 1.0 - m
-        rgba, rep = fe.make_texture(img, m, ocio_config, erode_px=erode_px)
+        rgba, rep = fe.make_texture(img, m, ocio_config, erode_px=erode_px, source=source_colour or ec.VIEW_INVERSE)
         aspect = rgba.shape[1] / rgba.shape[0]
 
         provisional = fe.place_card(cam, frame, distance_m, lateral_m, height_m, aspect, 0.0, yaw_deg)

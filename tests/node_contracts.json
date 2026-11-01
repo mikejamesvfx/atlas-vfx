@@ -431,6 +431,15 @@
     "name": "exposure_stops",
     "type": "FLOAT",
     "group": "optional"
+   },
+   {
+    "name": "source_colour",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "inverse display view (ACES 2.0 SDR, as LTX)",
+     "sRGB texture"
+    ]
    }
   ],
   "outputs": [
@@ -930,6 +939,15 @@
     "name": "out_dir",
     "type": "STRING",
     "group": "required"
+   },
+   {
+    "name": "source_colour",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "inverse display view (ACES 2.0 SDR, as LTX)",
+     "sRGB texture"
+    ]
    }
   ],
   "outputs": [
@@ -2793,7 +2811,8 @@
     "group": "required",
     "options": [
      "linear",
-     "srgb"
+     "srgb",
+     "inverse display view (ACES 2.0 SDR, as LTX)"
     ]
    },
    {
@@ -2945,7 +2964,8 @@
     "group": "required",
     "options": [
      "linear",
-     "srgb"
+     "srgb",
+     "inverse display view (ACES 2.0 SDR, as LTX)"
     ]
    },
    {

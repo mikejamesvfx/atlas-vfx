@@ -8,6 +8,7 @@ import numpy as np
 
 from atlas_vfx.contracts import shot_camera as sc
 
+from . import element_colour as ec
 from . import light_transfer as lt
 from . import ltx_integration as li
 from . import relight as rl
@@ -34,8 +35,9 @@ class AtlasVFXRelightTransfer:
                 "element": ("IMAGE", {"tooltip": "full-res element, same framing as relit"}),
                 "matte": ("MASK",),
                 "relit": ("IMAGE", {"tooltip": "the relit take, any size, same framing"}),
-                "encoding": (["linear", "srgb"], {"default": "linear",
-                                                  "tooltip": "how element and relit are encoded; output matches"}),
+                "encoding": (["linear", "srgb", ec.VIEW_INVERSE], {"default": "linear", "tooltip": (
+                    "how element and relit are encoded; output matches. Display pictures from LTX: the inverse "
+                    "display view (the ACES 2.0 SDR view LTX Prep used). srgb = the plain sRGB curve")}),
                 "mode": (list(lt.MODES), {"default": "guided"}),
                 "analysis_width": ("INT", {"default": 1280, "min": 0, "max": 8192, "step": 16,
                                            "tooltip": "width the gain is measured at; the LoRA's native width. "
@@ -90,6 +92,8 @@ class AtlasVFXRelightTransfer:
             rel = li.mirror(rel)
         if encoding == "srgb":
             el, rel = rl.srgb_to_lin(el), rl.srgb_to_lin(rel)
+        elif encoding == ec.VIEW_INVERSE:
+            el, rel = ec.to_acescg(el, ""), ec.to_acescg(rel, "")
         m = matte.float().cpu().numpy()
         if m.ndim == 2:
             m = m[None]
@@ -118,6 +122,10 @@ class AtlasVFXRelightTransfer:
                                      progress=(lambda t: pbar.update(1)) if pbar else None)
         if encoding == "srgb":
             out = rl.lin_to_srgb(out)
+        elif encoding == ec.VIEW_INVERSE:
+            out = np.ascontiguousarray(out, np.float32).copy()
+            ec.from_acescg_processor("", ec.VIEW_INVERSE).applyRGB(out)
+            out = np.clip(out, 0.0, 1.0)
         rep["relit_mirrored"] = bool(relit_mirrored)
         if rots is not None:
             rep["shot_frames"] = [int(first_frame), int(first_frame + len(el) - 1)]

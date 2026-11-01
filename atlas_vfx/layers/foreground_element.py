@@ -17,11 +17,14 @@ GEN_SPACE = "sRGB Encoded Rec.709 (sRGB)"
 
 
 def make_texture(image_srgb: np.ndarray, mask: np.ndarray, ocio_config: str, erode_px: int = 1,
-                 feather_px: float = 0.0, pad: int = 4) -> tuple[np.ndarray, dict]:
-    """image (H,W,3) display sRGB 0-1, mask (H,W) 1 = element. Returns premultiplied ACEScg RGBA and a report."""
+                 feather_px: float = 0.0, pad: int = 4, source: str | None = None) -> tuple[np.ndarray, dict]:
+    """image (H,W,3) display sRGB 0-1, mask (H,W) 1 = element. Returns premultiplied ACEScg RGBA and a report.
+    source: how the display picture comes into ACEScg (layers/element_colour.py); None = the old sRGB texture."""
+    from . import element_colour as ec
+
+    source = source or ec.SRGB_TEXTURE
     import cv2
 
-    from atlas_vfx.camera_side.plate import ocio_config as load_cfg
 
     img = np.clip(image_srgb.astype(np.float32), 0, 1)
     a = np.clip(mask.astype(np.float32), 0, 1)
@@ -35,9 +38,8 @@ def make_texture(image_srgb: np.ndarray, mask: np.ndarray, ocio_config: str, ero
         F = (img - (1 - a[..., None]) * B) / a[..., None]
     F = np.where(a[..., None] > 1e-3, np.clip(F, 0, 1), 0).astype(np.float32)
 
-    cfg = load_cfg(ocio_config)
     lin = np.ascontiguousarray(F.copy())
-    cfg.getProcessor(GEN_SPACE, "ACEScg").getDefaultCPUProcessor().applyRGB(lin)
+    ec.to_acescg_processor(ocio_config, source).applyRGB(lin)
     rgba = np.concatenate([lin * a[..., None], a[..., None]], -1)
 
     ys, xs = np.nonzero(a > 0.01)
@@ -48,7 +50,7 @@ def make_texture(image_srgb: np.ndarray, mask: np.ndarray, ocio_config: str, ero
     rgba = rgba[y0:y1, x0:x1]
     report = {"backdrop_srgb": B.tolist(), "erode_px": erode_px, "feather_px": feather_px,
               "crop": [int(x0), int(y0), int(x1), int(y1)], "size": [int(x1 - x0), int(y1 - y0)],
-              "alpha_coverage": float((a > 0.5).mean()), "colour": f"OCIO {GEN_SPACE} -> ACEScg",
+              "alpha_coverage": float((a > 0.5).mean()), "colour": ec.describe(source),
               "decontamination": "F = (I - (1 - a) * backdrop) / a, backdrop = median of a < 0.02"}
     return rgba, report
 

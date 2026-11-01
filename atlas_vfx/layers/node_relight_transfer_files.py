@@ -14,6 +14,7 @@ from atlas_vfx.camera_side import plate as pl
 from atlas_vfx.contracts import shot_camera as sc
 
 from . import chunks as ch
+from . import element_colour as ec
 from . import light_transfer as lt
 from . import light_transfer_files as ltf
 
@@ -48,8 +49,10 @@ class AtlasVFXRelightTransferFiles:
                 "relit_numbering": (["frame", "sequential"], {"default": "frame",
                                                               "tooltip": "sequential: a raw SaveImage take numbered "
                                                                          "from 1"}),
-                "relit_encoding": (["linear", "srgb"], {"default": "linear",
-                                                        "tooltip": "srgb for a raw LTX PNG take"}),
+                "relit_encoding": (["linear", "srgb", ec.VIEW_INVERSE], {"default": "linear", "tooltip": (
+                    "how the relit take is encoded. A raw LTX PNG / video take is display-referred through the ACES "
+                    "2.0 SDR view LTX Prep used: pick the inverse display view so it matches the ACEScg element. "
+                    "srgb is the plain sRGB curve (no tone map, Rec.709 primaries): kept for old takes")}),
                 "mode": (list(lt.MODES), {"default": "sh"}),
                 "analysis_width": ("INT", {"default": 1280, "min": 0, "max": 8192, "step": 16}),
                 "blur_px": ("FLOAT", {"default": 2.0, "min": 0.0, "max": 64.0, "step": 0.5}),
@@ -91,7 +94,9 @@ class AtlasVFXRelightTransferFiles:
             raise ValueError("mode sh needs moge_model (Load MoGe Model)")
         files = lambda p, numbering="frame": ch.pick(ch.scan(pl.clean_path(p)), first_frame, length, numbering)
         element = ltf.SeqFrames(files(element_path))
-        relit = ltf.SeqFrames(files(relit_path, relit_numbering), srgb=relit_encoding == "srgb", flip=relit_mirrored)
+        relit = ltf.SeqFrames(files(relit_path, relit_numbering), srgb=relit_encoding == "srgb", flip=relit_mirrored,
+                              proc=ec.to_acescg_processor(ocio_config, ec.VIEW_INVERSE)
+                              if relit_encoding == ec.VIEW_INVERSE else None)
         matte = (ltf.SeqFrames(files(matte_path), kind="mask") if matte_path.strip()
                  else ltf.SeqFrames(files(element_path), kind="alpha"))
         holdout = ltf.SeqFrames(files(holdout_path), kind="mask") if holdout_path.strip() else None
