@@ -2,7 +2,8 @@
 browser uploads straight to the GPU (WebGL2 RGBA16F), at two levels:
 
     proxy  PROXY_W wide, for scrubbing and playback (all frames of five takes fit in a few GB)
-    full   the source size, for the paused frame
+    full   the paused frame: the source size capped at FULL_MAX_W wide (HD, 1920, by default: a 4K set of seven
+           images is ~500 MB to read and upload; ATLAS_VFX_VIEW_MAX_W=0 keeps the source size)
 
 A frame file is  b"ATLF16\\n" + uint32 header length + header JSON + float16 RGBA rows (top row first, little
 endian). The header names its source key: sha1 of (source file, mtime_ns, size, level, width). A changed source no
@@ -34,6 +35,7 @@ from . import shot as sh
 MAGIC = b"ATLF16\n"
 LEVELS = ("proxy", "full")
 PROXY_W = 1024
+FULL_MAX_W = int(os.environ.get("ATLAS_VFX_VIEW_MAX_W", "1920") or 0)
 BUDGET_GB_DEFAULT = 12.0
 SCAN_EVERY_BYTES = 512 << 20        # check the budget after this much has been written since the last check
 STATUS: dict = {}               # (shot, layer, level) -> {"state", "done", "of", "error"}
@@ -54,9 +56,10 @@ def _level(level: str) -> str:
 
 
 def size_for(src_w: int, src_h: int, level: str) -> tuple[int, int]:
-    if _level(level) == "full" or src_w <= PROXY_W:
+    w = PROXY_W if _level(level) == "proxy" else FULL_MAX_W
+    if not w or src_w <= w:
         return src_w, src_h
-    return PROXY_W, max(2, int(round(src_h * PROXY_W / src_w / 2)) * 2)
+    return w, max(2, int(round(src_h * w / src_w / 2)) * 2)
 
 
 def encode(rgba: np.ndarray, header: dict) -> bytes:
@@ -245,12 +248,15 @@ def take_bytes(name: str, layer: str, version: str, level: str, frame: int) -> b
         return None
     path = take_file(name, layer, version, level, frame)
     head = _read_header(path)
-    if head is not None and head.get("key") == source_key(src, level, head.get("width", 0)):
+    w = head.get("width", 0) if head is not None else 0
+    # kept only at the size the current caps give (a file from before the cap changed is remade)
+    if head is not None and "src_w" in head and size_for(head["src_w"], head["src_h"], level)[0] == w             and head.get("key") == source_key(src, level, w):
         return _read(path)
     img = vw.read_frame(str(src), int(frame))
     W, H = size_for(img.shape[1], img.shape[0], level)
     data = encode(fr._resize(img, (W, H)), {"key": source_key(src, level, W), "frame": int(frame),
-                                              "layer": layer, "version": version, "level": level})
+                                              "layer": layer, "version": version, "level": level,
+                                              "src_w": int(img.shape[1]), "src_h": int(img.shape[0])})
     _write(path, data)
     return data
 

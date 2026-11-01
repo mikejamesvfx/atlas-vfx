@@ -84,8 +84,15 @@ def setup():
 
 
 def test_takes(H, W):
-    full = cc.decode(cc.take_bytes("C", "rl", "v002", "full", 1002))
     src = ramp(H, W, 1)
+    cap = cc.FULL_MAX_W                                            # the paused frame is capped at HD by default
+    hd, hd_head = cc.decode(cc.take_bytes("C", "rl", "v002", "full", 1002))
+    check(hd.shape[1] == min(W, cap) and np.allclose(hd, fr._resize(src, cc.size_for(W, H, "full")), atol=2e-3),
+          "full level is capped at FULL_MAX_W wide", f"{hd.shape}")
+    cc.FULL_MAX_W = 0                                              # 0: the source size
+    full = cc.decode(cc.take_bytes("C", "rl", "v002", "full", 1002))
+    check(full[0].shape == (H, W, 4), "a smaller cap's cache file is remade at the new size", f"{full[0].shape}")
+    cc.FULL_MAX_W = cap
     check(full[0].shape == (H, W, 4) and np.allclose(full[0], src, rtol=1e-3, atol=1e-3),
           "full level round trips to float16 rounding", f"max {np.abs(full[0] - src).max():.1e}")
     px, head = cc.decode(cc.take_bytes("C", "rl", "v002", "proxy", 1002))
