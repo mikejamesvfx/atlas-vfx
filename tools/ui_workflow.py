@@ -98,6 +98,25 @@ def convert(graph, title=""):
     return wf
 
 
+def _dynamic(prefix, spec, chosen, vals, k, inputs):
+    """A dynamic combo's chosen option brings its own widgets (saved right after it): name them prefix.sub and
+    recurse into nested dynamic combos (SaveVideo: format -> format.codec -> format.codec.encoding)."""
+    opts = spec[1] if len(spec) > 1 and isinstance(spec[1], dict) else {}
+    option = next((o for o in opts.get("options", []) if o.get("key") == chosen), None)
+    if option is None:
+        return k
+    subs = list(option["inputs"].get("required", {}).items()) + list(option["inputs"].get("optional", {}).items())
+    for sub, sspec in subs:
+        if not _is_widget(sspec) or k >= len(vals):
+            continue
+        key = f"{prefix}.{sub}"
+        inputs[key] = vals[k]
+        k += 1
+        if sspec[0] == "COMFY_DYNAMICCOMBO_V3":
+            k = _dynamic(key, sspec, inputs[key], vals, k, inputs)
+    return k
+
+
 def to_api(wf: dict) -> dict:
     """A GUI (litegraph) workflow back to an API graph, the inverse of convert: widgets_values are read in the
     node definition's input order (skipping the control_after_generate and upload slots convert adds), sockets and
@@ -121,8 +140,9 @@ def to_api(wf: dict) -> dict:
                     if name not in info["input"].get("optional", {}):
                         raise ValueError(f"to_api: {n['type']} #{n['id']} has {len(vals)} widget values, its "
                                          f"definition wants more (stale graph?)")
-                    inputs[name] = [str(linked[name][1]), linked[name][2]] if name in linked else _default(spec)
-                    continue                     # an optional input added after the graph was saved: its default
+                    if name in linked:
+                        inputs[name] = [str(linked[name][1]), linked[name][2]]
+                    continue                     # an optional input the saved graph doesn't know: the server default
                 v = vals[k]
                 k += 1
                 if _has_control(name, spec):
@@ -131,6 +151,8 @@ def to_api(wf: dict) -> dict:
                 if opts.get("image_upload") or opts.get("video_upload"):
                     k += 1
                 inputs[name] = [str(linked[name][1]), linked[name][2]] if name in linked else v
+                if spec[0] == "COMFY_DYNAMICCOMBO_V3":
+                    k = _dynamic(name, spec, v, vals, k, inputs)
             elif name in linked:
                 inputs[name] = [str(linked[name][1]), linked[name][2]]
         if k < len(vals):                # (k may run 1 past the end: an upload / control slot not saved)

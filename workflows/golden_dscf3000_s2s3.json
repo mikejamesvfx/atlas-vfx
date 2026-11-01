@@ -1393,7 +1393,7 @@
    "widgets_values": [
     "atlas-vfx/DEMO_element_clip",
     "auto",
-    "auto"
+    ""
    ]
   },
   {
@@ -1796,7 +1796,7 @@
    "widgets_values": [
     "atlas-vfx/DEMO_comp_S2S3",
     "auto",
-    "auto"
+    ""
    ]
   },
   {
@@ -4110,7 +4110,7 @@
    "widgets_values": [
     "atlas-vfx/LTX_element_integration",
     "auto",
-    "auto"
+    ""
    ]
   },
   {
@@ -4187,7 +4187,7 @@
    "widgets_values": [
     "atlas-vfx/LTX_element_reference",
     "auto",
-    "auto"
+    ""
    ]
   },
   {
