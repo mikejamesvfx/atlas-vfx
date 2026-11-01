@@ -53,8 +53,10 @@ class SolveOptions:
     min_registered_frac: float = 0.5
     min_points: int = 300
     bridge_gaps: bool = True
-    nodal_fallback: bool = True             # SfM too weak, or the shot is a pan -> rotation-only solve
-    nodal_panoramic_frac: float = 0.5       # this share of rotation-only (panoramic) pairs makes it a pan
+    nodal_fallback: bool = True             # SfM too weak, or a pan that SfM can't hold -> rotation-only solve
+    nodal_panoramic_frac: float = 0.5       # this share of rotation-only (panoramic) pairs makes it a candidate
+    camera_move: str = "auto"               # auto | free (always SfM) | nodal (tripod pan: always rotation-only)
+    lens_k_limit: float = 0.25              # |k1| or |k2| past this is not a real lens: SfM has gone degenerate
     reject_px: float = 2.0                  # drop points whose worst observation reprojects further than this
     reject_rounds: int = 2
     seed: int = 0
@@ -316,6 +318,25 @@ def _image_size(image_dir: Path, name: str) -> tuple[int, int]:
     return a.shape[1], a.shape[0]
 
 
+def _implausible_lens(rec, size: tuple[int, int], opts: SolveOptions) -> str | None:
+    """Why SfM's solved lens can't be a real one (or None): a distortion term past lens_k_limit, or a focal more
+    than 2x off the guess (no guess: outside a 10-120 degree horizontal field of view)."""
+    cam = next(iter(rec.cameras.values()))
+    p = [float(v) for v in cam.params]
+    f = float(cam.mean_focal_length())
+    k = p[3:5] if cam.model.name in ("RADIAL", "SIMPLE_RADIAL") else p[4:6]
+    bad = [f"k{i + 1} {v:+.3f}" for i, v in enumerate(k) if abs(v) > opts.lens_k_limit]
+    W = size[0]
+    if opts.focal_px:
+        if not 0.5 <= f / opts.focal_px <= 2.0:
+            bad.append(f"focal {f:.0f} px vs guess {opts.focal_px:.0f}")
+    else:
+        fov = math.degrees(2 * math.atan(W / 2 / f))
+        if not 10.0 <= fov <= 120.0:
+            bad.append(f"field of view {fov:.0f} deg")
+    return ", ".join(bad) or None
+
+
 def _camera_report(rec, size: tuple[int, int], opts: SolveOptions) -> dict:
     cam = next(iter(rec.cameras.values()))
     p = [float(v) for v in cam.params]
@@ -376,12 +397,25 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
     shutil.rmtree(out / "sparse", ignore_errors=True)
     deg_sfm = degeneracy(db, rec) if rec is not None else None
     panoramic = deg_sfm is not None and deg_sfm["panoramic_pair_frac"] > opts.nodal_panoramic_frac
-    if (weak or panoramic) and opts.nodal_fallback:
+    # Rotation-only PAIRS don't make a nodal SHOT: frames up to `overlap` apart look like pure rotation on a walk
+    # too (DSCF2977, 2026-11-01: 97 % of pairs, yet NukeX and SfM both solve the translation). What gives a true
+    # pan away is SfM's lens: with no baseline it trades focal against distortion into an impossible lens
+    # (synthetic pan: focal +98 %, k1 +0.66). So a panoramic shot goes nodal only when SfM's lens is implausible.
+    lens_bad = None if rec is None or weak else _implausible_lens(rec, size, opts)
+    go_nodal = {"nodal": True, "free": False}.get(opts.camera_move)
+    if go_nodal is None:
+        if opts.camera_move != "auto":
+            raise SolveError(f"camera_move {opts.camera_move!r}: auto, free or nodal")
+        go_nodal = opts.nodal_fallback and (weak or (panoramic and bool(lens_bad)))
+    panoramic_kept = panoramic and not go_nodal and not weak
+    if go_nodal:
         # no baseline: SfM either can't start or trades focal against distortion freely. A camera turning about
         # its lens is solved as rotations instead, which pins the focal.
         from . import nodal_solve
 
-        why = (f"{deg_sfm['panoramic_pair_frac']:.0%} of matched pairs are rotation-only" if panoramic else
+        why = ("camera_move nodal" if opts.camera_move == "nodal" else
+               f"{deg_sfm['panoramic_pair_frac']:.0%} of matched pairs are rotation-only and SfM's lens is "
+               f"implausible ({lens_bad})" if panoramic and lens_bad else
                f"SfM registered {len(_registered(rec)) if rec else 0}/{len(names)} frames")
         log(f"solve: {why}; nodal solve")
         sol = nodal_solve.solve(db, names, focal_px=opts.focal_px,
@@ -406,7 +440,7 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
     run = longest_run(reg)
     deg = deg_sfm if mode == "sfm" else {**(deg_sfm or {}), "nodal": True, "warn": False, "reasons": []}
     report = {
-        "mode": mode, "nodal": nodal_info,
+        "mode": mode, "nodal": nodal_info, "camera_move": opts.camera_move, "sfm_lens_check": lens_bad,
         "front_end": opts.front_end, "options": asdict(opts), "image_size": list(size),
         "frames": [first, last], "registered": len(reg), "of": len(names),
         "missing": gaps(reg, first, last), "longest_run": list(run),
@@ -419,6 +453,10 @@ def solve_folder(image_dir, names: list[str], out_dir, opts: SolveOptions | None
     if mode == "nodal":            # the model's points sit on their mean rays, so its own error says nothing
         report["mean_reproj_px"] = nodal_info["rms_px"]
     warn = []
+    if panoramic_kept and mode == "sfm":
+        warn.append(f"{deg_sfm['panoramic_pair_frac']:.0%} of matched pairs look rotation-only, but SfM found "
+                    "parallax with a plausible lens, so the camera is solved free. If this was a locked-off pan "
+                    "(tripod), set camera_move to nodal and compare the focal.")
     if mode == "nodal":
         warn.append("nodal solve: the shot has no usable baseline, so the camera turns about a fixed point and the "
                     f"points sit on a sphere {nodal_solve.POINT_DISTANCE:g} units out. Fine for a pan; there is no "

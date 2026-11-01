@@ -265,6 +265,24 @@ def render_mask(M, movers):
     return (np.abs(with_m - without) > 1e-6).astype(np.float32)
 
 
+def case_walk_pan():
+    """A walk with a big pan (DSCF2977's move): neighbouring frames look rotation-only, the shot has parallax.
+    It must stay SfM (the old rule sent it nodal and got focal +16 %, k1 +0.06 on the real clip)."""
+    n = 36
+    mats = [cam_matrix([-0.8 + 1.6 * i / (n - 1), 1.6, 2.5 - 1.2 * i / (n - 1)], 30 - 60 * i / (n - 1), -6.0)
+            for i in range(n)]
+    names = write_shot(TMP / "walkpan", mats)
+    res = ps.solve_folder(TMP / "walkpan", names, TMP / "walkpan_solve", ps.SolveOptions(focal_px=F_PX * 1.08))
+    r = res.report
+    check(r["mode"] == "sfm" and r["registered"] == n,
+          f"walk + pan stays SfM ({r['mode']}, {r['registered']}/{n}, panoramic pairs "
+          f"{r['degeneracy'].get('panoramic_pair_frac')}, lens check {r['sfm_lens_check']})")
+    f = r["camera"]["focal_px"]
+    check(abs(f / F_PX - 1) < 0.01, f"walk + pan: focal {f:.2f} vs {F_PX:.2f} ({100 * (f / F_PX - 1):+.2f} %)")
+    med, mx = rot_error(solved_camera(res, "walkpan"), truth_camera(mats, "truth"))
+    check(mx < 0.05, f"walk + pan: rotation error median {med:.4f}, max {mx:.4f} deg")
+
+
 def case_nodal():
     n = 24
     mats = [cam_matrix([0.0, 1.6, 2.0], 20 - 40 * i / (n - 1), -6.0 + 2 * np.sin(i / 4)) for i in range(n)]
@@ -281,6 +299,12 @@ def case_nodal():
     med, mx = rot_error(cam, truth_camera(mats, "truth"))
     check(mx < 0.05, f"nodal: rotation error median {med:.4f}, max {mx:.4f} deg < 0.05")
     check(any("nodal solve" in w for w in r["warnings"]), "nodal: report says it is a nodal solve")
+    check(r["sfm_lens_check"] is not None, f"nodal: SfM's lens was implausible ({r['sfm_lens_check']})")
+    forced = ps.solve_folder(TMP / "nodal", names, TMP / "nodal_forced", ps.SolveOptions(camera_move="nodal",
+                                                                                         focal_px=F_PX * 1.08))
+    ff = forced.report["camera"]["focal_px"]
+    check(forced.report["mode"] == "nodal" and abs(ff / F_PX - 1) < 0.01,
+          f"camera_move nodal: forced rotation-only solve, focal {ff:.2f} ({100 * (ff / F_PX - 1):+.2f} %)")
     pts = cio.colmap_points(res.model_dir, plate_width=W, frame_offset=F0)
     f0 = cam.frames[n // 2]
     k, xy = pts["observations"][f0]
@@ -302,6 +326,7 @@ def main() -> int:
               "a point behind the camera projects to NaN (pycolmap gives None), not a crash")
         case_dolly()
         case_mover()
+        case_walk_pan()
         case_nodal()
     finally:
         if not fails:

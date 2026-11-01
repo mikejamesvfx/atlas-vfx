@@ -195,7 +195,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 4 Solve Plate
 `AtlasVFXSolvePlate` · camera_side · Atlas VFX/Camera
 - in: plate_ref ATLAS_PLATE_SEQ, sensor_preset auto|fujifilm_xh2_dci4k_24p_dis_off|custom, sensor_width_mm FLOAT, sensor_height_mm FLOAT, focal_guess_mm FLOAT, solve_focal BOOLEAN, solve_distortion BOOLEAN, lens_model k1 k2 (RADIAL)|k1 (SIMPLE_RADIAL)|k1 k2 p1 p2 (OPENCV), proxy_width INT, max_features INT, overlap INT, reject_px FLOAT, name STRING, out_dir STRING
-- in, optional: masks MASK, mask_dilate_px INT, tracks ATLAS_TRACKS_2D, seed INT
+- in, optional: masks MASK, mask_dilate_px INT, tracks ATLAS_TRACKS_2D, seed INT, camera_move auto|free|nodal
 - out: shot_camera ATLAS_TRACKED_CAMERA, path STRING, report STRING, preview IMAGE
 - test: tests/test_plate_solve.py, tests/test_camera_io.py, tests/test_camera_checks.py
 - proof: synthetic (dolly: focal 0.1 % and k1/k2 from an 8 % wrong guess, all frames; moving board: its points

@@ -3860,6 +3860,16 @@
     "name": "seed",
     "type": "INT",
     "group": "optional"
+   },
+   {
+    "name": "camera_move",
+    "type": "COMBO",
+    "group": "optional",
+    "options": [
+     "auto",
+     "free",
+     "nodal"
+    ]
    }
   ],
   "outputs": [

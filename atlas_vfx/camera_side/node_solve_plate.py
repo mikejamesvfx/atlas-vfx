@@ -62,12 +62,16 @@ class AtlasVFXSolvePlate:
                 "mask_dilate_px": ("INT", {"default": 4, "min": 0, "max": 64}),
                 "tracks": ("ATLAS_TRACKS_2D",),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 2 ** 31 - 1}),
+                "camera_move": (["auto", "free", "nodal"], {"default": "auto", "tooltip": (
+                    "auto: SfM, and a rotation-only (nodal) solve only when SfM can't solve the shot or its lens "
+                    "comes out impossible (a pan). free: always SfM. nodal: the camera turns about its lens "
+                    "(tripod pan): rotations + focal + lens, no depth")}),
             },
         }
 
     def run(self, plate_ref, sensor_preset, sensor_width_mm, sensor_height_mm, focal_guess_mm, solve_focal,
             solve_distortion, lens_model, proxy_width, max_features, overlap, reject_px, name, out_dir,
-            masks=None, mask_dilate_px=4, tracks=None, seed=0):
+            masks=None, mask_dilate_px=4, tracks=None, seed=0, camera_move="auto"):
         import numpy as np
         import torch
 
@@ -100,7 +104,7 @@ class AtlasVFXSolvePlate:
                                focal_px=focal_guess_mm / sensor["width_mm"] * W if focal_guess_mm > 0 else None,
                                refine_focal=solve_focal, refine_distortion=solve_distortion,
                                max_image_size=proxy_width, max_features=max_features, overlap=overlap,
-                               reject_px=reject_px, seed=seed)
+                               reject_px=reject_px, seed=seed, camera_move=camera_move)
         res = ps.solve_folder(proxy_dir, names, out, opts, masks=mask_list, mask_dilate_px=mask_dilate_px,
                               tracks=tracks, log=lambda s: log.info("atlas-vfx Solve Plate: %s", s))
         fps = plate_ref["fps"][0] / plate_ref["fps"][1]
