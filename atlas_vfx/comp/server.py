@@ -18,6 +18,7 @@ from pathlib import Path
 from atlas_vfx.camera_side import plate as pl
 
 from . import bake as bk
+from . import cache as cc
 from . import cloud
 from . import frames as fr
 from . import queue as qu
@@ -357,6 +358,47 @@ def build_routes():
             s, f, w, _float(q, "exposure", 0.0, -20, 20), q.get("view") or fr.DEFAULT_VIEW, _names(q, "a"),
             _names(q, "b"), _float(q, "wipe", 0.5, 0, 1)))
         return web.Response(body=jpg, content_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+    # ---- Light room: half-float frames for the browser's GPU mix (comp/cache.py)
+    @routes.get("/atlas/api/shots/{shot}/cache/{layer}/{version}/{level}/{frame}")
+    @guard
+    async def cache_take(request):
+        m = request.match_info
+        data = await off_loop(lambda: cc.take_bytes(m["shot"], m["layer"], m["version"], m["level"],
+                                                   _int(m, "frame", 0, 0, 10 ** 6)))
+        if data is None:
+            return web.json_response({"error": "no such frame"}, status=404)
+        return web.Response(body=data, content_type="application/octet-stream",
+                            headers={"Cache-Control": "private, max-age=3600"})
+
+    @routes.get("/atlas/api/shots/{shot}/stack/{layer}/{side}/{level}/{frame}")
+    @guard
+    async def cache_stack(request):
+        m, q = request.match_info, request.query
+        size = (_int(q, "w", 1024, 16, 16384), _int(q, "h", 540, 16, 16384))
+        data = await off_loop(lambda: cc.stack_bytes(m["shot"], m["layer"], m["side"], m["level"],
+                                                    _int(m, "frame", 0, 0, 10 ** 6), size))
+        return web.Response(body=data, content_type="application/octet-stream", headers={"Cache-Control": "no-store"})
+
+    @routes.post("/atlas/api/shots/{shot}/cache/{layer}/warm")
+    @guard
+    async def cache_warm(request):
+        d = await body(request)
+        return web.json_response(cc.warm(request.match_info["shot"], request.match_info["layer"],
+                                         str(d.get("level", "proxy"))))
+
+    @routes.get("/atlas/api/shots/{shot}/cache/{layer}/status")
+    @guard
+    async def cache_status(request):
+        return web.json_response(cc.status(request.match_info["shot"], request.match_info["layer"],
+                                           request.query.get("level", "proxy")))
+
+    @routes.get("/atlas/api/view_shader")
+    @guard
+    async def view_shader(request):
+        q = request.query
+        return web.json_response(await off_loop(lambda: cc.view_shader(q.get("config", ""),
+                                                                        q.get("view") or fr.DEFAULT_VIEW)))
 
     @routes.get("/atlas/api/views")
     @guard
