@@ -178,16 +178,9 @@ def update_layer(name: str, layer: str, **changes) -> dict:
         elif k == "order":
             v = int(v)
         elif k == "mix":
-            if not isinstance(v, dict):
-                raise ValueError("mix: an object of version -> weight")
-            clean = {}
-            for ver, w in v.items():
-                if ver not in lay["versions"]:
-                    raise ValueError(f"mix: version {ver!r} is not rendered ({', '.join(lay['versions']) or 'none'})")
-                if isinstance(w, bool) or not isinstance(w, (int, float)) or not 0.0 <= float(w) <= MIX_MAX:
-                    raise ValueError(f"mix: weight for {ver} must be 0-{MIX_MAX:g}")
-                clean[ver] = float(w)
-            v = clean
+            from . import mix as mx
+
+            v = mx.validate(v, lay["versions"]) if v else None     # v2 record (comp/mix.py); v1 dicts still accepted
         lay[k] = v
     save_shot(shot)
     return lay

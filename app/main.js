@@ -311,40 +311,76 @@ function renderInspector() {
 // Light mix: a recipe layer's renders blended in linear, one slider per version (0-200 %). Light adds, so 70 % of a
 // left-sun take plus 30 % of a right-sun take is a believable two-light look. Saved on the layer as mix, so the
 // viewer, the timeline and a later Nuke handoff all see the same blend. Empty = the chosen version alone.
+// Light mix v2 (atlas_vfx/comp/mix.py): each render is a take; blend = weights as proportions (relit takes),
+// sum = weights add (light passes, and every mix saved before v2). Stops and mute/solo per take.
+function mixRecord(raw) {
+  if (!raw || !Object.keys(raw).length) return null;
+  if (raw.takes) return { mode: raw.mode || "blend", takes: structuredClone(raw.takes) };
+  return { mode: "sum", takes: Object.fromEntries(Object.entries(raw).map(([v, w]) =>
+    [v, { weight: w, stops: 0, tint: [1, 1, 1], mute: false, solo: false }])) };
+}
+
 function lightMix(l) {
   const versions = l.versions || [];
   if (versions.length < 2) return null;
-  const mix = { ...(l.mix || {}) };
-  const on = Object.keys(mix).length > 0;
+  const m = mixRecord(l.mix);
+  const on = !!m;
   let timer = null;
   const save = () => {
     clearTimeout(timer);
     timer = setTimeout(async () => {
-      try { await api.patchLayer(S.shot.name, l.name, { mix: { ...mix } }); l.mix = { ...mix }; refreshFrame(); }
+      try { await api.patchLayer(S.shot.name, l.name, { mix: structuredClone(m) }); l.mix = structuredClone(m); refreshFrame(); }
       catch (e) { status(e.message, true); }
     }, 120);
   };
-  const rows = versions.map((v) => {
-    const pct = el("output", { class: "num", text: `${Math.round((mix[v] ?? 0) * 100)}%` });
-    const slider = el("input", { type: "range", min: 0, max: 200, step: 5, value: Math.round((mix[v] ?? 0) * 100),
+  const wmax = m && m.mode === "sum" ? 200 : 100;
+  const rows = on ? versions.map((v) => {
+    const t = m.takes[v] || (m.takes[v] = { weight: 0, stops: 0, tint: [1, 1, 1], mute: false, solo: false });
+    const pct = el("output", { class: "num", text: `${Math.round(t.weight * 100)}%` });
+    const w = el("input", { type: "range", min: 0, max: wmax, step: 1, value: Math.round(t.weight * 100),
       "aria-label": `${v} weight` });
-    slider.addEventListener("input", () => {
-      mix[v] = Number(slider.value) / 100;
-      pct.textContent = `${slider.value}%`;
-      save();
+    w.addEventListener("input", () => { t.weight = Number(w.value) / 100; pct.textContent = `${w.value}%`; save(); });
+    const ev = el("output", { class: "num", text: `${t.stops >= 0 ? "+" : ""}${t.stops.toFixed(1)}` });
+    const st = el("input", { type: "range", min: -4, max: 4, step: 0.1, value: t.stops, "aria-label": `${v} stops` });
+    st.addEventListener("input", () => {
+      t.stops = Number(st.value); ev.textContent = `${t.stops >= 0 ? "+" : ""}${t.stops.toFixed(1)}`; save();
     });
-    return el("label", { class: "mixrow" }, el("span", { class: "num", text: v }), slider, pct);
-  });
+    const flag = (key, label) => {
+      const b = el("input", { type: "checkbox", "aria-label": `${v} ${key}` });
+      b.checked = !!t[key];
+      b.addEventListener("change", () => { t[key] = b.checked; save(); });
+      return el("label", { class: "flag", title: key }, b, document.createTextNode(label));
+    };
+    return el("div", { class: "mixrow" }, el("span", { class: "num", text: v }), w, pct, st, ev, flag("mute", "M"),
+      flag("solo", "S"));
+  }) : [];
   const start = el("button", { type: "button", text: on ? "Mix off" : "Mix these renders", onclick: async () => {
-    const next = on ? {} : Object.fromEntries(versions.map((v, i) => [v, i === versions.length - 1 ? 1 : 0]));
+    const next = on ? {} : { mode: "blend", takes: Object.fromEntries(versions.map((v, i) =>
+      [v, { weight: i === versions.length - 1 ? 1 : 0, stops: 0, tint: [1, 1, 1], mute: false, solo: false }])) };
     try { await api.patchLayer(S.shot.name, l.name, { mix: next }); await reloadShot(); }
     catch (e) { status(e.message, true); }
   } });
+  const bake = el("button", { type: "button", text: "Bake mix", title: "Write the mix as a new version (full size)",
+    onclick: async () => {
+      try {
+        await api.bakeMix(S.shot.name, l.name);
+        status("Baking the mix...");
+        const poll = setInterval(async () => {
+          const b = await api.bakeStatus(S.shot.name, l.name);
+          if (b.state === "running") { status(`Baking the mix: ${b.done}/${b.of || "?"}`); return; }
+          clearInterval(poll);
+          if (b.state === "error") status(b.error, true);
+          else { status(`Mix baked as ${b.version}`); await reloadShot(); }
+        }, 1000);
+      } catch (e) { status(e.message, true); }
+    } });
   const box = el("fieldset", { class: "field" }, el("legend", { text: "Light mix" }));
   box.append(el("p", { class: "muted", style: "margin: 0 0 8px;",
-    text: on ? "Each render is a light. Blend them like a light mixer." : "Blend this layer's renders like lights." }));
+    text: on ? (m.mode === "sum" ? "Each render is a light; they add." : "Each render is a relit take; weights blend them, stops push each one.")
+      : "Blend this layer's renders like lights." }));
   if (on) box.append(...rows);
   box.append(start);
+  if (on) box.append(bake);
   return box;
 }
 

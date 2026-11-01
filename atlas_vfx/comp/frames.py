@@ -165,25 +165,26 @@ def _single(shot: dict, lay: dict, frame: int) -> np.ndarray | None:
 
 
 def _mixed(shot: dict, lay: dict, frame: int) -> np.ndarray | None:
-    """A light mix: the weighted sum of the layer's versions in linear (light adds), alpha the weighted sum clipped
-    to 1. Versions missing the frame are left out; None when none has it."""
+    """A light mix of the layer's versions (comp/mix.py: blend for relit takes, sum for light passes). Versions
+    missing the frame are left out; None when none has it."""
+    from . import mix as mx
     from .shot import version_pattern
 
-    out = None
-    for ver, w in lay["mix"].items():
+    m = mx.normalize(lay["mix"])
+    images, size = {}, None
+    for ver in mx.active(m):
         pattern = version_pattern(shot, lay, ver)
-        if not pattern or w <= 0:
+        if not pattern:
             continue
         try:
             img = vw.read_frame(pattern, int(frame))
         except (ValueError, RuntimeError):
             continue
-        if out is not None and img.shape[:2] != out.shape[:2]:
-            img = _resize(img, (out.shape[1], out.shape[0]))
-        out = img * np.float32(w) if out is None else out + img * np.float32(w)
-    if out is not None:
-        out[..., 3] = np.clip(out[..., 3], 0.0, 1.0)
-    return out
+        if size is not None and img.shape[:2] != size:
+            img = _resize(img, (size[1], size[0]))
+        size = img.shape[:2]
+        images[ver] = img
+    return mx.mix_frame(images, m)
 
 
 def composite(shot: dict, frame: int, width: int = 1280, only: list[str] | None = None

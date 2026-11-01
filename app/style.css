@@ -87,7 +87,8 @@ fieldset.field legend { color: var(--ash); padding: 0 4px; font-size: 13px; }
 .compass button { min-height: 40px; font-size: 12px; }
 .compass .centre { display: grid; place-items: center; color: var(--ash); }
 .segmented { display: flex; gap: 6px; }
-.mixrow { display: grid !important; grid-template-columns: 48px 1fr 48px; gap: 8px; align-items: center; margin-bottom: 6px; }
+.mixrow { display: grid !important; grid-template-columns: 40px minmax(0, 1fr) 38px minmax(0, 1fr) 34px auto auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+.mixrow .flag { display: flex; gap: 2px; align-items: center; font-size: 12px; color: var(--ash); }
 .mixrow input[type=range] { accent-color: var(--bone); width: 100%; }
 .mixrow output { text-align: right; color: var(--bone); }
 .segmented button { flex: 1; min-height: 36px; font-size: 12px; }

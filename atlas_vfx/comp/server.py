@@ -17,6 +17,7 @@ from pathlib import Path
 
 from atlas_vfx.camera_side import plate as pl
 
+from . import bake as bk
 from . import cloud
 from . import frames as fr
 from . import queue as qu
@@ -281,6 +282,17 @@ def build_routes():
             if lay and lay[0]["kind"] == "recipe":
                 d["params"] = rc.validate(rc.load_recipe(lay[0]["recipe"]), d["params"])
         return web.json_response(sh.update_layer(name, layer, **d))
+
+    @routes.post("/atlas/api/shots/{shot}/layers/{layer}/bake_mix")
+    @guard
+    async def bake_mix(request):
+        """Write the layer's light mix as its next version (full-size ACEScg EXRs, comp/bake.py)."""
+        return web.json_response(bk.start(request.match_info["shot"], request.match_info["layer"]))
+
+    @routes.get("/atlas/api/shots/{shot}/layers/{layer}/bake_mix")
+    @guard
+    async def bake_status(request):
+        return web.json_response(bk.status(request.match_info["shot"], request.match_info["layer"]))
 
     @routes.get("/atlas/api/recipes")
     @guard
