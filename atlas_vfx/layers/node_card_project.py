@@ -110,8 +110,8 @@ class AtlasVFXCardProject:
             written.append(p.name)
             coverage.append(float((img[..., 3] > 0.5).mean()))
             if (n - f0) % preview_every == 0:
-                i, plate_img = next(pl.decode_rgb(plate_ref, n - off, n - off, width=preview_width))
-                lin = pl.to_working(plate_img, plate_ref)
+                i, frame = next(pl.decode_rgb(plate_ref, n - off, n - off, width=preview_width))
+                lin = pl.to_working(frame, plate_ref)
                 small = cv2.resize(plate_img, (lin.shape[1], lin.shape[0]), interpolation=cv2.INTER_AREA)
                 comp = np.ascontiguousarray(cp.over(small, lin))
                 disp_proc.applyRGB(comp)

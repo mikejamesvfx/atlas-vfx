@@ -60,6 +60,43 @@ def camera():
                     lens={"distortion_model": "brown", "distortion_params": [K1, K2, 0, 0, 0]})
 
 
+def node_card_project(cam, lens_folder):
+    """The Card Project NODE with a lens folder on a real (synthetic HEVC) plate: clean frames at the clean size,
+    plate frames at the plate size, render.json versions and sizes, and the preview (which once picked up the
+    decoded plate under the same variable name and crashed)."""
+    import json
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from test_plate import make_plate
+
+    from atlas_vfx.camera_side import exr_io
+    from atlas_vfx.camera_side import plate as pl
+    from atlas_vfx.layers.node_card_project import AtlasVFXCardProject
+
+    planes = []
+    for k in range(2):
+        planes.append((np.full((H, W), 400 + 20 * k, np.uint16), np.full((H, W // 2), 512, np.uint16),
+                       np.full((H, W // 2), 512, np.uint16)))
+    ref = pl.plate_ref(make_plate(TMP / "plates" / "syn.mov", "hevc", "pc", planes), frame_offset=1001)
+    tex = TMP / "tex.exr"
+    t = np.zeros((32, 32, 4), np.float32)
+    t[..., 1], t[..., 3] = 0.5, 1.0
+    exr_io.write_rgba(tex, t)
+    card = {"name": "card", "corners": [[-1.6, 2.4, -3.2], [-0.6, 2.4, -3.2], [-0.6, 1.4, -3.2], [-1.6, 1.4, -3.2]],
+            "texture": str(tex)}
+    out, prev = AtlasVFXCardProject().run(ref, cam.data, card, 1.0, 1, 1, 256, str(TMP / "cards"),
+                                          sensor_lens_folder=str(lens_folder))
+    rj = json.loads(next(Path(out).glob("*.render.json")).read_text(encoding="utf-8"))
+    Wc, Hc = cs.clean_size(lens_folder)
+    clean = exr_io.read_rgba(Path(out) / "card.1001.exr")[0]
+    plate = exr_io.read_rgba(Path(out) / "plate" / "card.1001.exr")[0]
+    check(clean.shape[:2] == (Hc, Wc) and plate.shape[:2] == (H, W) and plate.shape[2] == 4,
+          f"node: clean frames {clean.shape[1]}x{clean.shape[0]}, plate frames {plate.shape[1]}x{plate.shape[0]}")
+    check(rj["versions"] == {"clean": "card.%04d.exr", "plate": "plate/card.%04d.exr"}
+          and rj["sizes"] == {"clean": [Wc, Hc], "plate": [W, H]}, f"node: render.json versions + sizes {rj['sizes']}")
+    check(prev.shape[0] == 2 and prev.shape[-1] == 3, f"node: preview over the plate {tuple(prev.shape)}")
+
+
 def main() -> int:
     try:
         lens = ln.BrownConrady(F, F, W / 2, H / 2, k1=K1, k2=K2)
@@ -112,6 +149,7 @@ def main() -> int:
         uv, _ = cam.project(1001, X[None])
         check(a.sum() > 0.5 and np.abs(got - uv[0]).max() < 0.25,
               f"clean card redistorted lands on the lensed projection ({got.round(2)} vs {uv[0].round(2)})")
+        node_card_project(cam, d_over)
     finally:
         shutil.rmtree(TMP, ignore_errors=True)
     print("PASS" if not fails else f"{len(fails)} FAILED")
