@@ -20,13 +20,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
+from atlas_vfx.camera_side.plate import WORK_ROOT  # noqa: E402
 from atlas_vfx.contracts import shot_camera as sc  # noqa: E402
 from atlas_vfx.sensor import rs, rs_gpu  # noqa: E402
 from atlas_vfx.sensor.lens import BrownConrady  # noqa: E402
 
 FAILS: list[str] = []
-REAL = Path(r"C:\Users\miike\atlas-vfx-work\DSCF3000\solve\DSCF3000_relight_solve"
-            r"\DSCF3000_relight_solve.shot_camera.json")
+REAL = WORK_ROOT / "DSCF3000" / "solve" / "DSCF3000_relight_solve" / "DSCF3000_relight_solve.shot_camera.json"
 
 
 def check(ok, msg):
