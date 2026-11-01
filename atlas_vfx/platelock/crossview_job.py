@@ -173,7 +173,7 @@ def run(plate: str, ai: str, plate_ids: dict, out_dir: str, *, ai_ids: dict | No
         "per_frame": {str(k): v for k, v in per_frame.items()},
     }
     (od / "crossview.json").write_text(json.dumps(side, indent=1, default=str))
-    (od / "platelock_crossview.nk").write_text(_nuke(od, list(PM), frames, ai))
+    (od / "platelock_crossview.nk").write_text(_nuke(od, list(PM), frames, ai, ai_space))
     return side
 
 
@@ -195,19 +195,21 @@ def _summarise(per_frame: dict) -> dict:
     return out
 
 
-def _nuke(od: Path, ids: list, frames: list, ai: str) -> str:
+def _nuke(od: Path, ids: list, frames: list, ai: str, ai_space: str = "ACEScg") -> str:
     f0, f1 = frames[0], frames[-1]
     o = str(od).replace("\\", "/")
     lines = ["# platelock cross-view: generated Reads. Wire Read_AI into STMap.src and each _stmap Read into",
              "# STMap.stmap (UV channels rgb); the baked layers carry the plate ID matte in alpha.",
              f"Root {{\n inputs 0\n first_frame {f0}\n last_frame {f1}\n}}"]
 
-    def read(path, name, x):
-        return (f"Read {{\n inputs 0\n file {nt.nk_str(path)}\n first {int(f0)}\n last {int(f1)}\n on_error black\n"
+    def read(path, name, x, space=None):
+        # colour is always explicit (the config's file rule reads untagged EXRs as ACES2065-1); STMaps are raw
+        cs = (f" colorspace {nt.nk_str(space)}\n" if space else f" colorspace {nt.nk_str('Raw')}\n raw true\n")
+        return (f"Read {{\n inputs 0\n file {nt.nk_str(path)}\n first {int(f0)}\n last {int(f1)}\n{cs} on_error black\n"
                 f" name {nt.nk_name(name)}\n xpos {x}\n ypos 0\n}}")
-    lines.append(read(ai.replace("\\", "/").replace("%04d", "####"), "Read_AI", 0))
-    lines.append(read(f"{o}/comp/comp.####.exr", "Read_comp", 150))
+    lines.append(read(ai.replace("\\", "/").replace("%04d", "####"), "Read_AI", 0, ai_space))
+    lines.append(read(f"{o}/comp/comp.####.exr", "Read_comp", 150, ai_space))
     for n, k in enumerate(ids):
         lines.append(read(f"{o}/{k}/{k}_stmap.####.exr", f"Read_{k}_stmap", 300 + 300 * n))
-        lines.append(read(f"{o}/{k}/{k}.####.exr", f"Read_{k}", 450 + 300 * n))
+        lines.append(read(f"{o}/{k}/{k}.####.exr", f"Read_{k}", 450 + 300 * n, ai_space))
     return "\n".join(lines) + "\n"

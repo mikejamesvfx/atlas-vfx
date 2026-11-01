@@ -158,6 +158,12 @@ def test_camera_export(cam: sc.ShotCamera, tmp: Path):
     assert np.allclose(s2["win_translate"], [40 / 2048, -20 / 2048]), s2["win_translate"]
     text = Path(res["usda"]).read_text(encoding="utf-8")
     assert 'upAxis = "Y"' in text and "metersPerUnit = 1" in text and "timeCodesPerSecond = 24" in text
+    # the fps comes from shot.fps (it read a key the contract doesn't have and always wrote 24)
+    d25 = copy.deepcopy(cam.data)
+    d25["shot"]["fps"] = 25.0
+    r25 = ce.export(sc.ShotCamera(d25), tmp / "cam25", "syn25")
+    t25 = Path(r25["usda"]).read_text(encoding="utf-8")
+    assert "timeCodesPerSecond = 25" in t25 and "framesPerSecond = 25" in t25 and r25["settings"]["fps"] == 25.0
     print(f"ok camera export: chan round trip within {worst:.1e} (ZXY, metres), usda {len(usd)} transform samples "
           f"within {uworst:.1e}, apertures 23.5 x {s['vaperture']:.3f} mm, principal point -> win_translate")
     return res

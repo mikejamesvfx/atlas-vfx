@@ -63,6 +63,24 @@ def test_geometry(cam):
           f"projection at 1024")
 
 
+def test_lens_camera(cam):
+    """A card is a clean-space (pinhole) layer: a camera with a solved lens renders it exactly as the same camera
+    without one; the screen box must not use the distorted projection (barrel shrank it and clipped the card)."""
+    from atlas_vfx.contracts import shot_camera as sc
+
+    lensed = sc.ShotCamera({**cam.data, "lens": {"distortion_model": "brown",
+                                                 "distortion_params": [-0.12, 0.02, 0.0, 0.0, 0.0]}})
+    corners = [[-2.6, 2.4, -4.0], [2.6, 2.4, -4.0], [2.6, 0.0, -4.0], [-2.6, 0.0, -4.0]]     # wide: near the edges
+    tex = uv_texture()
+    worst = 0.0
+    for f in FRAMES[::11]:
+        a = cp.render(cam, f, corners, tex, scale=SCALE)
+        b = cp.render(lensed, f, corners, tex, scale=SCALE)
+        worst = max(worst, float(np.abs(a - b).max()))
+    assert worst == 0.0, f"lensed camera renders the card differently (max {worst})"
+    print("ok lens camera: card renders identically with a brown lens on the camera (clean-space layer)")
+
+
 def test_checker(cam):
     corners = [[-1.0, 1.8, -5.0], [1.0, 1.8, -5.0], [1.0, 0.0, -5.0], [-1.0, 0.0, -5.0]]
     tw, th, sq = 400, 360, 40
@@ -147,6 +165,7 @@ def test_texture_and_place(cam):
 def main() -> int:
     cam = camera()
     test_geometry(cam)
+    test_lens_camera(cam)
     test_checker(cam)
     test_walk_through(cam)
     test_texture_and_place(cam)

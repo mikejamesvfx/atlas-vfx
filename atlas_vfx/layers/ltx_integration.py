@@ -38,6 +38,14 @@ def view_processors(ocio_config: str, working: str = "ACEScg", display: str = pl
     return fwd.getDefaultCPUProcessor(), inv.getDefaultCPUProcessor()
 
 
+def prep_processors(prep: dict):
+    """(forward, inverse) for the exact display/view an LTX Prep record used, so Return inverts what Prep applied
+    even if the defaults change later. Old records without a view get the defaults."""
+    ref = prep["plate_ref"]
+    display, view = prep.get("view") or [pl.DEFAULT_DISPLAY, pl.DEFAULT_VIEW]
+    return view_processors(ref["ocio_config"], ref.get("working_space", "ACEScg"), display, view)
+
+
 def to_view(lin: np.ndarray, fwd) -> np.ndarray:
     out = np.ascontiguousarray(lin, dtype=np.float32).copy()
     fwd.applyRGB(out)

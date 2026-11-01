@@ -28,7 +28,7 @@ def nuke_settings(cam: sc.ShotCamera) -> dict:
     return {"rot_order": "ZXY", "xform_order": "SRT", "haperture": hap, "vaperture": hap * k.height / k.width / pa,
             "win_translate": [(k.cx - k.width / 2) / (k.width / 2), -(k.cy - k.height / 2) / (k.width / 2) * pa],
             "format": [k.width, k.height, pa], "frames": [cam.frames[0], cam.frames[-1]],
-            "fps": float(cam.data.get("fps", 24.0)), "units": "metres", "camera": cam.name}
+            "fps": float(cam.data["shot"]["fps"]), "units": "metres", "camera": cam.name}
 
 
 def write_chan(cam: sc.ShotCamera, path, units_per_m: float = 1.0) -> Path:
@@ -76,8 +76,8 @@ def write_usda(cam: sc.ShotCamera, path, near: float = 0.01, far: float = 10000.
     defaultPrim = "{name}"
     upAxis = "Y"
     metersPerUnit = 1
-    timeCodesPerSecond = {float(cam.data.get("fps", 24.0)):g}
-    framesPerSecond = {float(cam.data.get("fps", 24.0)):g}
+    timeCodesPerSecond = {float(cam.data["shot"]["fps"]):g}
+    framesPerSecond = {float(cam.data["shot"]["fps"]):g}
     startTimeCode = {cam.frames[0]}
     endTimeCode = {cam.frames[-1]}
     doc = "atlas-vfx Camera Export: shot-camera@0.1 '{cam.name}', metres, Y up, camera looks down -Z"

@@ -250,6 +250,16 @@ def test_lock_check(cam, r):
     seg = lc.project_segments(cam, f, [(C + 3 * fwd, C - 3 * fwd + np.array([0.1, 0, 0]))], 1.0)
     assert len(seg) == 1 and np.all(np.isfinite(seg[0]))
     assert lc.project_segments(cam, f, [(C - fwd, C - 2 * fwd)], 1.0) == []
+    # a lensed camera: the grid is drawn through the lens, so a line's points sit where project() (the marks) puts
+    # the 3D points along it, and the line bends
+    lensed = sc.ShotCamera({**cam.data, "lens": {"distortion_model": "brown",
+                                                 "distortion_params": [-0.15, 0.03, 0.0, 0.0, 0.0]}})
+    a, b = lines[0]
+    poly = lc.project_segments(lensed, f, [(a, b)], 1.0, samples=9)[0]
+    want = lensed.project(f, np.array([a + (b - a) * t for t in np.linspace(0, 1, 9)]))[0]
+    assert len(poly) == 9 and np.allclose(poly, want, atol=1e-6)
+    straight = np.linalg.norm(np.cross(np.r_[want[-1] - want[0], 0], np.r_[want[4] - want[0], 0]))
+    assert straight > 1e-3, "the lens should bend the line"
 
     with tempfile.TemporaryDirectory() as t:
         td = Path(t)

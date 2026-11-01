@@ -26,6 +26,8 @@ from ...camera_side.plate import safe_name
 from . import exr, warp
 from .pipeline import LockResult
 
+WORKING_SPACE = "ACEScg"        # atlas-vfx working space: plate EXRs, AI takes and Plate Lock layers
+
 
 def check_people_names(names) -> list[str]:
     """Performer names become folder names and Nuke node names: one path component each, or a ValueError before
@@ -128,13 +130,17 @@ def nuke_script(shot: dict, out_dir: str) -> str:
     out = ["# platelock generated script. Check paths on first open.",
            f"Root {{\n inputs 0\n first_frame {f0}\n last_frame {f1}\n}}"]
 
-    def read(path, name, first, last, x, y, label=""):
+    def read(path, name, first, last, x, y, label="", raw=False):
+        # colour is always explicit: the shipped config's file rule reads an untagged EXR as ACES2065-1, and an
+        # STMap must never be colour converted
         lab = f"\n label {nt.nk_str(label)}" if label else ""
-        return (f"Read {{\n inputs 0\n file {nt.nk_str(path)}\n first {int(first)}\n last {int(last)}\n on_error black{lab}"
-                f"\n name {nt.nk_name(name)}\n xpos {x}\n ypos {y}\n}}")
+        cs = f"\n colorspace {nt.nk_str('Raw')}\n raw true" if raw else f"\n colorspace {nt.nk_str(WORKING_SPACE)}"
+        return (f"Read {{\n inputs 0\n file {nt.nk_str(path)}\n first {int(first)}\n last {int(last)}{cs}\n on_error black"
+                f"{lab}\n name {nt.nk_name(name)}\n xpos {x}\n ypos {y}\n}}")
 
     out.append(read(f"{od}/bg/bg.####.exr", "Read_bg", f0, f1, 0, 0, "re-shot background (A: 1 real, 0.5 filled)"))
-    out.append(read(f"{od}/bg/bg_stmap.####.exr", "Read_bg_stmap", f0, f1, 150, 0, "STMap into AI frame of same number"))
+    out.append(read(f"{od}/bg/bg_stmap.####.exr", "Read_bg_stmap", f0, f1, 150, 0, "STMap into AI frame of same number",
+                    raw=True))
     out.append(read(f"{od}/comp/comp.####.exr", "Read_comp", f0, f1, 300, 0, "platelock review comp"))
     frames = list(range(f0, f1 + 1))
     for k, (name, p) in enumerate(shot["people"].items()):
@@ -144,6 +150,6 @@ def nuke_script(shot: dict, out_dir: str) -> str:
                    f" label {nt.nk_str(f'{name}: AI frame per plate frame')}\n name {nt.nk_name(f'TimeWarp_{name}')}\n"
                    f" xpos {x}\n ypos 80\n}}")
         out.append(read(f"{od}/{name}/{name}_stmap.####.exr", f"Read_{name}_stmap", f0, f1, x + 150, 0,
-                        f"STMap for {name} (wire to STMap.stmap, uv=rgb)"))
+                        f"STMap for {name} (wire to STMap.stmap, uv=rgb)", raw=True))
         out.append(read(f"{od}/{name}/{name}.####.exr", f"Read_{name}", f0, f1, x + 300, 0, f"baked {name} RGBA"))
     return "\n".join(out) + "\n"

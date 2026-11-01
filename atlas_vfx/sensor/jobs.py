@@ -355,6 +355,11 @@ def frames_windows_from_prep(ltx_prep: dict, n_images: int):
     f0, f1 = ltx_prep["frames"]
     if ltx_prep.get("mirror"):
         raise ValueError("LTX Prep mirror is on: these frames are flipped. Run LTX Return first (it flips them back)")
+    sens = ltx_prep.get("sensor") or {}
+    if sens.get("lens_folder") or sens.get("rs_folder"):
+        raise ValueError("this LTX Prep already took the plate camera off (sensor folders "
+                         f"{sens.get('lens_folder') or ''} {sens.get('rs_folder') or ''}); LTX Return puts it back, so "
+                         "Sensor Apply on the same take would apply it twice")
     if n_images < f1 - f0 + 1:
         raise ValueError(f"LTX gave {n_images} frames for {f0}-{f1}")
     wins = ltx_prep.get("windows")

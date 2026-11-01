@@ -57,8 +57,7 @@ class AtlasVFXLTXReturn:
             ltx = np.stack([li.resize(f, (ww, wh)) for f in ltx])
         if ltx_prep.get("mirror"):
             ltx = li.mirror(ltx)                            # Prep mirrored the frames LTX saw: flip the take back
-        _, inv = li.view_processors(ref["ocio_config"])
-        fwd, _ = li.view_processors(ref["ocio_config"])
+        fwd, inv = li.prep_processors(ltx_prep)          # the exact view Prep applied, from its record
         stem = Path(ref["path"]).stem
         name = pl.safe_name(name)
         out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / stem / "layers" / name)

@@ -60,20 +60,24 @@ def _clip_segment(pa_c, pb_c):
     return pa_c, pb_c
 
 
-def project_segments(cam: sc.ShotCamera, frame: int, lines, scale: float):
-    """Pixel segments at proxy scale (plate px * scale) for one frame, near-clipped."""
+def project_segments(cam: sc.ShotCamera, frame: int, lines, scale: float, samples: int = 24):
+    """Pixel polylines at proxy scale (plate px * scale) for one frame, near-clipped, through the camera's lens: a
+    pinhole camera gives 2-point segments, a lensed one each line as `samples` points so the curve sits on the plate
+    as shot (the same projection the marks use)."""
     W2C = cam.world_to_cam(frame)
-    k = cam.intrinsics(frame)
+    C2W = cam.cam_to_world(frame)
+    lens = (cam.data.get("lens") or {})
+    curved = lens.get("distortion_model", "none") != "none" and any(lens.get("distortion_params") or [])
     out = []
     for a, b in lines:
         seg = _clip_segment(W2C[:3, :3] @ a + W2C[:3, 3], W2C[:3, :3] @ b + W2C[:3, 3])
         if seg is None:
             continue
-        pts = []
-        for p in seg:
-            d = -p[2]
-            pts.append(((k.cx + k.fx * p[0] / d) * scale, (k.cy - k.fy * p[1] / d) * scale))
-        out.append(pts)
+        t = np.linspace(0.0, 1.0, samples if curved else 2)[:, None]
+        pc = seg[0] + (seg[1] - seg[0]) * t
+        pw = pc @ C2W[:3, :3].T + C2W[:3, 3]
+        uv, _ = cam.project(frame, pw)
+        out.append([(float(x) * scale, float(y) * scale) for x, y in uv])
     return out
 
 
@@ -106,9 +110,9 @@ def render(plate_ref: dict, shot_camera: dict | sc.ShotCamera, out_mp4, *, lines
         for i, img in pl.decode_rgb(plate_ref, f0, f1, width=width):
             n = i + off
             d8 = np.ascontiguousarray((pl.to_display(img, plate_ref) * 255 + 0.5).astype(np.uint8))
-            for (xa, ya), (xb, yb) in project_segments(cam, n, lines, scale):
-                cv2.line(d8, (int(round(xa)), int(round(ya))), (int(round(xb)), int(round(yb))), (0, 255, 120),
-                         lw, cv2.LINE_AA)
+            for poly in project_segments(cam, n, lines, scale):
+                pts = np.round(np.array(poly)).astype(np.int32).reshape(-1, 1, 2)
+                cv2.polylines(d8, [pts], False, (0, 255, 120), lw, cv2.LINE_AA)
             for label, X in (marks or {}).items():
                 uv, depth = cam.project(n, X)
                 if depth[0] > NEAR:

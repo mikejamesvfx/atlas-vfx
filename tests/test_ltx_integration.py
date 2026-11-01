@@ -142,8 +142,22 @@ def test_mirror(fwd, inv):
           f"{left:.2f} vs right {right:.2f})")
 
 
+def test_prep_view():
+    """Return inverts the view Prep recorded, not today's default."""
+    ref = {"ocio_config": OCIO, "working_space": "ACEScg"}
+    lin = plate()[:16, :16]
+    fwd_d, _ = li.prep_processors({"plate_ref": ref})
+    fwd_u, inv_u = li.prep_processors({"plate_ref": ref, "view": ["sRGB - Display", "Un-tone-mapped"]})
+    a, b = li.to_view(lin, fwd_d), li.to_view(lin, fwd_u)
+    assert float(np.abs(a - b).max()) > 1e-3, "the two views should differ"
+    back = li.from_view(b, inv_u)
+    assert float(np.abs(back - lin).max()) < 1e-3, float(np.abs(back - lin).max())
+    print("ok prep view: Return's processors come from the recorded view (Un-tone-mapped round trips, differs from the default)")
+
+
 def main() -> int:
     fwd, inv = li.view_processors(OCIO)
+    test_prep_view()
     test_roundtrip(fwd, inv)
     test_mask()
     test_identity(fwd, inv)
