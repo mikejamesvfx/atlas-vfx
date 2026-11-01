@@ -27,9 +27,9 @@ def to_acescg_processor(ocio_config: str, source: str = VIEW_INVERSE):
         cfg = pl.ocio_config(pl.ocio_path(ocio_config))
         t = ocio.DisplayViewTransform(src="ACEScg", display=pl.DEFAULT_DISPLAY, view=pl.DEFAULT_VIEW,
                                       direction=ocio.TRANSFORM_DIR_INVERSE)
-        return cfg.getProcessor(t).getDefaultCPUProcessor()
+        return pl.fast_cpu(cfg.getProcessor(t))
     if source == SRGB_TEXTURE:
-        return pl.ocio_config(pl.ocio_path(ocio_config)).getProcessor(GEN_SPACE, "ACEScg").getDefaultCPUProcessor()
+        return pl.fast_cpu(pl.ocio_config(pl.ocio_path(ocio_config)).getProcessor(GEN_SPACE, "ACEScg"))
     raise ValueError(f"source colour {source!r}: one of {SOURCES}")
 
 
@@ -39,10 +39,10 @@ def from_acescg_processor(ocio_config: str, source: str = VIEW_INVERSE):
 
     cfg = pl.ocio_config(pl.ocio_path(ocio_config))
     if source == VIEW_INVERSE:
-        return cfg.getProcessor(ocio.DisplayViewTransform(src="ACEScg", display=pl.DEFAULT_DISPLAY,
-                                                          view=pl.DEFAULT_VIEW)).getDefaultCPUProcessor()
+        return pl.fast_cpu(cfg.getProcessor(ocio.DisplayViewTransform(src="ACEScg", display=pl.DEFAULT_DISPLAY,
+                                                                      view=pl.DEFAULT_VIEW)))
     if source == SRGB_TEXTURE:
-        return cfg.getProcessor("ACEScg", GEN_SPACE).getDefaultCPUProcessor()
+        return pl.fast_cpu(cfg.getProcessor("ACEScg", GEN_SPACE))
     raise ValueError(f"source colour {source!r}: one of {SOURCES}")
 
 

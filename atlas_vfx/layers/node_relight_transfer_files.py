@@ -110,7 +110,7 @@ class AtlasVFXRelightTransferFiles:
 
         normals = depth = None
         if moge_model is not None:
-            proc = pl.ocio_config(ocio_config).getProcessor("ACEScg", SRGB).getDefaultCPUProcessor()
+            proc = pl.fast_cpu(pl.ocio_config(ocio_config).getProcessor("ACEScg", SRGB))
 
             def display(rgb):
                 rgb = np.ascontiguousarray(rgb, np.float32).copy()

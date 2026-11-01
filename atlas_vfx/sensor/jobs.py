@@ -248,6 +248,7 @@ class Maps:
         self.clean_size = tuple((self.lens_report or {}).get("clean_size") or self.plate_size)
         self.overscan = self.clean_size != self.plate_size
         self._lens = {}
+        self._gain = {}
 
     def _map_window(self, st, win):
         """Map at map size -> plate size if needed -> window."""
@@ -295,6 +296,13 @@ class Maps:
         v = self.lens_report["vignette"]
         if not any(v[k] for k in ("v1", "v2", "v3")):
             return None
+        if win is not None:                         # per-frame crop windows: not kept (one per frame)
+            return self._gain_uncached(win, clean)
+        if clean not in self._gain:                 # the whole-plate gain is the same every frame: read it once
+            self._gain[clean] = self._gain_uncached(None, clean)
+        return self._gain[clean]
+
+    def _gain_uncached(self, win, clean):
         g = mio.read_exr(self.lens_folder / "vignette.exr")[0][..., 0]
         if clean and self.overscan:
             return ap.warp(g[..., None], self.lens("undistort")["G"], "edge", self.clean_size)[..., 0]
@@ -325,9 +333,9 @@ def colour_procs(colorspace: str, ocio_config: str):
         fwd = cfg.getProcessor(ocio.DisplayViewTransform(src="ACEScg", display=pl.DEFAULT_DISPLAY, view=pl.DEFAULT_VIEW))
         inv = cfg.getProcessor(ocio.DisplayViewTransform(src="ACEScg", display=pl.DEFAULT_DISPLAY, view=pl.DEFAULT_VIEW,
                                                          direction=ocio.TRANSFORM_DIR_INVERSE))
-        return inv.getDefaultCPUProcessor(), fwd.getDefaultCPUProcessor()
-    return (cfg.getProcessor(colorspace, "ACEScg").getDefaultCPUProcessor(),
-            cfg.getProcessor("ACEScg", colorspace).getDefaultCPUProcessor())
+        return pl.fast_cpu(inv), pl.fast_cpu(fwd)
+    return (pl.fast_cpu(cfg.getProcessor(colorspace, "ACEScg")),
+            pl.fast_cpu(cfg.getProcessor("ACEScg", colorspace)))
 
 
 def _apply_proc(proc, img):

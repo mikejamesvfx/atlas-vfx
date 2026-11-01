@@ -46,7 +46,7 @@ class AtlasVFXEXRWrite:
         out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / "exr_write" / name)
         proc = None
         if input_colorspace != colorspace:
-            proc = pl.ocio_config(ocio_config).getProcessor(input_colorspace, colorspace).getDefaultCPUProcessor()
+            proc = pl.fast_cpu(pl.ocio_config(ocio_config).getProcessor(input_colorspace, colorspace))
         imgs = images.cpu().numpy()
         masks = mask.cpu().numpy() if mask is not None else None
         for i, img in enumerate(imgs):

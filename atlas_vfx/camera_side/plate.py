@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import subprocess
+import warnings
 from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
@@ -355,9 +356,15 @@ def _raw_frames(ref: dict, first: int, last: int, luma_only: bool, step: int = 1
         out_fmt, nbytes = ref["pix_fmt"], (ny + 2 * nc) * dt.itemsize
     else:
         out_fmt, nbytes = "rgb48le", W * H * 6
-    cmd = ["ffmpeg", "-v", "error", "-nostdin", "-i", ref["path"], "-map", "0:v:0",
-           "-vf", f"select=between(n\\,{first}\\,{last})*not(mod(n-{first}\\,{step}))",
-           "-fps_mode", "passthrough",
+    # seek to half a frame before `first` (ffmpeg's input seek decodes from the keyframe and drops the frames before
+    # that time, so the first frame out is `first`) and stop after the frames asked for: without the seek and the
+    # count ffmpeg decoded the whole file on every call, even for one frame
+    count = (last - first) // step + 1
+    seek = ["-ss", f"{(first - 0.5) * ref['fps'][1] / ref['fps'][0]:.6f}"] if first > 0 and ref.get("fps") else []
+    start = 0 if seek else first
+    cmd = ["ffmpeg", "-v", "error", "-nostdin", *seek, "-i", ref["path"], "-map", "0:v:0",
+           "-vf", f"select=gte(n\\,{start})*not(mod(n-{start}\\,{step}))",
+           "-fps_mode", "passthrough", "-frames:v", str(count),
            "-f", "rawvideo", "-pix_fmt", out_fmt, "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     i = first
@@ -417,6 +424,66 @@ def _resize(img: np.ndarray, width: int | None, ref: dict) -> np.ndarray:
     return cv2.resize(img, (W, H), interpolation=cv2.INTER_AREA)
 
 
+@lru_cache(maxsize=1)
+def _gpu_decode() -> bool:
+    """Y'CbCr -> R'G'B' on CUDA when there is one (ATLAS_VFX_GPU_DECODE=0 keeps it on the CPU)."""
+    if os.environ.get("ATLAS_VFX_GPU_DECODE", "1").lower() in ("0", "false", "off"):
+        return False
+    try:
+        import torch
+
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
+
+
+def _ycbcr_to_rgb_gpu(planes, lay, full: bool, siting, kr_kb) -> np.ndarray:
+    """The same maths as decode_rgb's CPU branch (same float32 steps, same upsampling weights), on the GPU:
+    ~360 ms per 4K frame on the CPU, a few ms here plus the copy back."""
+    import torch
+
+    dev = torch.device("cuda")
+    sx, sy, bits = lay
+    ox, oy = siting
+    kr, kb = kr_kb
+
+    def up(a):                                       # integer plane (read-only ffmpeg buffer) -> float32 tensor
+        with warnings.catch_warnings():              # torch only reads it, straight onto the GPU
+            warnings.simplefilter("ignore", UserWarning)
+            t = torch.from_numpy(np.ascontiguousarray(a).view(np.int16) if a.dtype == np.uint16 else a).to(dev)
+        return (t.to(torch.int32) & 0xFFFF).to(torch.float32) if a.dtype == np.uint16 else t.to(torch.float32)
+
+    def upsample(c, factor, axis, offset):
+        if factor == 1:
+            return c
+        n = c.shape[axis] * factor
+        pos = np.clip((np.arange(n) - offset) / factor, 0, c.shape[axis] - 1)
+        i0 = np.floor(pos).astype(np.int64)
+        i1 = np.minimum(i0 + 1, c.shape[axis] - 1)
+        w = torch.from_numpy((pos - i0).astype(np.float32)).to(dev)
+        w = w.view(-1, 1) if axis == 0 else w.view(1, -1)
+        a = c.index_select(axis, torch.from_numpy(i0).to(dev))
+        b = c.index_select(axis, torch.from_numpy(i1).to(dev))
+        return a * (1 - w) + b * w
+
+    with torch.no_grad():
+        y = up(planes[0])
+        if full:
+            y = y / float((1 << bits) - 1)
+        else:
+            s = float(1 << (bits - 8))
+            y = (y - 16 * s) / (219 * s)
+        half = float(1 << (bits - 1))
+        scale = float((1 << bits) - 1) if full else 224 * float(1 << (bits - 8))
+        cb = upsample(upsample((up(planes[1]) - half) / scale, sx, 1, ox), sy, 0, oy)
+        cr = upsample(upsample((up(planes[2]) - half) / scale, sx, 1, ox), sy, 0, oy)
+        kg = 1.0 - kr - kb
+        r = y + 2 * (1 - kr) * cr
+        b = y + 2 * (1 - kb) * cb
+        g = (y - kr * r - kb * b) / kg
+        return torch.stack([r, g, b], dim=-1).cpu().numpy()
+
+
 def decode_rgb(ref: dict, first: int | None = None, last: int | None = None, width: int | None = None,
                step: int = 1):
     """Yields (plate frame index, float32 HxWx3 normalised code values in the plate's input space).
@@ -425,9 +492,12 @@ def decode_rgb(ref: dict, first: int | None = None, last: int | None = None, wid
     f1 = ref["last"] if last is None else last
     lay = _yuv_layout(ref["pix_fmt"])
     full = ref["range"] == "full"
+    gpu = lay is not None and _gpu_decode()
     for i, planes in _raw_frames(ref, f0, f1, luma_only=False, step=max(1, int(step))):
         if lay is None:
             rgb = planes.astype(np.float32) / 65535.0
+        elif gpu:
+            rgb = _ycbcr_to_rgb_gpu(planes, lay, full, _siting(ref), _KR_KB[ref["color_matrix"]])
         else:
             sx, sy, bits = lay
             ox, oy = _siting(ref)
@@ -462,6 +532,13 @@ def decode_luma16(ref: dict, first: int | None = None, last: int | None = None, 
 
 # --------------------------------------------------------------------------------------------- colour
 
+def fast_cpu(proc):
+    """An OCIO Processor (or CPU processor) -> its CPU processor, run over every core (ocio_fast)."""
+    from .ocio_fast import fast
+
+    return fast(proc)
+
+
 @lru_cache(maxsize=32)
 def _cpu(config_path: str, src: str, dst: str | None, display: str | None, view: str | None):
     import PyOpenColorIO as ocio
@@ -471,7 +548,7 @@ def _cpu(config_path: str, src: str, dst: str | None, display: str | None, view:
         proc = cfg.getProcessor(src, dst)
     else:
         proc = cfg.getProcessor(ocio.DisplayViewTransform(src=src, display=display, view=view))
-    return proc.getDefaultCPUProcessor()
+    return fast_cpu(proc)
 
 
 def to_working(img: np.ndarray, ref: dict, dst: str | None = None) -> np.ndarray:

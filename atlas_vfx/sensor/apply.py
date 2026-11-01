@@ -26,11 +26,23 @@ import numpy as np
 from .lens import from_st
 
 
+_RESIZED: dict = {}         # (id(st), w, h) -> (st, resized): the same map object resized once, not every frame
+
+
 def resize_map(st: np.ndarray, w: int, h: int) -> np.ndarray:
     if st.shape[1] == w and st.shape[0] == h:
         return st
+    key = (id(st), w, h)
+    hit = _RESIZED.get(key)
+    if hit is not None and hit[0] is st:
+        return hit[1]
     import cv2
-    return cv2.resize(st.astype(np.float32), (w, h), interpolation=cv2.INTER_LINEAR)
+    out = cv2.resize(st.astype(np.float32), (w, h), interpolation=cv2.INTER_LINEAR)
+    out.flags.writeable = False                # shared between calls: nobody may change it in place
+    if len(_RESIZED) >= 6:                     # bounded: per-frame RS maps pass through too
+        _RESIZED.pop(next(iter(_RESIZED)))
+    _RESIZED[key] = (st, out)
+    return out
 
 
 def compose(outer: np.ndarray, inner: np.ndarray) -> np.ndarray:
@@ -45,19 +57,54 @@ def compose(outer: np.ndarray, inner: np.ndarray) -> np.ndarray:
     return out
 
 
+_COORDS: dict = {}          # (id(st), w, h, ow, oh) -> (st, mx, my): the lens maps are the same every frame
+
+
+def _coords(st: np.ndarray, w: int, h: int, ow: int, oh: int):
+    """cv2.remap coordinates for an STMap, cached while the same map object comes back (Maps keeps the lens maps,
+    so a shot converts them once instead of every frame and channel). Same maths as before, same result."""
+    key = (id(st), w, h, ow, oh)
+    hit = _COORDS.get(key)
+    if hit is not None and hit[0] is st:
+        return hit[1], hit[2]
+    x, y = from_st(resize_map(st, ow, oh), w, h)
+    mx, my = (x - 0.5).astype(np.float32), (y - 0.5).astype(np.float32)
+    if len(_COORDS) >= 6:
+        _COORDS.pop(next(iter(_COORDS)))
+    _COORDS[key] = (st, mx, my)
+    return mx, my
+
+
 def warp(img: np.ndarray, st: np.ndarray, edge: str = "edge", out_size=None) -> np.ndarray:
     """Sample img (H, W, C) at an STMap (bilinear). edge: 'edge' repeats border pixels, 'black' is Nuke's default.
     out_size (w, h): the output grid (the map is resized to it); default the image's own size."""
     import cv2
     h, w = img.shape[:2]
     ow, oh = out_size or (w, h)
-    st = resize_map(st, ow, oh)
-    x, y = from_st(st, w, h)
+    mx, my = _coords(st, w, h, ow, oh)
     border = cv2.BORDER_REPLICATE if edge == "edge" else cv2.BORDER_CONSTANT
     src = np.ascontiguousarray(img, np.float32)
-    out = cv2.remap(src, (x - 0.5).astype(np.float32), (y - 0.5).astype(np.float32), cv2.INTER_LINEAR,
-                    borderMode=border, borderValue=0)
+    out = cv2.remap(src, mx, my, cv2.INTER_LINEAR, borderMode=border, borderValue=0)
     return out.reshape((oh, ow) + img.shape[2:])
+
+
+def _by_map(chans, map_for):
+    """[(st, [channel indices])]: channels that use the same map object are warped together (cv2.remap takes up to
+    4 channels; alpha uses G's map). map_for(c) is called once per distinct channel name."""
+    groups, seen = [], {}
+    for ci, c in enumerate(chans):
+        if c not in seen:
+            seen[c] = map_for(c)
+        st = seen[c]
+        for g in groups:
+            if g[0] is st and len(g[1]) < 4:
+                g[1].append(ci)
+                break
+        else:
+            groups.append((st, [ci]))
+    # cv2.remap's 2-channel path interpolates differently (up to 0.024 off on random data); 1, 3 and 4 channels
+    # match a channel at a time exactly, so a pair is split to keep the result what it was
+    return [g for st, idx in groups for g in ([(st, [i]) for i in idx] if len(idx) == 2 else [(st, idx)])]
 
 
 def window_map(st: np.ndarray, win, plate_size) -> np.ndarray:
@@ -99,12 +146,14 @@ def remove(img: np.ndarray, *, gain: np.ndarray | None = None, lens: dict | None
     lens = {c: resize_map(m, ow, oh) for c, m in (lens or {}).items()}
     if ders is not None or lens:
         ders = resize_map(ders, w, h) if ders is not None else None      # ders lives on the plate grid
-        chans = _chans(out.shape[2])
         res = np.empty((oh, ow, out.shape[2]), np.float32)
-        for ci, c in enumerate(chans):
+
+        def map_for(c):
             L = lens.get(c)
-            st = ders if L is None else (L if ders is None else compose(L, ders))
-            res[..., ci] = warp(out[..., ci:ci + 1], st, edge, (ow, oh))[..., 0]
+            return ders if L is None else (L if ders is None else compose(L, ders))
+
+        for st, idx in _by_map(_chans(out.shape[2]), map_for):
+            res[..., idx] = warp(out[..., idx], st, edge, (ow, oh))
         out = res
     else:
         out = out.copy()
@@ -134,13 +183,10 @@ def apply(img: np.ndarray, *, gain: np.ndarray | None = None, lens: dict | None 
     chans = _chans(out.shape[2])
     result = np.zeros((oh, ow, out.shape[2]), np.float32)
     for m in (rs or [None]):
-        for ci, c in enumerate(chans):
+        def map_for(c, m=m):
             L = lens.get(c)
-            if m is None:
-                st = L
-            elif L is None:
-                st = m
-            else:
-                st = compose(m, L)
-            result[..., ci] += warp(out[..., ci:ci + 1], st, edge, (ow, oh))[..., 0]
+            return L if m is None else (m if L is None else compose(m, L))
+
+        for st, idx in _by_map(chans, map_for):
+            result[..., idx] += warp(out[..., idx], st, edge, (ow, oh))
     return result / max(1, len(rs))

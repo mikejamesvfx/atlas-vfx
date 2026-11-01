@@ -506,7 +506,7 @@ def light_rig(sun_dirs_cam, e_sun, e_sky_up, ground_albedo, sun_el, fov_x_deg, a
 def to_working(rgb709, ocio_config_path=""):
     """Linear Rec.709 -> ACEScg by the named OCIO transform (shipped config when blank). float32, unclipped."""
     out = np.ascontiguousarray(rgb709, np.float32).copy()
-    pl.ocio_config(ocio_config_path).getProcessor(REC709, WORKING).getDefaultCPUProcessor().applyRGB(out)
+    pl.fast_cpu(pl.ocio_config(ocio_config_path).getProcessor(REC709, WORKING)).applyRGB(out)
     return out
 
 
@@ -528,7 +528,7 @@ def preview(acescg, sun_az, sun_el, centre, heading, fov_x, ocio_config_path="",
     pev = math.log2(0.18 / med) if med > 0 else 0.0
     out = np.ascontiguousarray(img * np.float32(2.0 ** pev))
     cfg = pl.ocio_config(ocio_config_path)
-    cfg.getProcessor(ocio.DisplayViewTransform(src=WORKING, display=display, view=view)).getDefaultCPUProcessor() \
+    pl.fast_cpu(cfg.getProcessor(ocio.DisplayViewTransform(src=WORKING, display=display, view=view))) \
         .applyRGB(out)
     out = np.clip(out, 0.0, 1.0)
     x, y = sun_pixel(sun_az, sun_el, W, H, centre)          # ringed even under the horizon: it is still the sun

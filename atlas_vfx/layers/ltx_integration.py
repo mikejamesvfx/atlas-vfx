@@ -39,7 +39,7 @@ def view_processors(ocio_config: str, working: str = "ACEScg", display: str = pl
     fwd = cfg.getProcessor(ocio.DisplayViewTransform(src=working, display=display, view=view))
     inv = cfg.getProcessor(ocio.DisplayViewTransform(src=working, display=display, view=view,
                                                      direction=ocio.TRANSFORM_DIR_INVERSE))
-    return fwd.getDefaultCPUProcessor(), inv.getDefaultCPUProcessor()
+    return pl.fast_cpu(fwd), pl.fast_cpu(inv)
 
 
 def prep_processors(prep: dict):
