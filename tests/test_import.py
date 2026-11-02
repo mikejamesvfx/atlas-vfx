@@ -33,7 +33,7 @@ ALLOWED: dict[str, set[str]] = {
     "comp": {"contracts", "camera_side", "platelock", "sensor", "layers", "deliver", "_atlas_camera"},
 }
 # `_atlas_scene` is the Atlas Scene adapter (Prague sky, 2026-10-28): only layers (Physical Sky) uses it.
-ROOT_MODULES = ("_atlas_camera", "_atlas_scene", "registry")
+ROOT_MODULES = ("_atlas_camera", "_atlas_scene", "_kitchen_fix", "registry")
 
 
 def atlas_imports(source: str, package: str) -> list[str]:
