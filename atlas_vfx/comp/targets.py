@@ -64,7 +64,7 @@ def _fetch(url: str, timeout: float = 10):
 
 
 def _same(name: str) -> str:
-    """ws writes model subfolders with \, a Linux box with /: the same file either way."""
+    """ws writes model subfolders with \\, a Linux box with /: the same file either way."""
     return name.replace("\\", "/")
 
 
@@ -83,7 +83,7 @@ def options_of(info: dict, cls: str, key: str):
 
 
 def localize(graph: dict, info: dict) -> dict:
-    """Rewrite model names to the target's own spelling (its / or \ subfolders), in place."""
+    """Rewrite model names to the target's own spelling (its / or \\ subfolders), in place."""
     for node in graph.values():
         for key, val in node.get("inputs", {}).items():
             if key in MODEL_INPUTS and isinstance(val, str):

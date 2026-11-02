@@ -8,6 +8,7 @@ so live previews and progress arrive on ComfyUI's websocket."""
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 import os
@@ -160,6 +161,23 @@ def _client_for(name: str):
             raise ValueError(f"{name}: set COMFY_CLOUD_API_KEY (your Comfy account's API key) and restart ComfyUI")
         return cloud.CloudClient(key, model_map=t.get("models", {}))
     return qu.HttpClient(t["url"])
+
+
+def from_this_machine(request) -> bool:
+    """True when the request comes from ws itself (a loopback peer). Cloud spend is gated on this: ComfyUI's API has
+    no login, so with --listen any host on the network could otherwise queue and confirm jobs that bill the owner's
+    Comfy Cloud key. The peer address comes from the socket, not from a header a caller can set."""
+    try:
+        return ipaddress.ip_address(str(request.remote or "").split("%")[0]).is_loopback
+    except ValueError:
+        return False
+
+
+def _refuse_remote_spend(request, what: str):
+    if not from_this_machine(request):
+        from aiohttp import web
+        raise web.HTTPForbidden(text=json.dumps({"error": f"{what}: Comfy Cloud jobs are queued and confirmed from "
+                                                          "this machine only"}), content_type="application/json")
 
 
 def _comfy_port() -> int:
@@ -329,8 +347,11 @@ def build_routes():
     async def queue_add(request):
         d = await body(request)
         target = str(d.get("target", "ws"))
-        if target not in [t["name"] for t in tg.load_targets()]:
+        known = {t["name"]: t for t in tg.load_targets()}
+        if target not in known:
             raise ValueError(f"target {target!r}: not one of the targets")
+        if known[target]["kind"] == "comfy_cloud":
+            _refuse_remote_spend(request, "queue")
         mode = d.get("mode", "render")
         jg = _job_graph(d.get("shot", ""), d.get("layer", ""), mode, d.get("params"))
         job = qu.new_job(jg["shot"], jg["layer"], mode, target, jg["expected"], str(jg["out"]), jg["version"])
@@ -340,6 +361,7 @@ def build_routes():
     @routes.post("/atlas/api/queue/{job}/confirm")
     @guard
     async def queue_confirm(request):
+        _refuse_remote_spend(request, "confirm")      # confirm only exists for Cloud jobs: it is the spend
         return web.json_response(qu.public(_queue(request).confirm(request.match_info["job"])))
 
     @routes.post("/atlas/api/queue/{job}/cancel")
