@@ -1081,3 +1081,18 @@ latent uploaded, generate, the sampled latent downloaded, post on ws.
   250 s. Against ws: mean 0.04 stop, the largest differences in the hottest highlights.
 - NFS caches folder listings: render saw new files about 30 s after they landed on hub.
 
+
+## 2026-11-02 Full LTX-2.5 VAE decode: comfy-kitchen grid limit, split in atlas-vfx
+
+A timed 97-frame relight (DSCF3000_S2S3 1130-1226) failed at VAEDecodeTiled with "Triton Error [CUDA]: invalid
+argument", at 768, 512 and 384 px tiles alike. The traceback ends in comfy-kitchen 0.2.40's Triton `rms_rope_`, called
+from ComfyUI's stock `na_diffusion_decoder.py`. The kernel launches (batch, heads, tokens) and CUDA allows 65535 on
+that last axis; the decoder chunks its attention to about 2**25 / dim tokens, more than that, whatever the tile.
+`atlas_vfx/_kitchen_fix.py` (installed by the root `__init__`) splits long token runs into pieces of 65535 and calls
+the original on each; the op is per token, so the numbers are the same. `tests/test_kitchen_fix.py`: the real kernel
+refuses 70000 tokens unwrapped and, wrapped, matches a reference within 1.4e-6.
+
+Timing from the same session (Tiny VAE decode in place of the broken one, RTX 5090, per run): the 4K relight
+transfer 450-480 s, LTX Prep 63 s, sampling 43-63 s, LTX Return 58 s, the guide encode 4 s (image guide), 5 s
+(Pre-render, cold) and 1 s (warm). The Pre-render saves about 3 s of a ~630 s run; the precomp worth building is the
+4K transfer's plate-side inputs.

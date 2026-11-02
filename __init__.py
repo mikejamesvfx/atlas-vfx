@@ -14,7 +14,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from atlas_vfx import __version__, _atlas_camera  # noqa: E402
+from atlas_vfx import __version__, _atlas_camera, _kitchen_fix  # noqa: E402
 from atlas_vfx.registry import load_nodes  # noqa: E402
 
 log = logging.getLogger("atlas_vfx")
@@ -33,6 +33,10 @@ log.info(
     len(DISABLED),
     f"{_ac['source']} {_ac['version'] or '?'} at {_ac['root']}" if _ac["root"] else "not found",
 )
+
+# comfy-kitchen's Triton rms_rope can't launch more than 65535 tokens, which breaks the full LTX-2.5 VAE decode;
+# split long runs (same numbers, see atlas_vfx/_kitchen_fix.py).
+log.info("atlas-vfx: kitchen fix: %s", _kitchen_fix.install())
 
 # Atlas Comp (the app at /atlas, atlas_vfx/comp): routes on ComfyUI's server. Never stops the nodes loading.
 try:
