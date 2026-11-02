@@ -30,8 +30,10 @@ class AtlasVFXRelightTransferFiles:
     DESCRIPTION = ("Relight Transfer for long or 4K shots: give it the element, matte and relit sequences as paths "
                    "and it streams them, one frame at a time, writing <name>.<frame>.exr (ACEScg, alpha = the matte) "
                    "and <name>_gain (log2 gain for QC). Wire Load MoGe Model for mode sh: MoGe runs on each frame "
-                   "inside the node (normals cached on disk as half floats, deleted at the end). Same result as "
-                   "Relight Transfer fed by Sequence Read + MoGe + Normals, in a few GB of RAM.")
+                   "inside the node. Its normals and depth depend on the element only, so with geometry_cache on "
+                   "they are kept in <work>/geometry_cache/<key> and later runs on the same element, matte and "
+                   "MoGe settings skip MoGe entirely. Same result as Relight Transfer fed by Sequence Read + MoGe + "
+                   "Normals, in a few GB of RAM.")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -81,6 +83,10 @@ class AtlasVFXRelightTransferFiles:
                                                                       "invented (first channel); blank = none"}),
                 "holdout_grow": ("INT", {"default": 2, "min": 0, "max": 64}),
                 "ocio_config": ("STRING", {"default": "", "tooltip": "blank = the shipped config"}),
+                "geometry_cache": ("BOOLEAN", {"default": True, "tooltip": (
+                    "keep MoGe's normals and depth in <work>/geometry_cache, keyed on the element and matte files "
+                    "and the MoGe settings, so relighting the same plate again skips MoGe (the slow part). Off = "
+                    "compute them in the output folder and delete them at the end, as before")}),
             },
         }
 
@@ -88,7 +94,7 @@ class AtlasVFXRelightTransferFiles:
             analysis_width, blur_px, max_stops, temporal, eps, subsample, geo_weight, min_r2, lift_limit, name,
             out_dir, moge_model=None, resolution_level=9, refine_steps=3, normals_temporal=1, normals_sigma=1.5,
             depth_guide=True, shot_camera=None, relit_mirrored=False, holdout_path="", holdout_grow=2,
-            ocio_config=""):
+            ocio_config="", geometry_cache=True):
         t0 = time.time()
         if mode == "sh" and moge_model is None:
             raise ValueError("mode sh needs moge_model (Load MoGe Model)")
@@ -109,6 +115,7 @@ class AtlasVFXRelightTransferFiles:
         out_gain.mkdir(parents=True, exist_ok=True)
 
         normals = depth = None
+        geo_dir, geo_hit = None, False
         if moge_model is not None:
             proc = pl.fast_cpu(pl.ocio_config(ocio_config).getProcessor("ACEScg", SRGB))
 
@@ -116,10 +123,18 @@ class AtlasVFXRelightTransferFiles:
                 rgb = np.ascontiguousarray(rgb, np.float32).copy()
                 proc.applyRGB(rgb)
                 return rgb
-            normals = ltf.MoGeNormals(element, moge_model, out / ".normals_cache", display=display, matte=matte,
+            if geometry_cache:
+                key = ltf.geometry_key(element, matte, {
+                    "resolution_level": int(resolution_level), "refine_steps": int(refine_steps),
+                    "temporal": int(normals_temporal), "sigma": float(normals_sigma), "display": ["ACEScg", SRGB],
+                    "ocio_config": pl.clean_path(ocio_config), "model": ltf.model_tag(moge_model)})
+                geo_dir = pl.resolve_out_dir("", pl.WORK_ROOT / ltf.GEOMETRY_CACHE / key)
+            normals = ltf.MoGeNormals(element, moge_model, geo_dir or (out / ".normals_cache"), display=display,
+                                      matte=matte,
                                       temporal=normals_temporal, sigma=normals_sigma,
                                       resolution_level=resolution_level, refine_steps=refine_steps)
             depth = normals.depth if depth_guide else None
+            geo_hit = geo_dir is not None and normals.complete()
         rots = None
         if shot_camera is not None:
             cam = sc.ShotCamera(shot_camera)
@@ -154,14 +169,17 @@ class AtlasVFXRelightTransferFiles:
                                     lift_limit=lift_limit, sink=sink,
                                     progress=(lambda t: pbar.update(1)) if pbar else None)
         finally:
-            if normals is not None:
+            if normals is not None and geo_dir is None:
                 shutil.rmtree(normals.cache, ignore_errors=True)
         rep.update(streamed=True, frames_range=[first_frame, first_frame + length - 1],
                    relit_mirrored=bool(relit_mirrored), seconds=round(time.time() - t0, 1),
                    moge=None if normals is None else {"runs": normals.runs, "normals": normals.source,
                                                       "resolution_level": resolution_level,
                                                       "refine_steps": refine_steps, "temporal": normals_temporal,
-                                                      "sigma": normals_sigma, "depth_guide": bool(depth_guide)})
+                                                      "sigma": normals_sigma, "depth_guide": bool(depth_guide),
+                                                      "seconds": round(normals.seconds, 1),
+                                                      "cache": None if geo_dir is None else
+                                                      {"dir": str(geo_dir), "hit": geo_hit}})
         pattern, gpattern = str(out / f"{name}.%04d.exr"), str(out_gain / f"{name}_gain.%04d.exr")
         inputs = {"element": element_path, "relit": relit_path, "matte": matte_path or "(element alpha)",
                   "holdout": holdout_path, "first_frame": first_frame, "length": length, "mode": mode,

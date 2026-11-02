@@ -3,6 +3,10 @@ computed per frame and cached on disk, and an EXR sink. light_transfer.transfer 
 so a 4K shot of any length needs a few GB of RAM instead of ~10 GB per IMAGE link per 100 frames."""
 from __future__ import annotations
 
+import hashlib
+import json
+import os
+import time
 from collections import OrderedDict
 from pathlib import Path
 
@@ -90,10 +94,49 @@ class SeqFrames:
         return out
 
 
+GEOMETRY_CACHE = "geometry_cache"   # folder under the work root
+GEOMETRY_VERSION = 1           # bump when what MoGeNormals stores changes: old caches are then never read
+
+
+def _file_ids(files):
+    return [[Path(f).name, st.st_size, st.st_mtime_ns] for f in files for st in [Path(f).stat()]]
+
+
+def model_tag(model) -> str:
+    """A cheap identity for a loaded MoGe model: its class and parameter count (ComfyUI's MOGE_MODEL carries no file
+    name). Two different checkpoints of the same size would share a tag; MoGe ships one size per variant."""
+    for m in (model, getattr(model, "model", None)):
+        params = getattr(m, "parameters", None)
+        if callable(params):
+            try:
+                return f"{type(model).__name__}:{sum(p.numel() for p in params())}"
+            except Exception:  # noqa: BLE001
+                pass
+    return type(model).__name__
+
+
+def geometry_key(element, matte, settings: dict) -> str:
+    """sha256 over what the cached normals and depth depend on: every element and matte file (name, size, mtime),
+    the MoGe settings, the display transform and the model. A changed plate frame, matte or setting is a new key."""
+    blob = {"v": GEOMETRY_VERSION, "element": _file_ids(element.files),
+            "matte": [getattr(matte, "kind", None), _file_ids(matte.files)] if matte is not None else None,
+            "settings": settings}
+    return hashlib.sha256(json.dumps(blob, sort_keys=True).encode()).hexdigest()
+
+
+def _save(path: Path, arr) -> None:
+    """np.save through a temporary name, so an interrupted run never leaves a half-written frame in the cache."""
+    tmp = path.with_name(path.stem + ".partial.npy")
+    np.save(tmp, arr)
+    os.replace(tmp, path)
+
+
 class MoGeNormals:
     """OpenGL camera-space normals of the element, from a MoGe model run one frame at a time, then smoothed as Atlas
     VFX Normals does (+-temporal frames, sigma px inside the matte). Each finished frame is cached in cache_dir as
-    float16 .npy (plain arrays, loaded without pickle), so the SH fit and the full-res pass share one MoGe run.
+    float16 .npy (plain arrays, loaded without pickle), so the SH fit and the full-res pass share one MoGe run, and
+    (with a cache_dir keyed by geometry_key) later runs on the same plate share it too. Every read returns the
+    stored float16 values, so a run from the cache gives the same numbers as the run that filled it.
 
     model is the MOGE_MODEL ComfyUI's Load MoGe Model gives (anything with .infer(bchw, ...) returning "normal"
     and/or "points", and "depth"). display turns a linear frame into what MoGe expects (sRGB, 0-1)."""
@@ -108,6 +151,7 @@ class MoGeNormals:
         self.shape = tuple(element.shape[:3]) + (3,)
         self._raw = {}
         self.runs = 0
+        self.seconds = 0.0
         self.source = None
         self.depth = _Depth(self)
 
@@ -121,9 +165,11 @@ class MoGeNormals:
         if self.display is not None:
             rgb = self.display(rgb)
         x = torch.from_numpy(np.ascontiguousarray(np.clip(rgb, 0.0, 1.0))).movedim(-1, 0)[None]
+        t0 = time.perf_counter()
         r = self.model.infer(x, resolution_level=self.resolution_level, fov_x=None, force_projection=True,
                              apply_mask=False, refine_steps=self.refine_steps)
         self.runs += 1
+        self.seconds += time.perf_counter() - t0
         if r.get("normal") is not None:
             n = r["normal"][0].float().cpu().numpy()
             self.source = "predicted"
@@ -157,13 +203,13 @@ class MoGeNormals:
             if al.shape != n.shape[:2]:
                 al = cv2.resize(al, (n.shape[1], n.shape[0]), interpolation=cv2.INTER_LINEAR)
             al = al[None]
-        n = rl.smooth_normals(n[None], al, 0, self.sigma)[0]
+        n = rl.smooth_normals(n[None], al, 0, self.sigma)[0].astype(np.float16)
         pn, pd = self._paths(t)
-        np.save(pn, n.astype(np.float16))
         d = self._raw_at(t)[1]
         if d is not None:
-            np.save(pd, d.astype(np.float32))
-        return n
+            _save(pd, d.astype(np.float32))
+        _save(pn, n)                                  # normals last: their file marks the frame done
+        return n.astype(np.float32)
 
     def __getitem__(self, t):
         t = int(t) % self.shape[0]
@@ -171,6 +217,9 @@ class MoGeNormals:
         if pn.exists():
             return np.load(pn).astype(np.float32)
         return self._compute(t)
+
+    def complete(self) -> bool:
+        return all(self._paths(t)[0].exists() for t in range(self.shape[0]))
 
     def clear(self):
         for f in self.cache.glob("*.npy"):
