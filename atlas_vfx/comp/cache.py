@@ -93,7 +93,7 @@ def _inside(path: Path, root: Path) -> Path:
     resolve() raced while warm() created folders in parallel."""
     rp = os.path.normcase(os.path.abspath(path))
     rr = os.path.normcase(os.path.abspath(root))
-    if not rp.startswith(rr.rstrip("\/") + os.sep):
+    if not rp.startswith(rr.rstrip("\\/") + os.sep):
         raise ValueError("cache path outside the cache folder")
     return path
 

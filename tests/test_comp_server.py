@@ -167,6 +167,21 @@ async def run():
         check(cc.kind == "comfy_cloud" and cc.model_map == {"a.safetensors": "b.safetensors"},
               "cloud: the client carries the target's model map")
         os.environ.pop("COMFY_CLOUD_API_KEY", None)
+        from types import SimpleNamespace as NS
+        check(srv.from_this_machine(NS(remote="127.0.0.1")) and srv.from_this_machine(NS(remote="::1"))
+              and not srv.from_this_machine(NS(remote="203.0.113.7")) and not srv.from_this_machine(NS(remote=None))
+              and not srv.from_this_machine(NS(remote="not an address")),
+              "cloud: only a loopback peer counts as this machine")
+        real = srv.from_this_machine
+        srv.from_this_machine = lambda request: False     # as a host on the network would be seen
+        try:
+            r = await c.post("/atlas/api/queue", json={"shot": "TEST", "layer": "x", "target": "cloud"})
+            check(r.status == 403 and "this machine" in (await r.json())["error"],
+                  "cloud: a job for the Cloud target is refused from another host", r.status)
+            r = await c.post("/atlas/api/queue/anything/confirm")
+            check(r.status == 403, "cloud: confirm (the spend) is refused from another host", r.status)
+        finally:
+            srv.from_this_machine = real
         r = await c.get("/atlas/api/targets")
         check(all("models" not in t for t in (await r.json())["targets"]), "cloud: the model map is not listed")
         (pl.WORK_ROOT / "atlas_comp_targets.local.json").unlink()
