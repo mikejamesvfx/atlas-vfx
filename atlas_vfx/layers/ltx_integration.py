@@ -21,9 +21,13 @@ Return (from LTX):
 """
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 
 from atlas_vfx.camera_side import plate as pl
+
+log = logging.getLogger("atlas_vfx")
 
 
 def view_processors(ocio_config: str, working: str = "ACEScg", display: str = pl.DEFAULT_DISPLAY,
@@ -35,7 +39,15 @@ def view_processors(ocio_config: str, working: str = "ACEScg", display: str = pl
     fwd = cfg.getProcessor(ocio.DisplayViewTransform(src=working, display=display, view=view))
     inv = cfg.getProcessor(ocio.DisplayViewTransform(src=working, display=display, view=view,
                                                      direction=ocio.TRANSFORM_DIR_INVERSE))
-    return fwd.getDefaultCPUProcessor(), inv.getDefaultCPUProcessor()
+    return pl.fast_cpu(fwd), pl.fast_cpu(inv)
+
+
+def prep_processors(prep: dict):
+    """(forward, inverse) for the exact display/view an LTX Prep record used, so Return inverts what Prep applied
+    even if the defaults change later. Old records without a view get the defaults."""
+    ref = prep["plate_ref"]
+    display, view = prep.get("view") or [pl.DEFAULT_DISPLAY, pl.DEFAULT_VIEW]
+    return view_processors(ref["ocio_config"], ref.get("working_space", "ACEScg"), display, view)
 
 
 def to_view(lin: np.ndarray, fwd) -> np.ndarray:
@@ -48,6 +60,21 @@ def from_view(disp: np.ndarray, inv) -> np.ndarray:
     out = np.ascontiguousarray(np.clip(disp, 0.0, 1.0), dtype=np.float32).copy()
     inv.applyRGB(out)
     return out
+
+
+ROUNDTRIP_CLIP_SHARE = 0.005     # more than 0.5 % of the plate off by over 5 % after view -> inverse: say so
+
+
+def roundtrip_warnings(rt: dict | None, mask_mode: str) -> list[str]:
+    """What the SDR view round trip loses on this plate. LTX sees display-referred 0-1, so anything brighter than
+    the view's peak comes back clipped inside the generated mask (outside it the plate is untouched)."""
+    if not rt or rt["share_over_5pct"] <= ROUNDTRIP_CLIP_SHARE:
+        return []
+    msg = (f"{100 * rt['share_over_5pct']:.1f} % of the plate does not survive the SDR view round trip (max "
+           f"luminance {rt['max_luminance']:.2f}); highlights inside the mask come back clipped")
+    if mask_mode == "none":
+        msg += ". mask_mode none replaces the WHOLE plate, so the delivered plate loses them everywhere"
+    return [msg]
 
 
 def roundtrip_report(lin: np.ndarray, fwd, inv, step: int = 4) -> dict:
@@ -77,6 +104,15 @@ def make_mask(alpha: np.ndarray, size: tuple[int, int], thresh: float = 0.05, sh
     if dilate_px > 0:
         m = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * dilate_px + 1, 2 * dilate_px + 1)))
     return m.astype(np.float32)
+
+
+def mirror(frames: np.ndarray) -> np.ndarray:
+    """Left-right flip of a frame stack (N, H, W[, C]). LTX Prep's mirror: the LTX-2.3 Relight LoRA kept the sun on
+    frame right on DSCF3000 whatever the light ball said, so the reference is flipped, lit from the right and the take
+    flipped back (LTX Return / Relight Transfer). Its own inverse."""
+    if frames.ndim < 3:
+        raise ValueError(f"mirror wants a frame stack (N, H, W[, C]), got shape {frames.shape}")
+    return np.ascontiguousarray(frames[:, :, ::-1])
 
 
 def resize(img: np.ndarray, size: tuple[int, int]) -> np.ndarray:

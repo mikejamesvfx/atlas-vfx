@@ -76,6 +76,15 @@ def test_shot_camera_adapter():
         worst = max(worst, float(np.abs(np.stack([u, v], 1) - (uv_ref - 0.5)).max()))
         check(bool((z > 0).all()), f"points in front stay in front, frame {f}") if n == 0 else None
     check(worst < 1e-6, "shot-camera adapter projects like ShotCamera.project", f"max {worst:.1e} px")
+    lensed = sc.ShotCamera({**cam.data, "lens": {"distortion_model": "brown",
+                                                 "distortion_params": [-0.08, 0.01, 0, 0, 0]}})
+    try:
+        adapters.track_from_shot_camera(lensed)
+        check(False, "a lensed shot camera on raw frames is refused (the lock is pinhole)")
+    except ValueError as e:
+        check("pinhole" in str(e), "a lensed shot camera on raw frames is refused (the lock is pinhole)")
+    tr2 = adapters.track_from_shot_camera(lensed, frames_are_clean=True)
+    check(tr2.n == tr.n, "frames_are_clean accepts it (pinhole on clean frames)")
 
 
 def T(a):

@@ -7,6 +7,7 @@
 - F-Log2 code 0.391 -> 0.18 ACEScg through the shipped OCIO config (1e-3), straight and through a decoded file
 - tracking proxies: one PNG per selected frame, named by plate index, sidecar written; refuses the plate folder
 - F-Log (original) code 0.4593 -> 0.18 ACEScg; the Fuji VideoRecordingMode tag (0x3803) picks F-Log / F-Log2
+- ffmpeg seeks (random-code frames exact from any start and step); GPU Y'CbCr decode equals the CPU one
 - real plate, if present: DSCF3000 probes as full range, X-H2, F-Log F-Gamut (from its tag), 528 frames,
   TC 03:02:20:07
 
@@ -235,6 +236,35 @@ def test_tracking(td: Path, full_ref: dict):
     print(f"ok tracking proxies: {files}, sidecar, refuses the plate folder")
 
 
+def test_seek_and_gpu(td: Path):
+    """Speed pass 2026-11-01: ffmpeg seeks to the first frame and stops after the last (it used to decode the whole
+    file per call), and Y'CbCr -> R'G'B' runs on CUDA when there is one. Frames are random codes, so a frame off by
+    one or a chroma sample off by one shows."""
+    rng = np.random.default_rng(7)
+    planes = [(rng.integers(64, 960, (H, W), dtype=np.uint16), rng.integers(64, 960, (H, W // 2), dtype=np.uint16),
+               rng.integers(64, 960, (H, W // 2), dtype=np.uint16)) for _ in range(12)]
+    ref = pl.plate_ref(make_plate(td / "plates" / "seek.mov", "hevc", "pc", planes))
+    for a, b, step in [(0, 2, 1), (1, 1, 1), (5, 9, 1), (3, 11, 4), (11, 11, 1)]:
+        got = list(pl._raw_frames(ref, a, b, False, step))
+        assert [i for i, _ in got] == list(range(a, b + 1, step)), (a, b, step, [i for i, _ in got])
+        for i, (y, cb, cr) in got:
+            assert all(np.array_equal(x, w) for x, w in zip((y, cb, cr), planes[i])), f"frame {i} (from {a})"
+    if pl._gpu_decode():
+        gpu = dict(pl.decode_rgb(ref, 4, 7))
+        os.environ["ATLAS_VFX_GPU_DECODE"] = "0"
+        pl._gpu_decode.cache_clear()
+        try:
+            cpu = dict(pl.decode_rgb(ref, 4, 7))
+        finally:
+            os.environ.pop("ATLAS_VFX_GPU_DECODE")
+            pl._gpu_decode.cache_clear()
+        worst = max(float(np.abs(gpu[i] - cpu[i]).max()) for i in cpu)
+        assert sorted(gpu) == sorted(cpu) and worst < 1e-6, worst
+        print(f"ok seek: random-code frames exact from any start and step; GPU decode = CPU within {worst:.1e}")
+    else:
+        print("ok seek: random-code frames exact from any start and step (no CUDA: GPU decode not checked)")
+
+
 def test_real():
     if not REAL.is_file():
         print(f"skip real plate: {REAL} not found")
@@ -265,6 +295,7 @@ def main() -> int:
         test_fuji_tag(td)
         test_config_menus()
         test_tracking(td, full_ref)
+        test_seek_and_gpu(td)
     test_real()
     return 0
 

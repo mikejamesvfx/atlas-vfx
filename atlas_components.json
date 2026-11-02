@@ -58,6 +58,11 @@
       "note": "4.2.1, BSD-3-Clause (COLMAP). SfM solve, proven on DSCF3000 2026-10-18."
     },
     {
+      "id": "pycolmap-caspar-cuda",
+      "usage": "runtime",
+      "note": "Optional, ws only: COLMAP / pycolmap 4.2.1 built from source (github.com/colmap/colmap tag 4.2.1, BSD-3-Clause, COPYING.txt) with CUDA_ENABLED and CASPAR_ENABLED, for GPU bundle adjustment in Solve Plate. Caspar's generated kernels are vendored at src/thirdparty/Symforce-Caspar (Apache-2.0, its LICENSE file; checked 2026-11-01). Built into its own venv outside the repo and the ComfyUI venv (CUDA DLLs kept apart from torch); nothing of it ships in this tree. Dependencies through COLMAP's own vcpkg manifest (Ceres BSD-3, SuiteSparse, Boost BSL-1.0, glog/gflags BSD-3, OpenImageIO Apache-2.0, SQLite public domain)."
+    },
+    {
       "id": "opencolorio",
       "usage": "runtime",
       "note": "2.6, BSD-3-Clause. Config config/atlas_aces2.0_studio_flog2.ocio is derived from the ACES studio-config-v4.0.0_aces-v2.0_ocio-v2.5 (BSD-3, Academy) with added F-Log2 F-Gamut and F-Log F-Gamut input spaces from the Fujifilm F-Log2 and F-Log data sheets (F-Log added 2026-10-20, checked against colour-science log_decoding_FLog to 1e-6). Installed into V141 venv as opencolorio==2.6.0 on 2026-10-19 (was missing there)."
@@ -123,6 +128,39 @@
           "sha256": "52ad9a13037a28fd65003cae7df056c8f903f5aed2c3a5c802be0f5c74a6a7b8",
           "folder": "geometry_estimation",
           "hashed": "2026-10-26"
+        }
+      ]
+    },
+    {
+      "id": "transformers",
+      "usage": "runtime",
+      "note": "Hugging Face transformers, Apache-2.0 (github.com/huggingface/transformers LICENSE). 5.20.1 in V141. Native GroundingDinoForObjectDetection and Sam2VideoModel classes only, never trust_remote_code. Used by Solve Mask (catalogue 67)."
+    },
+    {
+      "id": "grounding-dino-base",
+      "usage": "model",
+      "note": "IDEA-Research Grounding DINO base, Apache-2.0 (huggingface.co/IDEA-Research/grounding-dino-base licence tag apache-2.0, safetensors, checked 2026-11-01). Text-prompted boxes ('person. car. tree.') on keyframes for Solve Mask (catalogue 67); the boxes prompt SAM 2.1. Folder models/detection/grounding-dino-base (tools/fetch_solve_models.py fetches it); hashes added when fetched.",
+      "files": [
+        {
+          "name": "grounding-dino-base/model.safetensors",
+          "bytes": 933400872,
+          "sha256": "5548f844c928c4b6f411fa8cbcc2bfa8dbbba437cb1d513975519f93c2a9ed21",
+          "folder": "detection",
+          "hashed": "2026-11-01"
+        }
+      ]
+    },
+    {
+      "id": "sam2.1-hiera-large",
+      "usage": "model",
+      "note": "Meta SAM 2.1 Hiera Large, Apache-2.0 (huggingface.co/facebook/sam2.1-hiera-large licence tag apache-2.0, safetensors, transformers Sam2VideoModel, checked 2026-11-01; code github.com/facebookresearch/sam2 Apache-2.0). Tracks Grounding DINO's boxes through the clip for Solve Mask (catalogue 67). Folder models/sam2/sam2.1-hiera-large (tools/fetch_solve_models.py); hashes added when fetched.",
+      "files": [
+        {
+          "name": "sam2.1-hiera-large/model.safetensors",
+          "bytes": 897897416,
+          "sha256": "dc407dce21301fd94abb395c5099b4f2c455fdc8a8f261ac3d0ea6d4cd197230",
+          "folder": "sam2",
+          "hashed": "2026-11-01"
         }
       ]
     },
@@ -270,6 +308,111 @@
       ]
     },
     {
+      "id": "ltx-2.3-ic-lora-relight",
+      "usage": "model",
+      "note": "ltx-2.3-22b-ic-lora-relight-1.0.safetensors (D:/models/loras/ltx23; Lightricks/LTX-2.3-22b-IC-LoRA-Relight): relights a clip from a light-direction ball composited top-right, trained 1280x704 x 121 frames, exteriors, single-stage only (stage 2 drops the IC-LoRA). LTX-2 Community License Agreement, licence date 2026-01-05, embedded in the file's metadata (model_version 2.3). Its text counts subsidiaries, affiliates and companies under common control together for its revenue thresholds; the newer LTX-2.x text (2026-08-11, embedded in the Day-to-Night file) states the threshold: entities with annual revenues of at least $10,000,000 (\"Commercial Entities\") need a paid licence for any use beyond a Non-Commercial Purpose. No LTX-2.3 base on ws: runs on the LTX-2.5 base like the in/outpainting IC-LoRA. Source take for Relight Transfer (catalogue 53); hashed 2026-10-30.",
+      "files": [
+        {
+          "name": "ltx-2.3-22b-ic-lora-relight-1.0.safetensors",
+          "bytes": 327309305,
+          "sha256": "c0d519f83681395d160e115829a9044d7d2ec013be6a2655834d235a2e866ebd",
+          "folder": "loras/ltx23",
+          "hashed": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "id": "relight-light-balls",
+      "usage": "data (shipped)",
+      "note": "24 light-direction ball images for the LTX-2.3 Relight IC-LoRA, assets/relight_balls/<direction>__<band>.png, 512x512. Rendered 2026-10-29 on ws with the scene code of Sphere-Light-Render-ComfyUI (github.com/eric-venti-seeds/Sphere-Light-Render-ComfyUI, commit cc89da6 2026-08-17; js/preview.js buildScene + renderLight, intensity 1.5) in headless Chromium. MIT, Copyright 2026 eric-venti-seeds and Christopher Connock; licence verified 2026-10-31 from the LICENSE and NOTICE.md of the local clone at that commit (custom_nodes/Sphere-Light-Render-ComfyUI), copied as assets/relight_balls/Sphere-Light-Render.LICENSE. Used by Light Ball (catalogue 57). Tool assets, not production data.",
+      "files": [
+        {
+          "name": "assets/relight_balls/*.png",
+          "count": 24,
+          "sha256": "799832cf6617f3c0b87f89ceadb74d12aa440679557e6cc2a579862e85a4e2c0",
+          "sha256_means": "sha256 over (file name + sha256 of the file) for each PNG in name order",
+          "hashed": "2026-10-31"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-ic-lora-day-to-night",
+      "usage": "model",
+      "note": "ltx-2.5-22b-ic-lora-day-to-night-0.9.safetensors (D:/models/loras/ltx25; Lightricks LTX-2.5 Day-to-Night IC-LoRA). LTX-2.x Community License Agreement, licence date 2026-08-11, embedded in the file's metadata (model_version 2.5). Commercial terms quoted from the embedded 2026-08-11 text: entities with annual revenues of at least $10,000,000 (\"Commercial Entities\") need a paid licence for any use beyond a Non-Commercial Purpose, and subsidiaries, affiliates and companies under common control count together. Tested 2026-10-19 (NOTES.md): the take lags the plate ~0.5-1 frame. Source take for Relight Transfer (catalogue 53); hashed 2026-10-30.",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-ic-lora-day-to-night-0.9.safetensors",
+          "bytes": 327318440,
+          "sha256": "2212838ea446628a07eddb57734427b2150e9cf159b19360cda28365a30b275b",
+          "folder": "loras/ltx25",
+          "hashed": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-ic-lora-golden-hour",
+      "usage": "model",
+      "note": "ltx-2.5-22b-ic-lora-golden-hour.safetensors (D:/models/loras/ltx25). The file carries no metadata (no licence text, no version), so its terms are NOT verified: treated as the LTX-2.x Community License (2026-08-11) like the other LTX-2.5 IC-LoRAs until the download source is confirmed. Personal tests only until then. Source take for Relight Transfer (catalogue 53); hashed 2026-10-30.",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-ic-lora-golden-hour.safetensors",
+          "bytes": 327287352,
+          "sha256": "f622a687fcfdca3b0b7145e7e54f0a822ec9466b1cc234a1c77d85616b5c2b6a",
+          "folder": "loras/ltx25",
+          "hashed": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-ic-lora-sdr-to-hdr",
+      "usage": "model",
+      "note": "ltx-2.5-22b-ic-lora-sdr-to-hdr-1.0.safetensors (D:/models/loras/ltx25) + ltx-2.5-22b-ic-lora-sdr-to-hdr-scene-emb.safetensors (D:/models/embeddings, precomputed scene embedding; a copy sits in loras/ltx25): Lightricks LTX-2.5 SDR-to-HDR IC-LoRA (huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-SDR-to-HDR, licence tag ltx-2.x-community-license, checked 2026-11-01). LTX-2.x Community License Agreement, licence date 2026-08-11, embedded in the file's metadata (model_version 2.5, reference_downscale_factor 1); the same terms as the Day-to-Night entry: entities with annual revenues of at least $10,000,000 need a paid licence beyond a Non-Commercial Purpose. Run through ComfyUI-LTXVideo's hdr_nodes (LTXVSDRToHDRWorkingSpace, LTXVHDRDecodePostprocess; the comfyui-ltxvideo entry). For the flow review's HDR spike: an SDR LTX take -> scene-linear ACEScg highlights.",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-ic-lora-sdr-to-hdr-1.0.safetensors",
+          "bytes": 1308787472,
+          "sha256": "0b39eac09672c18d0d10f401d5e71a68a73225f1169df826b092b7e5ef489675",
+          "folder": "loras/ltx25",
+          "hashed": "2026-11-01"
+        },
+        {
+          "name": "ltx-2.5-22b-ic-lora-sdr-to-hdr-scene-emb.safetensors",
+          "bytes": 12614165,
+          "sha256": "63c03987a1984f6d4b3d3440c15deee66b0310c01950496329f983f5dc8c88bd",
+          "folder": "embeddings",
+          "hashed": "2026-11-01"
+        }
+      ]
+    },
+    {
+      "id": "ltx-2.5-ic-lora-alpha-gen",
+      "usage": "model",
+      "note": "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors (D:/models/loras/ltx25; Lightricks LTX-2.5 Alpha-Gen IC-LoRA): a matte (white = foreground, soft edges as real alpha) from any RGB clip, no green screen, no mask or prompt. LTX-2.x Community License Agreement, licence date 2026-08-11, embedded in the file's metadata (model_version 2.5, reference_downscale_factor 1); the same terms as the Day-to-Night entry: entities with annual revenues of at least $10,000,000 need a paid licence beyond a Non-Commercial Purpose. Model-card settings (from the owner's 2026-10-26 graph): distilled base, LoRA 1.0, empty prompt, reference strength 1.0, single stage at native res, <= 1920x1088 padded never stretched, <= 145 frames 8n+1. Used by Alpha Prep / Alpha Return (catalogue 63-64); verified and hashed 2026-10-31.",
+      "files": [
+        {
+          "name": "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors",
+          "bytes": 1308787472,
+          "sha256": "d9e143f979e0756f0c83d772e6a8890f4c6b933db1f7d93fc06e25c179f3fd36",
+          "folder": "loras/ltx25",
+          "hashed": "2026-10-31"
+        }
+      ]
+    },
+    {
+      "id": "taeltx2-3",
+      "usage": "model",
+      "note": "taeltx2_3.safetensors: Tiny AutoEncoder for LTX-2.3 / LTX-2.5 latents (TAEHV family) by Ollin Boer Bohan, github.com/madebyollin/taehv (file safetensors/taeltx2_3.safetensors, last changed in commit e06f53f0b5, 2026-03-06). MIT, 'Copyright (c) 2025 Ollin Boer Bohan', verified 2026-10-31 from the repo's LICENSE. The safetensors file is used, not the .pth (a pickle). Loaded by Atlas VFX Tiny VAE (catalogue 62; core's VAE Loader only lists taeltx_2) for quick previews, and for live sampler previews through atlas_vfx's hook (layers/ltx_live_preview.py, off with ATLAS_VFX_LTX_LIVE_PREVIEW=0). The author notes its decodes are blurry (a _wide variant exists on a branch); preview only, never a delivery decode.",
+      "files": [
+        {
+          "name": "taeltx2_3.safetensors",
+          "bytes": 23531296,
+          "sha256": "f0773b4e3e57318e6aa4dd4a35e1d16213a5f160fbc0376163f06888bbcbe246",
+          "folder": "vae_approx",
+          "hashed": "2026-10-31"
+        }
+      ]
+    },
+    {
       "id": "comfyui-ltxvideo",
       "usage": "runtime",
       "note": "Lightricks ComfyUI-LTXVideo node pack (V141 custom_nodes, commit dbaf9e6 2026-10-08), LICENSE file is the LTX-2 Community License Agreement (license date 2026-01-05), checked 2026-10-19; same terms model as the LTX weights. IC-LoRA loader/guide, inpaint preprocess, mask dilation nodes."
@@ -325,6 +468,11 @@
           "hashed": "2026-10-26"
         }
       ]
+    },
+    {
+      "id": "comfy-cloud",
+      "usage": "external",
+      "note": "Comfy Cloud (cloud.comfy.org), Comfy Org's hosted ComfyUI: a paid service on the user's own account, not a library. Atlas Comp's optional comfy_cloud target talks to its HTTP API (docs.comfy.org/development/cloud/api-reference, checked 2026-10-31). Opt-in per job: the artist confirms a credit estimate before any frame is uploaded; the API key comes from COMFY_CLOUD_API_KEY and is never stored. Models it runs are the account's (the LTX-2.5 base and Alpha-Gen from Cloud's catalogue, the LTX-2.3 Relight IC-LoRA only once imported); their licences are the entries already in this register."
     }
   ]
 }

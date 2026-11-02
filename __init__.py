@@ -34,4 +34,12 @@ log.info(
     f"{_ac['source']} {_ac['version'] or '?'} at {_ac['root']}" if _ac["root"] else "not found",
 )
 
+# Atlas Comp (the app at /atlas, atlas_vfx/comp): routes on ComfyUI's server. Never stops the nodes loading.
+try:
+    from atlas_vfx.comp import server as _comp_server  # noqa: E402
+
+    log.info("atlas-vfx: %s", _comp_server.register())
+except Exception as _e:  # noqa: BLE001
+    log.warning("atlas-vfx: Atlas Comp routes not added: %s", _e)
+
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

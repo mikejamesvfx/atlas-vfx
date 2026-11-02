@@ -9,11 +9,13 @@ from pathlib import Path
 
 import numpy as np
 
+from atlas_vfx.camera_side import camera_checks as cc
 from atlas_vfx.camera_side import exr_io
 from atlas_vfx.camera_side import plate as pl
 from atlas_vfx.contracts import shot_camera as sc
 
 from . import character_insert as ci
+from . import element_colour as ec
 
 log = logging.getLogger("atlas_vfx")
 
@@ -71,18 +73,20 @@ class AtlasVFXCharacterInsert:
                 "exposure_stops": ("FLOAT", {"default": 0.0, "min": -6.0, "max": 6.0, "step": 0.25,
                                              "tooltip": "brighten (+) or darken (-) the character, in stops, "
                                                         "applied in linear ACEScg before the card is written"}),
+                "source_colour": (list(ec.SOURCES), {"default": ec.VIEW_INVERSE, "tooltip": "how the generated (display) picture comes into ACEScg. inverse display view = the inverse of the ACES 2.0 SDR view LTX Prep shows LTX, so the element survives the LTX round trip as it was made. sRGB texture = the old flat texture transform (comes back dimmer after LTX)"}),
             },
         }
 
     def run(self, images, shot_camera, first_frame, last_frame, pick_frame, pick_u, pick_v, deck_y, height_m, key_lo,
             key_hi, erode_px, mode, clip_start, end_mode, source_model, ocio_config, name, out_dir, mask=None,
-            exposure_stops=0.0):
+            exposure_stops=0.0, source_colour=None):
         import torch
 
         warn = LICENCE_WARNINGS.get(source_model.strip().lower())
         if warn:
             log.warning("atlas-vfx Character Insert (%s): %s", source_model, warn)
         cam = sc.ShotCamera(shot_camera)
+        cc.require_metric(cam, "Character Insert", "deck_y and height_m (metres)")
         frames = [n for n in cam.frames if first_frame <= n <= last_frame]
         if not frames:
             raise ValueError(f"no camera frames in {first_frame}-{last_frame}")
@@ -92,10 +96,11 @@ class AtlasVFXCharacterInsert:
         clip = images.cpu().numpy()[..., :3].astype(np.float32)
         if mask is not None:
             alpha, B, plate_info = ci.mask_key(clip, mask.cpu().numpy(), erode_px)
-            rgba, rep = ci.make_sequence(clip, alpha, B, ocio_config, method=ci.MASK_METHOD)
+            rgba, rep = ci.make_sequence(clip, alpha, B, ocio_config, method=ci.MASK_METHOD,
+                                         source=source_colour or ec.VIEW_INVERSE)
         else:
             alpha, B, plate_info = ci.grey_key(clip, key_lo, key_hi, erode_px)
-            rgba, rep = ci.make_sequence(clip, alpha, B, ocio_config)
+            rgba, rep = ci.make_sequence(clip, alpha, B, ocio_config, source=source_colour or ec.VIEW_INVERSE)
         rep["backdrop_plate"] = plate_info
         if exposure_stops:
             rgba[..., :3] *= np.float32(2.0 ** float(exposure_stops))     # premultiplied linear: scale RGB only

@@ -73,8 +73,8 @@ class AtlasVFXSequenceReadChunk:
         files = ch.pick(ch.scan(src), start, length, numbering)
         proc = None
         if input_colorspace.strip():
-            proc = pl.ocio_config(ocio_config).getProcessor(input_colorspace.strip(),
-                                                            colorspace.strip()).getDefaultCPUProcessor()
+            proc = pl.fast_cpu(pl.ocio_config(ocio_config).getProcessor(input_colorspace.strip(),
+                                                                        colorspace.strip()))
         frames, size, info0 = [], None, None
         for f in files:
             img, info = read_image(f)

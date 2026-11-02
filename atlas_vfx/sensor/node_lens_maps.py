@@ -9,6 +9,9 @@ from . import jobs
 from ._node_util import CATEGORY, grid_image, work_dir
 
 
+OVERSCAN = {"none": "none", "auto": "auto", "5 %": 0.05, "10 %": 0.10}
+
+
 class AtlasVFXSensorLensMaps:
     CATEGORY = CATEGORY
     FUNCTION = "run"
@@ -39,11 +42,15 @@ class AtlasVFXSensorLensMaps:
             "optional": {
                 "shot_camera": ("ATLAS_TRACKED_CAMERA",),
                 "plate_ref": ("ATLAS_PLATE_SEQ",),
+                "overscan": (["none", "auto", "5 %", "10 %"], {"default": "none", "tooltip": (
+                    "clean frame bigger than the plate so barrel corners are kept when the plate is undistorted "
+                    "(auto: just enough for this lens). Card Project, LTX Prep / Return and the Nuke Builder follow "
+                    "the clean size")}),
             },
         }
 
     def run(self, lens_source, k1, k2, k3, p1, p2, ca_r, ca_b, vig_1, vig_2, vig_3, map_scale, out_dir,
-            shot_camera=None, plate_ref=None):
+            shot_camera=None, plate_ref=None, overscan="none"):
         import torch
 
         from . import apply as ap
@@ -59,11 +66,14 @@ class AtlasVFXSensorLensMaps:
         out = work_dir(cam.data if cam else {"plate": {"path": plate_ref["path"]}},
                        f"{cam.name if cam else 'typed'}_lens", out_dir)
         rep = jobs.make_lens_maps(lens, size, out, ca_r=ca_r, ca_b=ca_b, v1=vig_1, v2=vig_2, v3=vig_3,
-                                  scale=map_scale, lens_from=lens_from)
+                                  scale=map_scale, lens_from=lens_from, overscan=OVERSCAN[overscan])
         maps = jobs.Maps(lens_folder=str(out))
-        g = grid_image(1024, int(round(1024 * size[1] / size[0])))
-        prev = ap.apply(g, lens=maps.lens("redistort"), gain=maps.gain())
-        sl = {"lens": lens.to_dict(), "plate_size": list(size), "folder": str(out), "lens_from": lens_from}
+        cw, ch = maps.clean_size
+        g = grid_image(1024, int(round(1024 * ch / cw)))
+        prev = ap.apply(g, lens=maps.lens("redistort"), gain=maps.gain(clean=True),
+                        out_size=maps.out_size(1024, "apply") if maps.overscan else None)
+        sl = {"lens": lens.to_dict(), "plate_size": list(size), "folder": str(out), "lens_from": lens_from,
+              "clean_size": list(maps.clean_size), "overscan_px": rep["overscan_px"]}
         return (sl, str(out), torch.from_numpy(prev[None]), json.dumps(rep, indent=1))
 
 

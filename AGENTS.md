@@ -29,11 +29,12 @@ tests/                      plain script tests (see Testing)
 atlas_components.json       licence register: every model, runtime and source this repo uses
 ```
 
-The import graph, enforced by `tests/test_import.py` over every `.py` in the six packages (absolute, relative and
+The import graph, enforced by `tests/test_import.py` over every `.py` in the seven packages (absolute, relative and
 `import_module` strings alike): contracts imports nothing of atlas_vfx; camera_side: contracts and `_atlas_camera`;
 platelock: camera_side, contracts; sensor: those plus platelock; layers: camera_side, contracts, sensor and
 `_atlas_scene` (optional: every node loads and renders without Atlas Scene; only the Prague sky needs it); deliver: every package
-and `_atlas_camera` (not `_atlas_scene`). `registry` is the root's alone. A new edge is a decision: change this
+and `_atlas_camera` (not `_atlas_scene`); comp (Atlas Comp's server, 2026-10-31): every package and `_atlas_camera`, and
+nothing imports comp but the root `__init__.py`. `registry` is the root's alone. A new edge is a decision: change this
 paragraph and the test's `ALLOWED` in the same commit.
 
 ## Rules

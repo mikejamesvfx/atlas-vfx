@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import math
-from pathlib import Path
 
 import numpy as np
 
@@ -69,7 +68,7 @@ class AtlasVFXChartCalibrate:
         if sensor_preset not in sensors.PRESETS:
             raise ValueError(f"Chart Calibrate: unknown sensor preset {sensor_preset!r}")
         ref = cc.chart_ref(video_path, int(first_frame), None if last_frame < 0 else int(last_frame))
-        name = pl.safe_name(name.strip() or Path(ref["path"]).stem)
+        name = pl.safe_name(name.strip() or pl.plate_stem(ref))
         out = pl.resolve_out_dir(out_dir, cc.default_out_dir(), plate_path=ref["path"])
         args = {"mode": mode, "sensor_preset": sensor_preset, "first_frame": ref["first"], "last_frame": ref["last"],
                 "name": name}

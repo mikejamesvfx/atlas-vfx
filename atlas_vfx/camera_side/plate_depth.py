@@ -57,7 +57,7 @@ def frame_scale(cam: sc.ShotCamera, frame: int, depth: np.ndarray, points: dict)
         idx = obs[0]
     else:
         idx = np.arange(len(points["xyz"]))
-    uv, z = cam.project(frame, points["xyz"][idx], ignore_distortion=True)
+    uv, z = cam.project(frame, points["xyz"][idx])   # plate as shot: the depth map is of the distorted plate
     m = sample(depth, uv, cam.data["plate"]["width"])
     good = np.isfinite(m) & (z > 0)
     r = z[good] / m[good]

@@ -27,13 +27,14 @@ import numpy as np
 
 from atlas_vfx.contracts import shot_camera as sc
 
-from .foreground_element import GEN_SPACE
+
+from .element_colour import GEN_SPACE  # noqa: E402,F401  (the sRGB texture space, kept for callers)
 
 LOCAL_PX = 3
 POLY_DEG = 4
 KEY_METHOD = ("distance key: d = |I - B| in display sRGB, B = smooth backdrop plate (degree-4 polynomial fitted to "
-              "the backdrop pixels of the median frame, refitted); alpha = d / max(local max of d within 3 px, hi), ramped to 0 below lo; then erode; edge decontamination F = (I - (1 - a) B) / a; OCIO "
-              f"'{GEN_SPACE}' -> ACEScg; premultiplied; one crop for the whole clip")
+              "the backdrop pixels of the median frame, refitted); alpha = d / max(local max of d within 3 px, hi), ramped to 0 below lo; then erode; edge decontamination F = (I - (1 - a) B) / a; into ACEScg "
+              "through the source_colour transform (layers/element_colour.py); premultiplied; one crop for the clip")
 
 
 def backdrop_colour(frames: np.ndarray, border: float = 0.04) -> np.ndarray:
@@ -104,8 +105,8 @@ def grey_key(frames: np.ndarray, lo: float = 0.06, hi: float = 0.16, erode_px: i
 
 
 MASK_METHOD = ("matte from a background-removal model (BiRefNet), eroded; backdrop = smooth plate (degree-4 polynomial "
-               "of the backdrop pixels) used only for edge decontamination F = (I - (1 - a) B) / a; OCIO "
-               f"'{GEN_SPACE}' -> ACEScg; premultiplied; one crop for the whole clip")
+               "of the backdrop pixels) used only for edge decontamination F = (I - (1 - a) B) / a; into ACEScg "
+               "through the source_colour transform (layers/element_colour.py); premultiplied; one crop for the clip")
 
 
 def mask_key(frames: np.ndarray, masks: np.ndarray, erode_px: int = 1) -> tuple[np.ndarray, np.ndarray, dict]:
@@ -142,9 +143,12 @@ def figure_rows(alpha: np.ndarray, thresh: float = 0.5, min_px: int = 3) -> tupl
 
 
 def make_sequence(frames: np.ndarray, alpha: np.ndarray, B: np.ndarray, ocio_config: str,
-                  pad: int = 4, method: str = KEY_METHOD) -> tuple[np.ndarray, dict]:
-    """Keyed clip -> premultiplied ACEScg RGBA (N,h,w,4) cropped to one box, and the figure metrics in that box."""
-    from atlas_vfx.camera_side.plate import ocio_config as load_cfg
+                  pad: int = 4, method: str = KEY_METHOD, source: str | None = None) -> tuple[np.ndarray, dict]:
+    """Keyed clip -> premultiplied ACEScg RGBA (N,h,w,4) cropped to one box, and the figure metrics in that box.
+    source: how the display clip comes into ACEScg (layers/element_colour.py); None = the old sRGB texture."""
+    from . import element_colour as ec
+
+    source = source or ec.SRGB_TEXTURE
 
     union = (alpha > 0.01).any(0)
     ys, xs = np.nonzero(union)
@@ -153,7 +157,7 @@ def make_sequence(frames: np.ndarray, alpha: np.ndarray, B: np.ndarray, ocio_con
     H, W = union.shape
     y0, y1 = max(ys.min() - pad, 0), min(ys.max() + pad + 1, H)
     x0, x1 = max(xs.min() - pad, 0), min(xs.max() + pad + 1, W)
-    proc = load_cfg(ocio_config).getProcessor(GEN_SPACE, "ACEScg").getDefaultCPUProcessor()
+    proc = ec.to_acescg_processor(ocio_config, source)
     out = np.empty((len(frames), y1 - y0, x1 - x0, 4), np.float32)
     for i in range(len(frames)):
         img = np.clip(frames[i, y0:y1, x0:x1].astype(np.float32), 0, 1)

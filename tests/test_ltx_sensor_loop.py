@@ -70,6 +70,14 @@ def main() -> int:
     hole[60:120, 120:200] = 0.0
     b2 = li.apply_camera(hole, maps, 1130)
     check(float(b2[85:95, 155:165, 3].max()) < 1e-3, "transparent area stays transparent")
+    # Sensor Apply refuses a take whose Prep already removed the camera (LTX Return puts it back: twice otherwise)
+    prep = {"frames": [1130, 1131], "sensor": rec}
+    try:
+        jobs.frames_windows_from_prep(prep, 2)
+        check(False, "Sensor Apply refuses a take whose Prep had sensor folders")
+    except ValueError as e:
+        check("twice" in str(e), "Sensor Apply refuses a take whose Prep had sensor folders", str(e)[:60])
+    check(jobs.frames_windows_from_prep({"frames": [1130, 1131]}, 2) == (1130, None), "a plain Prep still passes")
     print("FAILED: " + ", ".join(FAILS) if FAILS else "all ok")
     return 1 if FAILS else 0
 

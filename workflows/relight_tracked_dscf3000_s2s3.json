@@ -1,0 +1,2659 @@
+{
+ "last_node_id": 210,
+ "last_link_id": 65,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    460,
+    801
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "first",
+     "type": "INT",
+     "widget": {
+      "name": "first"
+     },
+     "link": 1
+    },
+    {
+     "name": "last",
+     "type": "INT",
+     "widget": {
+      "name": "last"
+     },
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      3
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~/Videos/atlas-vfx_footage/DSCF3000.MOV",
+    0,
+    -1,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    56
+   ]
+  },
+  {
+   "id": 2,
+   "type": "AtlasVFXLTXPrep",
+   "pos": [
+    2560,
+    977
+   ],
+   "size": [
+    300,
+    772
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 3
+    },
+    {
+     "name": "layer_folder",
+     "type": "STRING",
+     "widget": {
+      "name": "layer_folder"
+     },
+     "link": 4
+    },
+    {
+     "name": "first_frame",
+     "type": "INT",
+     "widget": {
+      "name": "first_frame"
+     },
+     "link": 5
+    },
+    {
+     "name": "length",
+     "type": "INT",
+     "widget": {
+      "name": "length"
+     },
+     "link": 6
+    },
+    {
+     "name": "sensor_lens_folder",
+     "type": "STRING",
+     "widget": {
+      "name": "sensor_lens_folder"
+     },
+     "link": 7
+    },
+    {
+     "name": "mirror",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "mirror"
+     },
+     "link": 8
+    }
+   ],
+   "outputs": [
+    {
+     "name": "reference",
+     "type": "IMAGE",
+     "links": [
+      9
+     ]
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": []
+    },
+    {
+     "name": "reference_half",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "mask_half",
+     "type": "MASK",
+     "links": []
+    },
+    {
+     "name": "start_image",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "ltx_prep",
+     "type": "ATLAS_VFX_LTX_PREP",
+     "links": [
+      44
+     ]
+    },
+    {
+     "name": "keyframes_half",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXLTXPrep"
+   },
+   "widgets_values": [
+    "",
+    1130,
+    121,
+    1280,
+    704,
+    0.05,
+    24,
+    12,
+    24,
+    "full",
+    96,
+    "",
+    "comp",
+    "none",
+    "",
+    "",
+    false,
+    false
+   ]
+  },
+  {
+   "id": 5,
+   "type": "AtlasVFXLightBall",
+   "pos": [
+    2980,
+    1430
+   ],
+   "size": [
+    300,
+    112
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 9
+    },
+    {
+     "name": "sun",
+     "type": "ATLAS_VFX_SUN",
+     "link": 10
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      45,
+      56
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXLightBall"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 12,
+   "type": "UNETLoader",
+   "pos": [
+    40,
+    516
+   ],
+   "size": [
+    300,
+    148
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      12
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+    "default"
+   ]
+  },
+  {
+   "id": 13,
+   "type": "CLIPLoader",
+   "pos": [
+    40,
+    2446
+   ],
+   "size": [
+    300,
+    178
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      14,
+      15
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors",
+    "ltxv",
+    "default"
+   ]
+  },
+  {
+   "id": 14,
+   "type": "VAELoader",
+   "pos": [
+    40,
+    2258
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      11
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "ltx-2.5-video-vae-bf16.safetensors"
+   ]
+  },
+  {
+   "id": 15,
+   "type": "LTXVVAEForceFloat32",
+   "pos": [
+    460,
+    1797
+   ],
+   "size": [
+    300,
+    100
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 11
+    }
+   ],
+   "outputs": [
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      21,
+      42,
+      57
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVVAEForceFloat32"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 16,
+   "type": "VAELoader",
+   "pos": [
+    40,
+    2694
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      26
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "ltx-2.5-audio-vae-bf16.safetensors"
+   ]
+  },
+  {
+   "id": 17,
+   "type": "LTXICLoRALoaderModelOnly",
+   "pos": [
+    460,
+    1277
+   ],
+   "size": [
+    300,
+    172
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 12
+    }
+   ],
+   "outputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "links": [
+      29
+     ]
+    },
+    {
+     "name": "latent_downscale_factor",
+     "type": "FLOAT",
+     "links": [
+      24
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXICLoRALoaderModelOnly"
+   },
+   "widgets_values": [
+    "ltx23\\ltx-2.3-22b-ic-lora-relight-1.0.safetensors",
+    1.0
+   ]
+  },
+  {
+   "id": 39,
+   "type": "CLIPTextEncode",
+   "pos": [
+    2560,
+    1819
+   ],
+   "size": [
+    300,
+    142
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "text",
+     "type": "STRING",
+     "widget": {
+      "name": "text"
+     },
+     "link": 13
+    },
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 14
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      16
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    ""
+   ]
+  },
+  {
+   "id": 40,
+   "type": "CLIPTextEncode",
+   "pos": [
+    460,
+    1967
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 15
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      17
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "pc game, console game, video game, cartoon, childish, ugly, blurry, deformed"
+   ]
+  },
+  {
+   "id": 41,
+   "type": "LTXVConditioning",
+   "pos": [
+    2980,
+    1612
+   ],
+   "size": [
+    300,
+    142
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 16
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 17
+    }
+   ],
+   "outputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "links": [
+      19
+     ]
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "links": [
+      20
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVConditioning"
+   },
+   "widgets_values": [
+    24.0
+   ]
+  },
+  {
+   "id": 42,
+   "type": "EmptyLTXVLatentVideo",
+   "pos": [
+    460,
+    1519
+   ],
+   "size": [
+    300,
+    208
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "length",
+     "type": "INT",
+     "widget": {
+      "name": "length"
+     },
+     "link": 18
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      22
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "EmptyLTXVLatentVideo"
+   },
+   "widgets_values": [
+    1280,
+    704,
+    97,
+    1
+   ]
+  },
+  {
+   "id": 43,
+   "type": "AtlasVFXGuideFromLatent",
+   "pos": [
+    3820,
+    1501
+   ],
+   "size": [
+    300,
+    268
+   ],
+   "flags": {},
+   "order": 13,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 19
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 20
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 21
+    },
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "link": 22
+    },
+    {
+     "name": "guide",
+     "type": "LATENT",
+     "link": 23
+    },
+    {
+     "name": "latent_downscale_factor",
+     "type": "FLOAT",
+     "widget": {
+      "name": "latent_downscale_factor"
+     },
+     "link": 24
+    }
+   ],
+   "outputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "links": [
+      30,
+      38
+     ]
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "links": [
+      31,
+      39
+     ]
+    },
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      27
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXGuideFromLatent"
+   },
+   "widgets_values": [
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "id": 44,
+   "type": "LTXVEmptyLatentAudio",
+   "pos": [
+    460,
+    2155
+   ],
+   "size": [
+    300,
+    202
+   ],
+   "flags": {},
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "frames_number",
+     "type": "INT",
+     "widget": {
+      "name": "frames_number"
+     },
+     "link": 25
+    },
+    {
+     "name": "audio_vae",
+     "type": "VAE",
+     "link": 26
+    }
+   ],
+   "outputs": [
+    {
+     "name": "Latent",
+     "type": "LATENT",
+     "links": [
+      28
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVEmptyLatentAudio"
+   },
+   "widgets_values": [
+    97,
+    24,
+    1
+   ]
+  },
+  {
+   "id": 45,
+   "type": "LTXVConcatAVLatent",
+   "pos": [
+    4240,
+    1704
+   ],
+   "size": [
+    300,
+    112
+   ],
+   "flags": {},
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "video_latent",
+     "type": "LATENT",
+     "link": 27
+    },
+    {
+     "name": "audio_latent",
+     "type": "LATENT",
+     "link": 28
+    }
+   ],
+   "outputs": [
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      36
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVConcatAVLatent"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 46,
+   "type": "CFGGuider",
+   "pos": [
+    4240,
+    1468
+   ],
+   "size": [
+    300,
+    166
+   ],
+   "flags": {},
+   "order": 16,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 29
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 30
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 31
+    }
+   ],
+   "outputs": [
+    {
+     "name": "GUIDER",
+     "type": "GUIDER",
+     "links": [
+      33
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CFGGuider"
+   },
+   "widgets_values": [
+    1.0
+   ]
+  },
+  {
+   "id": 47,
+   "type": "ManualSigmas",
+   "pos": [
+    40,
+    1476
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 17,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "SIGMAS",
+     "type": "SIGMAS",
+     "links": [
+      35
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ManualSigmas"
+   },
+   "widgets_values": [
+    "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+   ]
+  },
+  {
+   "id": 48,
+   "type": "KSamplerSelect",
+   "pos": [
+    40,
+    1664
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 18,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "SAMPLER",
+     "type": "SAMPLER",
+     "links": [
+      34
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSamplerSelect"
+   },
+   "widgets_values": [
+    "euler_ancestral_cfg_pp"
+   ]
+  },
+  {
+   "id": 49,
+   "type": "RandomNoise",
+   "pos": [
+    40,
+    1852
+   ],
+   "size": [
+    300,
+    148
+   ],
+   "flags": {},
+   "order": 19,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "NOISE",
+     "type": "NOISE",
+     "links": [
+      32
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "RandomNoise"
+   },
+   "widgets_values": [
+    42,
+    "fixed"
+   ]
+  },
+  {
+   "id": 50,
+   "type": "SamplerCustomAdvanced",
+   "pos": [
+    4660,
+    1564
+   ],
+   "size": [
+    300,
+    184
+   ],
+   "flags": {},
+   "order": 20,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "noise",
+     "type": "NOISE",
+     "link": 32
+    },
+    {
+     "name": "guider",
+     "type": "GUIDER",
+     "link": 33
+    },
+    {
+     "name": "sampler",
+     "type": "SAMPLER",
+     "link": 34
+    },
+    {
+     "name": "sigmas",
+     "type": "SIGMAS",
+     "link": 35
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 36
+    }
+   ],
+   "outputs": [
+    {
+     "name": "output",
+     "type": "LATENT",
+     "links": [
+      37
+     ]
+    },
+    {
+     "name": "denoised_output",
+     "type": "LATENT",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SamplerCustomAdvanced"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 51,
+   "type": "LTXVSeparateAVLatent",
+   "pos": [
+    5080,
+    1600
+   ],
+   "size": [
+    300,
+    112
+   ],
+   "flags": {},
+   "order": 21,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "av_latent",
+     "type": "LATENT",
+     "link": 37
+    }
+   ],
+   "outputs": [
+    {
+     "name": "video_latent",
+     "type": "LATENT",
+     "links": [
+      40
+     ]
+    },
+    {
+     "name": "audio_latent",
+     "type": "LATENT",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVSeparateAVLatent"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 52,
+   "type": "LTXVCropGuides",
+   "pos": [
+    5500,
+    1588
+   ],
+   "size": [
+    300,
+    136
+   ],
+   "flags": {},
+   "order": 22,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 38
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 39
+    },
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "link": 40
+    }
+   ],
+   "outputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "links": []
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "links": []
+    },
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      41
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVCropGuides"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 53,
+   "type": "VAEDecodeTiled",
+   "pos": [
+    5920,
+    1540
+   ],
+   "size": [
+    300,
+    232
+   ],
+   "flags": {},
+   "order": 23,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 41
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 42
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      43
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecodeTiled"
+   },
+   "widgets_values": [
+    768,
+    192,
+    64,
+    16
+   ]
+  },
+  {
+   "id": 54,
+   "type": "AtlasVFXLTXReturn",
+   "pos": [
+    6340,
+    1525
+   ],
+   "size": [
+    300,
+    262
+   ],
+   "flags": {},
+   "order": 24,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 43
+    },
+    {
+     "name": "ltx_prep",
+     "type": "ATLAS_VFX_LTX_PREP",
+     "link": 44
+    }
+   ],
+   "outputs": [
+    {
+     "name": "layer_folder",
+     "type": "STRING",
+     "links": [
+      47
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXLTXReturn"
+   },
+   "widgets_values": [
+    3.0,
+    "comp_relit",
+    "ltx-2.5-22b-distilled int8 + ltx-2.3-22b-ic-lora-relight-1.0",
+    24,
+    ""
+   ]
+  },
+  {
+   "id": 55,
+   "type": "PreviewImage",
+   "pos": [
+    3400,
+    1189
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 25,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 45
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 56,
+   "type": "LoadMoGeModel",
+   "pos": [
+    40,
+    2070
+   ],
+   "size": [
+    300,
+    118
+   ],
+   "flags": {},
+   "order": 26,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MOGE_MODEL",
+     "type": "MOGE_MODEL",
+     "links": [
+      50
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadMoGeModel"
+   },
+   "widgets_values": [
+    "moge_3_vitl_fp16.safetensors"
+   ]
+  },
+  {
+   "id": 57,
+   "type": "AtlasVFXRelightTransferFiles",
+   "pos": [
+    6760,
+    1132
+   ],
+   "size": [
+    300,
+    1048
+   ],
+   "flags": {},
+   "order": 27,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "element_path",
+     "type": "STRING",
+     "widget": {
+      "name": "element_path"
+     },
+     "link": 46
+    },
+    {
+     "name": "relit_path",
+     "type": "STRING",
+     "widget": {
+      "name": "relit_path"
+     },
+     "link": 47
+    },
+    {
+     "name": "first_frame",
+     "type": "INT",
+     "widget": {
+      "name": "first_frame"
+     },
+     "link": 48
+    },
+    {
+     "name": "length",
+     "type": "INT",
+     "widget": {
+      "name": "length"
+     },
+     "link": 49
+    },
+    {
+     "name": "moge_model",
+     "type": "MOGE_MODEL",
+     "link": 50
+    },
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 51
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "STRING",
+     "links": [
+      53
+     ]
+    },
+    {
+     "name": "gain",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": [
+      52
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXRelightTransferFiles"
+   },
+   "widgets_values": [
+    "~/atlas-vfx-work/element/element.####.exr",
+    "~/atlas-vfx-work/DSCF3000/layers/element_relit/element_relit.####.exr",
+    "",
+    1001,
+    97,
+    "frame",
+    "linear",
+    "sh",
+    1280,
+    2.0,
+    3.0,
+    1,
+    0.01,
+    2,
+    0.5,
+    0.3,
+    3.0,
+    "element_relit_4k_tracked",
+    "",
+    9,
+    3,
+    1,
+    1.5,
+    true,
+    false,
+    "",
+    2,
+    ""
+   ]
+  },
+  {
+   "id": 58,
+   "type": "AtlasVFXNotes",
+   "pos": [
+    7180,
+    1422
+   ],
+   "size": [
+    300,
+    100
+   ],
+   "flags": {},
+   "order": 28,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "info",
+     "type": "STRING",
+     "link": 52
+    }
+   ],
+   "outputs": [
+    {
+     "name": "text",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXNotes"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 59,
+   "type": "AtlasVFXViewer",
+   "pos": [
+    7180,
+    1592
+   ],
+   "size": [
+    300,
+    496
+   ],
+   "flags": {},
+   "order": 29,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "a_path",
+     "type": "STRING",
+     "widget": {
+      "name": "a_path"
+     },
+     "link": 53
+    },
+    {
+     "name": "b_path",
+     "type": "STRING",
+     "widget": {
+      "name": "b_path"
+     },
+     "link": 54
+    },
+    {
+     "name": "frame",
+     "type": "INT",
+     "widget": {
+      "name": "frame"
+     },
+     "link": 55
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXViewer"
+   },
+   "widgets_values": [
+    "",
+    "",
+    1001,
+    "wipe",
+    0.5,
+    0.0,
+    1.0,
+    "sRGB - Display / ACES 2.0 - SDR 100 nits (Rec.709)",
+    true,
+    1280,
+    0,
+    ""
+   ]
+  },
+  {
+   "id": 60,
+   "type": "AtlasVFXLatentPrerender",
+   "pos": [
+    3400,
+    1607
+   ],
+   "size": [
+    300,
+    196
+   ],
+   "flags": {},
+   "order": 30,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 56
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 57
+    }
+   ],
+   "outputs": [
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      23
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXLatentPrerender"
+   },
+   "widgets_values": [
+    "DSCF3000_relight_ref",
+    ""
+   ]
+  },
+  {
+   "id": 61,
+   "type": "PreviewAny",
+   "pos": [
+    1300,
+    610
+   ],
+   "size": [
+    300,
+    348
+   ],
+   "flags": {},
+   "order": 31,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 58
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 70,
+   "type": "AtlasVFXShotRange",
+   "pos": [
+    40,
+    734
+   ],
+   "size": [
+    300,
+    388
+   ],
+   "flags": {},
+   "order": 32,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "first_frame",
+     "type": "INT",
+     "links": [
+      5,
+      48,
+      55
+     ]
+    },
+    {
+     "name": "length",
+     "type": "INT",
+     "links": [
+      6,
+      18,
+      25,
+      49
+     ]
+    },
+    {
+     "name": "last_frame",
+     "type": "INT",
+     "links": []
+    },
+    {
+     "name": "plate_first",
+     "type": "INT",
+     "links": [
+      1
+     ]
+    },
+    {
+     "name": "plate_last",
+     "type": "INT",
+     "links": [
+      2
+     ]
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXShotRange"
+   },
+   "widgets_values": [
+    1130,
+    1226,
+    "8k+1 shorter",
+    1001,
+    4096,
+    2160
+   ]
+  },
+  {
+   "id": 71,
+   "type": "AtlasVFXLayerPicker",
+   "pos": [
+    40,
+    1192
+   ],
+   "size": [
+    300,
+    214
+   ],
+   "flags": {},
+   "order": 33,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "folder",
+     "type": "STRING",
+     "links": [
+      4
+     ]
+    },
+    {
+     "name": "pattern",
+     "type": "STRING",
+     "links": [
+      46,
+      54
+     ]
+    },
+    {
+     "name": "first",
+     "type": "INT",
+     "links": []
+    },
+    {
+     "name": "last",
+     "type": "INT",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXLayerPicker"
+   },
+   "widgets_values": [
+    "DSCF3000/layers/showcase_abc_showcase_element"
+   ]
+  },
+  {
+   "id": 72,
+   "type": "AtlasVFXSunDirection",
+   "pos": [
+    2140,
+    1437
+   ],
+   "size": [
+    300,
+    286
+   ],
+   "flags": {},
+   "order": 34,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "light_rig",
+     "type": "ATLAS_VFX_LIGHT_RIG",
+     "link": 59
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mirror",
+     "type": "BOOLEAN",
+     "links": [
+      8
+     ]
+    },
+    {
+     "name": "prompt",
+     "type": "STRING",
+     "links": [
+      13
+     ]
+    },
+    {
+     "name": "sun",
+     "type": "ATLAS_VFX_SUN",
+     "links": [
+      10
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSunDirection"
+   },
+   "widgets_values": [
+    "the left",
+    "low",
+    "hard warm golden sunset sunlight",
+    "auto",
+    "middle"
+   ]
+  },
+  {
+   "id": 200,
+   "type": "AtlasVFXPlateRead",
+   "pos": [
+    40,
+    40
+   ],
+   "size": [
+    300,
+    406
+   ],
+   "flags": {},
+   "order": 35,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "links": [
+      60,
+      61
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPlateRead"
+   },
+   "widgets_values": [
+    "~/Videos/atlas-vfx_footage/DSCF3000.MOV",
+    0,
+    296,
+    "",
+    "auto",
+    "auto",
+    1001,
+    512,
+    96
+   ]
+  },
+  {
+   "id": 201,
+   "type": "AtlasVFXSolveMask",
+   "pos": [
+    460,
+    415
+   ],
+   "size": [
+    300,
+    316
+   ],
+   "flags": {},
+   "order": 36,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 60
+    }
+   ],
+   "outputs": [
+    {
+     "name": "masks",
+     "type": "MASK",
+     "links": [
+      62
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSolveMask"
+   },
+   "widgets_values": [
+    "person. car. bicycle. dog. tree. bush. flag.",
+    16,
+    0.35,
+    0.25,
+    6,
+    1024
+   ]
+  },
+  {
+   "id": 202,
+   "type": "AtlasVFXSolvePlate",
+   "pos": [
+    880,
+    656
+   ],
+   "size": [
+    300,
+    670
+   ],
+   "flags": {},
+   "order": 37,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "plate_ref",
+     "type": "ATLAS_PLATE_SEQ",
+     "link": 61
+    },
+    {
+     "name": "masks",
+     "type": "MASK",
+     "link": 62
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      63
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": [
+      58
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSolvePlate"
+   },
+   "widgets_values": [
+    "auto",
+    23.5,
+    12.39,
+    16.0,
+    true,
+    true,
+    "k1 k2 (RADIAL)",
+    1024,
+    8192,
+    15,
+    2.0,
+    "DSCF3000_relight_solve",
+    "",
+    4,
+    0,
+    "fixed",
+    "auto"
+   ]
+  },
+  {
+   "id": 203,
+   "type": "AtlasVFXMeasureScale",
+   "pos": [
+    1300,
+    1028
+   ],
+   "size": [
+    300,
+    340
+   ],
+   "flags": {},
+   "order": 38,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 63
+    }
+   ],
+   "outputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "links": [
+      51,
+      64,
+      65
+     ]
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXMeasureScale"
+   },
+   "widgets_values": [
+    "~/atlas-vfx-work/DSCF3000/picks/DSCF3000_S2S3_picks_GUESS.json",
+    "",
+    5.0,
+    false,
+    "DSCF3000_relight_metric",
+    ""
+   ]
+  },
+  {
+   "id": 204,
+   "type": "AtlasVFXSensorLensMaps",
+   "pos": [
+    1720,
+    768
+   ],
+   "size": [
+    300,
+    580
+   ],
+   "flags": {},
+   "order": 39,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 64
+    }
+   ],
+   "outputs": [
+    {
+     "name": "sensor_lens",
+     "type": "ATLAS_VFX_SENSOR_LENS",
+     "links": []
+    },
+    {
+     "name": "lens_folder",
+     "type": "STRING",
+     "links": [
+      7
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXSensorLensMaps"
+   },
+   "widgets_values": [
+    "camera",
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    "",
+    "auto"
+   ]
+  },
+  {
+   "id": 210,
+   "type": "AtlasVFXPhysicalSky",
+   "pos": [
+    1720,
+    1418
+   ],
+   "size": [
+    300,
+    934
+   ],
+   "flags": {},
+   "order": 40,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "shot_camera",
+     "type": "ATLAS_TRACKED_CAMERA",
+     "link": 65
+    }
+   ],
+   "outputs": [
+    {
+     "name": "hdri_acescg",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "light_rig",
+     "type": "ATLAS_VFX_LIGHT_RIG",
+     "links": [
+      59
+     ]
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": []
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "exr_path",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "AtlasVFXPhysicalSky"
+   },
+   "widgets_values": [
+    -34.1906,
+    151.0425,
+    5.0,
+    "2025-12-25T07:58:19Z",
+    0.0,
+    180.0,
+    69.5,
+    0.0,
+    40.0,
+    0.25,
+    0.0,
+    "metadata",
+    0.0,
+    0.0,
+    250.0,
+    15.0,
+    1024,
+    "camera heading",
+    "DSCF3000_relight_sky",
+    "",
+    "",
+    "",
+    "sRGB - Display",
+    "ACES 2.0 - SDR 100 nits (Rec.709)",
+    "auto"
+   ]
+  }
+ ],
+ "links": [
+  [
+   1,
+   70,
+   3,
+   1,
+   0,
+   "INT"
+  ],
+  [
+   2,
+   70,
+   4,
+   1,
+   1,
+   "INT"
+  ],
+  [
+   3,
+   1,
+   0,
+   2,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   4,
+   71,
+   0,
+   2,
+   1,
+   "STRING"
+  ],
+  [
+   5,
+   70,
+   0,
+   2,
+   2,
+   "INT"
+  ],
+  [
+   6,
+   70,
+   1,
+   2,
+   3,
+   "INT"
+  ],
+  [
+   7,
+   204,
+   1,
+   2,
+   4,
+   "STRING"
+  ],
+  [
+   8,
+   72,
+   0,
+   2,
+   5,
+   "BOOLEAN"
+  ],
+  [
+   9,
+   2,
+   0,
+   5,
+   0,
+   "IMAGE"
+  ],
+  [
+   10,
+   72,
+   2,
+   5,
+   1,
+   "ATLAS_VFX_SUN"
+  ],
+  [
+   11,
+   14,
+   0,
+   15,
+   0,
+   "VAE"
+  ],
+  [
+   12,
+   12,
+   0,
+   17,
+   0,
+   "MODEL"
+  ],
+  [
+   13,
+   72,
+   1,
+   39,
+   0,
+   "STRING"
+  ],
+  [
+   14,
+   13,
+   0,
+   39,
+   1,
+   "CLIP"
+  ],
+  [
+   15,
+   13,
+   0,
+   40,
+   0,
+   "CLIP"
+  ],
+  [
+   16,
+   39,
+   0,
+   41,
+   0,
+   "CONDITIONING"
+  ],
+  [
+   17,
+   40,
+   0,
+   41,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   18,
+   70,
+   1,
+   42,
+   0,
+   "INT"
+  ],
+  [
+   19,
+   41,
+   0,
+   43,
+   0,
+   "CONDITIONING"
+  ],
+  [
+   20,
+   41,
+   1,
+   43,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   21,
+   15,
+   0,
+   43,
+   2,
+   "VAE"
+  ],
+  [
+   22,
+   42,
+   0,
+   43,
+   3,
+   "LATENT"
+  ],
+  [
+   23,
+   60,
+   0,
+   43,
+   4,
+   "LATENT"
+  ],
+  [
+   24,
+   17,
+   1,
+   43,
+   5,
+   "FLOAT"
+  ],
+  [
+   25,
+   70,
+   1,
+   44,
+   0,
+   "INT"
+  ],
+  [
+   26,
+   16,
+   0,
+   44,
+   1,
+   "VAE"
+  ],
+  [
+   27,
+   43,
+   2,
+   45,
+   0,
+   "LATENT"
+  ],
+  [
+   28,
+   44,
+   0,
+   45,
+   1,
+   "LATENT"
+  ],
+  [
+   29,
+   17,
+   0,
+   46,
+   0,
+   "MODEL"
+  ],
+  [
+   30,
+   43,
+   0,
+   46,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   31,
+   43,
+   1,
+   46,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   32,
+   49,
+   0,
+   50,
+   0,
+   "NOISE"
+  ],
+  [
+   33,
+   46,
+   0,
+   50,
+   1,
+   "GUIDER"
+  ],
+  [
+   34,
+   48,
+   0,
+   50,
+   2,
+   "SAMPLER"
+  ],
+  [
+   35,
+   47,
+   0,
+   50,
+   3,
+   "SIGMAS"
+  ],
+  [
+   36,
+   45,
+   0,
+   50,
+   4,
+   "LATENT"
+  ],
+  [
+   37,
+   50,
+   0,
+   51,
+   0,
+   "LATENT"
+  ],
+  [
+   38,
+   43,
+   0,
+   52,
+   0,
+   "CONDITIONING"
+  ],
+  [
+   39,
+   43,
+   1,
+   52,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   40,
+   51,
+   0,
+   52,
+   2,
+   "LATENT"
+  ],
+  [
+   41,
+   52,
+   2,
+   53,
+   0,
+   "LATENT"
+  ],
+  [
+   42,
+   15,
+   0,
+   53,
+   1,
+   "VAE"
+  ],
+  [
+   43,
+   53,
+   0,
+   54,
+   0,
+   "IMAGE"
+  ],
+  [
+   44,
+   2,
+   5,
+   54,
+   1,
+   "ATLAS_VFX_LTX_PREP"
+  ],
+  [
+   45,
+   5,
+   0,
+   55,
+   0,
+   "IMAGE"
+  ],
+  [
+   46,
+   71,
+   1,
+   57,
+   0,
+   "STRING"
+  ],
+  [
+   47,
+   54,
+   0,
+   57,
+   1,
+   "STRING"
+  ],
+  [
+   48,
+   70,
+   0,
+   57,
+   2,
+   "INT"
+  ],
+  [
+   49,
+   70,
+   1,
+   57,
+   3,
+   "INT"
+  ],
+  [
+   50,
+   56,
+   0,
+   57,
+   4,
+   "MOGE_MODEL"
+  ],
+  [
+   51,
+   203,
+   0,
+   57,
+   5,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   52,
+   57,
+   2,
+   58,
+   0,
+   "STRING"
+  ],
+  [
+   53,
+   57,
+   0,
+   59,
+   0,
+   "STRING"
+  ],
+  [
+   54,
+   71,
+   1,
+   59,
+   1,
+   "STRING"
+  ],
+  [
+   55,
+   70,
+   0,
+   59,
+   2,
+   "INT"
+  ],
+  [
+   56,
+   5,
+   0,
+   60,
+   0,
+   "IMAGE"
+  ],
+  [
+   57,
+   15,
+   0,
+   60,
+   1,
+   "VAE"
+  ],
+  [
+   58,
+   202,
+   2,
+   61,
+   0,
+   "*"
+  ],
+  [
+   59,
+   210,
+   1,
+   72,
+   0,
+   "ATLAS_VFX_LIGHT_RIG"
+  ],
+  [
+   60,
+   200,
+   0,
+   201,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   61,
+   200,
+   0,
+   202,
+   0,
+   "ATLAS_PLATE_SEQ"
+  ],
+  [
+   62,
+   201,
+   0,
+   202,
+   1,
+   "MASK"
+  ],
+  [
+   63,
+   202,
+   0,
+   203,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   64,
+   203,
+   0,
+   204,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ],
+  [
+   65,
+   203,
+   0,
+   210,
+   0,
+   "ATLAS_TRACKED_CAMERA"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "Relight a comp: tracker -> lens (clean space) -> Physical Sky sun -> LTX relight",
+   "bounding": [
+    -5,
+    -51,
+    7530,
+    2908
+   ],
+   "color": "#335159",
+   "font_size": 24
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

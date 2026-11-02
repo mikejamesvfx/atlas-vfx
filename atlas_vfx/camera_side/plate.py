@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import subprocess
+import warnings
 from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
@@ -297,6 +298,63 @@ def plate_ref(path: str | os.PathLike, first: int = 0, last: int | None = None,
     }
 
 
+def virtual_plate_ref(width: int, height: int, fps=24, frame_count: int = 1, first: int = 0, last: int | None = None,
+                      ocio_config_path: str | os.PathLike | None = None, frame_offset: int = NUKE_FRAME_OFFSET,
+                      name: str = "virtual") -> dict:
+    """A plate_ref with no file: the size, frame rate, frame range and colour of a shot whose picture is made, not
+    shot (Shot Setup's generate mode). Nodes that only need the frame (cameras, Card Project, LTX sizes) take it as
+    a plate; nodes that read plate pixels refuse it (decode) or use black (is_virtual)."""
+    width, height, frame_count = int(width), int(height), int(frame_count)
+    if width < 16 or height < 16 or width % 2 or height % 2:
+        raise PlateError(f"virtual plate {width}x{height}: even sizes of at least 16 px")
+    if frame_count < 1:
+        raise PlateError("virtual plate: at least one frame")
+    if isinstance(fps, (list, tuple)):
+        f = Fraction(int(fps[0]), int(fps[1]))
+    else:
+        f = Fraction(str(fps).strip()) if isinstance(fps, str) else Fraction(fps).limit_denominator(1001)
+        for ntsc in (24, 30, 60):                       # 23.976 / 29.97 / 59.94 typed as decimals
+            if abs(float(f) - ntsc * 1000 / 1001) < 2e-3:
+                f = Fraction(ntsc * 1000, 1001)
+    if f <= 0:
+        raise PlateError(f"virtual plate: frame rate {fps!r}")
+    last = frame_count - 1 if last is None or last < 0 else int(last)
+    first = int(first)
+    if not (0 <= first <= last < frame_count):
+        raise PlateError(f"frames {first}-{last} outside the virtual plate's 0-{frame_count - 1}")
+    cfg_path = ocio_path(ocio_config_path)
+    if not Path(cfg_path).is_file():                # the path lands in scripts and headers: only a real file
+        raise PlateError(f"OCIO config {cfg_path!r} is not a file")
+    return {
+        "kind": "atlas_vfx.plate_ref", "version": 1, "virtual": True, "name": safe_name(name, "plate name"),
+        "path": "", "quick_sha256": None, "size_bytes": 0, "codec": None, "profile": None, "pix_fmt": None,
+        "width": width, "height": height, "fps": [f.numerator, f.denominator], "frame_count": frame_count,
+        "range": "full", "range_source": "virtual", "color_matrix": None, "color_matrix_source": "virtual",
+        "chroma_location": None, "stream_color_tags": {},
+        "colorspace": WORKING_SPACE, "colorspace_source": "virtual (made in the working space)",
+        "ocio_config": cfg_path, "working_space": WORKING_SPACE, "camera_body": None, "timecode": None,
+        "first": first, "last": last, "frame_offset": int(frame_offset),
+        "nuke_first": first + int(frame_offset), "nuke_last": last + int(frame_offset),
+    }
+
+
+def plate_stem(ref: dict) -> str:
+    """The plate's file stem, or a virtual plate's name: what default output folders are named after."""
+    return (ref.get("name") or "virtual") if is_virtual(ref) else Path(ref["path"]).stem
+
+
+def is_virtual(ref: dict | None) -> bool:
+    """True for a plate_ref with no picture behind it (virtual_plate_ref)."""
+    return bool(ref and ref.get("virtual"))
+
+
+def _require_picture(ref: dict) -> None:
+    if is_virtual(ref):
+        raise PlateError(f"plate {ref.get('name', 'virtual')!r} is virtual (Shot Setup generate mode): there is no "
+                         "picture to read. Render the background first and read that, or use a node that takes a "
+                         "virtual plate")
+
+
 # --------------------------------------------------------------------------------------------- decode
 
 def proxy_size(ref: dict, width: int | None) -> tuple[int, int]:
@@ -344,6 +402,7 @@ def _upsample(c: np.ndarray, factor: int, axis: int, offset: float) -> np.ndarra
 def _raw_frames(ref: dict, first: int, last: int, luma_only: bool, step: int = 1):
     """Yields (index, planes) straight from ffmpeg: (Y, Cb, Cr) native integer planes for Y'CbCr, or an
     HxWx3 uint16 array (rgb48le) for RGB formats."""
+    _require_picture(ref)
     W, H = ref["width"], ref["height"]
     lay = _yuv_layout(ref["pix_fmt"])
     if lay is None and not _is_rgb(ref["pix_fmt"]):
@@ -355,9 +414,15 @@ def _raw_frames(ref: dict, first: int, last: int, luma_only: bool, step: int = 1
         out_fmt, nbytes = ref["pix_fmt"], (ny + 2 * nc) * dt.itemsize
     else:
         out_fmt, nbytes = "rgb48le", W * H * 6
-    cmd = ["ffmpeg", "-v", "error", "-nostdin", "-i", ref["path"], "-map", "0:v:0",
-           "-vf", f"select=between(n\\,{first}\\,{last})*not(mod(n-{first}\\,{step}))",
-           "-fps_mode", "passthrough",
+    # seek to half a frame before `first` (ffmpeg's input seek decodes from the keyframe and drops the frames before
+    # that time, so the first frame out is `first`) and stop after the frames asked for: without the seek and the
+    # count ffmpeg decoded the whole file on every call, even for one frame
+    count = (last - first) // step + 1
+    seek = ["-ss", f"{(first - 0.5) * ref['fps'][1] / ref['fps'][0]:.6f}"] if first > 0 and ref.get("fps") else []
+    start = 0 if seek else first
+    cmd = ["ffmpeg", "-v", "error", "-nostdin", *seek, "-i", ref["path"], "-map", "0:v:0",
+           "-vf", f"select=gte(n\\,{start})*not(mod(n-{start}\\,{step}))",
+           "-fps_mode", "passthrough", "-frames:v", str(count),
            "-f", "rawvideo", "-pix_fmt", out_fmt, "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     i = first
@@ -417,17 +482,81 @@ def _resize(img: np.ndarray, width: int | None, ref: dict) -> np.ndarray:
     return cv2.resize(img, (W, H), interpolation=cv2.INTER_AREA)
 
 
+@lru_cache(maxsize=1)
+def _gpu_decode() -> bool:
+    """Y'CbCr -> R'G'B' on CUDA when there is one (ATLAS_VFX_GPU_DECODE=0 keeps it on the CPU)."""
+    if os.environ.get("ATLAS_VFX_GPU_DECODE", "1").lower() in ("0", "false", "off"):
+        return False
+    try:
+        import torch
+
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
+
+
+def _ycbcr_to_rgb_gpu(planes, lay, full: bool, siting, kr_kb) -> np.ndarray:
+    """The same maths as decode_rgb's CPU branch (same float32 steps, same upsampling weights), on the GPU:
+    ~360 ms per 4K frame on the CPU, a few ms here plus the copy back."""
+    import torch
+
+    dev = torch.device("cuda")
+    sx, sy, bits = lay
+    ox, oy = siting
+    kr, kb = kr_kb
+
+    def up(a):                                       # integer plane (read-only ffmpeg buffer) -> float32 tensor
+        with warnings.catch_warnings():              # torch only reads it, straight onto the GPU
+            warnings.simplefilter("ignore", UserWarning)
+            t = torch.from_numpy(np.ascontiguousarray(a).view(np.int16) if a.dtype == np.uint16 else a).to(dev)
+        return (t.to(torch.int32) & 0xFFFF).to(torch.float32) if a.dtype == np.uint16 else t.to(torch.float32)
+
+    def upsample(c, factor, axis, offset):
+        if factor == 1:
+            return c
+        n = c.shape[axis] * factor
+        pos = np.clip((np.arange(n) - offset) / factor, 0, c.shape[axis] - 1)
+        i0 = np.floor(pos).astype(np.int64)
+        i1 = np.minimum(i0 + 1, c.shape[axis] - 1)
+        w = torch.from_numpy((pos - i0).astype(np.float32)).to(dev)
+        w = w.view(-1, 1) if axis == 0 else w.view(1, -1)
+        a = c.index_select(axis, torch.from_numpy(i0).to(dev))
+        b = c.index_select(axis, torch.from_numpy(i1).to(dev))
+        return a * (1 - w) + b * w
+
+    with torch.no_grad():
+        y = up(planes[0])
+        if full:
+            y = y / float((1 << bits) - 1)
+        else:
+            s = float(1 << (bits - 8))
+            y = (y - 16 * s) / (219 * s)
+        half = float(1 << (bits - 1))
+        scale = float((1 << bits) - 1) if full else 224 * float(1 << (bits - 8))
+        cb = upsample(upsample((up(planes[1]) - half) / scale, sx, 1, ox), sy, 0, oy)
+        cr = upsample(upsample((up(planes[2]) - half) / scale, sx, 1, ox), sy, 0, oy)
+        kg = 1.0 - kr - kb
+        r = y + 2 * (1 - kr) * cr
+        b = y + 2 * (1 - kb) * cb
+        g = (y - kr * r - kb * b) / kg
+        return torch.stack([r, g, b], dim=-1).cpu().numpy()
+
+
 def decode_rgb(ref: dict, first: int | None = None, last: int | None = None, width: int | None = None,
                step: int = 1):
     """Yields (plate frame index, float32 HxWx3 normalised code values in the plate's input space).
     Y'CbCr -> R'G'B' with the plate's range and matrix (H.273), chroma upsampled linearly at its siting."""
+    _require_picture(ref)
     f0 = ref["first"] if first is None else first
     f1 = ref["last"] if last is None else last
     lay = _yuv_layout(ref["pix_fmt"])
     full = ref["range"] == "full"
+    gpu = lay is not None and _gpu_decode()
     for i, planes in _raw_frames(ref, f0, f1, luma_only=False, step=max(1, int(step))):
         if lay is None:
             rgb = planes.astype(np.float32) / 65535.0
+        elif gpu:
+            rgb = _ycbcr_to_rgb_gpu(planes, lay, full, _siting(ref), _KR_KB[ref["color_matrix"]])
         else:
             sx, sy, bits = lay
             ox, oy = _siting(ref)
@@ -443,9 +572,25 @@ def decode_rgb(ref: dict, first: int | None = None, last: int | None = None, wid
         yield i, _resize(rgb, width, ref)
 
 
+def decode_rgb_or_black(ref: dict, first: int | None = None, last: int | None = None, width: int | None = None,
+                        step: int = 1):
+    """decode_rgb, or black frames of the same size and count for a virtual plate (the background under layers when
+    the shot has no plate: previews and comps over it). A virtual plate's input space is the working space, so
+    to_working leaves black black."""
+    if not is_virtual(ref):
+        yield from decode_rgb(ref, first, last, width, step)
+        return
+    f0 = ref["first"] if first is None else first
+    f1 = ref["last"] if last is None else last
+    W, H = proxy_size(ref, width)
+    for i in range(f0, f1 + 1, max(1, int(step))):
+        yield i, np.zeros((H, W, 3), np.float32)
+
+
 def decode_luma16(ref: dict, first: int | None = None, last: int | None = None, width: int | None = None,
                   step: int = 1):
     """Yields (plate frame index, uint16 HxW luma, range-expanded to 0-65535). For tracking proxies and charts."""
+    _require_picture(ref)
     f0 = ref["first"] if first is None else first
     f1 = ref["last"] if last is None else last
     lay = _yuv_layout(ref["pix_fmt"])
@@ -462,6 +607,13 @@ def decode_luma16(ref: dict, first: int | None = None, last: int | None = None, 
 
 # --------------------------------------------------------------------------------------------- colour
 
+def fast_cpu(proc):
+    """An OCIO Processor (or CPU processor) -> its CPU processor, run over every core (ocio_fast)."""
+    from .ocio_fast import fast
+
+    return fast(proc)
+
+
 @lru_cache(maxsize=32)
 def _cpu(config_path: str, src: str, dst: str | None, display: str | None, view: str | None):
     import PyOpenColorIO as ocio
@@ -471,7 +623,7 @@ def _cpu(config_path: str, src: str, dst: str | None, display: str | None, view:
         proc = cfg.getProcessor(src, dst)
     else:
         proc = cfg.getProcessor(ocio.DisplayViewTransform(src=src, display=display, view=view))
-    return proc.getDefaultCPUProcessor()
+    return fast_cpu(proc)
 
 
 def to_working(img: np.ndarray, ref: dict, dst: str | None = None) -> np.ndarray:
@@ -499,7 +651,7 @@ def tracking_proxy_frame(y16: np.ndarray, clahe) -> np.ndarray:
 
 
 def default_track_dir(ref: dict, width: int) -> Path:
-    return WORK_ROOT / Path(ref["path"]).stem / f"track_{ref['first']:04d}-{ref['last']:04d}_w{width}"
+    return WORK_ROOT / plate_stem(ref) / f"track_{ref['first']:04d}-{ref['last']:04d}_w{width}"
 
 
 def write_tracking_proxies(ref: dict, out_dir: str | os.PathLike | None = None, width: int = 1024,

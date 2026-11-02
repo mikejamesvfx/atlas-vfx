@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ..camera_side.ocio_fast import fast
 from .core.crossview import acescct_from_acescg
 
 log = logging.getLogger("atlas_vfx")
@@ -29,7 +30,7 @@ def _processor(config_path: str, src: str, dst: str):
     for n in (src, dst):
         if n not in names and cfg.getColorSpace(n) is None:
             raise ValueError(f"OCIO colorspace {n!r} is not in {config_path}")
-    return cfg.getProcessor(src, dst).getDefaultCPUProcessor()
+    return fast(cfg.getProcessor(src, dst))
 
 
 def convert(rgb: np.ndarray, src: str, dst: str, config_path: str | None = None) -> np.ndarray:

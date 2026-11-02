@@ -151,21 +151,43 @@ def _ca_scale(ca: dict, c: str) -> float:
     return 1.0 + float(ca.get(c, 0.0)) if c != "G" else 1.0
 
 
-def lens_maps(lens: BrownConrady, w: int, h: int, ca_r: float = 0.0, ca_b: float = 0.0) -> dict:
-    """{"undistort": {R, G, B}, "redistort": {R, G, B}} STMaps (h, w, 2) float32 at w x h.
+def overscan_for(lens: BrownConrady, w: int, h: int, margin_px: float = 2.0) -> tuple[int, int]:
+    """Pixels to add on each side of the clean frame (x, y) so every sensor pixel's undistorted position lands
+    inside it: barrel pushes the edges out, pincushion needs none. Even numbers, so the frame stays centred."""
+    if lens.is_identity:
+        return 0, 0
+    u = np.linspace(0.5, w - 0.5, 257)
+    v = np.linspace(0.5, h - 0.5, 129)
+    xs = np.concatenate([u, u, np.full_like(v, 0.5), np.full_like(v, w - 0.5)])     # the plate's border
+    ys = np.concatenate([np.full_like(u, 0.5), np.full_like(u, h - 0.5), v, v])
+    xu, yu = lens.undistort(xs, ys)
+    ox = max(0.0, -float(xu.min()), float(xu.max()) - w)
+    oy = max(0.0, -float(yu.min()), float(yu.max()) - h)
+    even = lambda d: int(2 * np.ceil((d + margin_px) / 2)) if d > 0 else 0
+    return even(ox), even(oy)
 
-    `lens` must already be at this resolution (BrownConrady.scaled). ca_r / ca_b are radial scale - 1 of R and B
-    relative to G (e.g. 0.0004 = R is 0.04 % larger than G at the sensor)."""
+
+def lens_maps(lens: BrownConrady, w: int, h: int, ca_r: float = 0.0, ca_b: float = 0.0,
+              overscan_px: tuple[int, int] = (0, 0)) -> dict:
+    """{"undistort": {R, G, B}, "redistort": {R, G, B}} STMaps float32.
+
+    undistort lives on the CLEAN grid (w + 2 ox, h + 2 oy) and points into the plate (s/t of w x h); redistort lives
+    on the plate grid (w x h) and points into the clean frame (s/t of the clean size). With no overscan both are
+    w x h, as before. `lens` must already be at the plate resolution (BrownConrady.scaled). ca_r / ca_b are radial
+    scale - 1 of R and B relative to G (e.g. 0.0004 = R is 0.04 % larger than G at the sensor)."""
     ca = {"R": ca_r, "B": ca_b}
+    ox, oy = (int(v) for v in overscan_px)
+    wc, hc = w + 2 * ox, h + 2 * oy
+    Xc, Yc = pixel_grid(wc, hc)
     X, Y = pixel_grid(w, h)
     out = {"undistort": {}, "redistort": {}}
-    xd, yd = lens.distort(X, Y)                                         # clean pixel -> where G lands on the sensor
+    xd, yd = lens.distort(Xc - ox, Yc - oy)                             # clean pixel -> where G lands on the sensor
     for c in CHANNELS:
         s = _ca_scale(ca, c)
         out["undistort"][c] = to_st(lens.cx + (xd - lens.cx) * s, lens.cy + (yd - lens.cy) * s, w, h)
         xg, yg = lens.cx + (X - lens.cx) / s, lens.cy + (Y - lens.cy) / s   # sensor pixel of channel c -> G position
         xu, yu = lens.undistort(xg, yg)
-        out["redistort"][c] = to_st(xu, yu, w, h)
+        out["redistort"][c] = to_st(xu + ox, yu + oy, wc, hc)
     return out
 
 

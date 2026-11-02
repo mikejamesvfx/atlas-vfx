@@ -35,7 +35,7 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 1 | Plate Read | camera_side | Atlas Camera | built | plate V141 | T2 | vfx_probe/plate_proxy.py |
 | 2 | Tracking Proxy | camera_side | Atlas Camera | built | plate V141 | T2 | vfx_probe/track_proxy.py |
 | 3 | Shot Splitter | camera_side | Atlas Camera | prototype | - | later | vfx_probe/split_analysis.py |
-| 4 | Solve Plate | camera_side | Atlas Camera | scripts | plate script | later | vfx_probe/solve_s1s3.py, vfx_probe/resolve_nodist.py |
+| 4 | Solve Plate | camera_side | Atlas Camera | built | synthetic | Tracker | vfx_probe/solve_s1s3.py, vfx_probe/resolve_nodist.py, tools/rs_clip_solve.py |
 | 5 | Camera Import | camera_side | Atlas Camera | built | plate V141 | T3 | vfx_probe/align_nuke.py (reader) |
 | 6 | Solve Compare | camera_side | Atlas Camera | built | plate V141 | T3 | vfx_probe/align_nuke.py |
 | 7 | Measure & Scale | camera_side | Atlas Camera | built | plate V141 (guessed picks) | T4 | vfx_probe/door_scale3.py, ground_check.py, grid_frames.py, zoom_door.py |
@@ -84,17 +84,33 @@ change a node, run `<V141 python> tests\test_node_contracts.py --update`, commit
 | 50 | Chunk Plan | layers | atlas-vfx | built | synthetic | Frame chunks | |
 | 51 | Sequence Read Chunk | layers | atlas-vfx | built | synthetic | Frame chunks | |
 | 52 | Chunk Stitch | layers | atlas-vfx | built | synthetic | Frame chunks | |
+| 53 | Relight Transfer | layers | atlas-vfx | built | synthetic | with 18 | tools/light_transfer.py (Gaussian ratio, superseded) |
+| 54 | Relight Transfer Files | layers | atlas-vfx | built | synthetic; plate V141 | with 18 | |
+| 55 | Shot Range | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 56 | Sun Direction | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 57 | Light Ball | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 58 | Layer Picker | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 59 | Grade | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 60 | Viewer | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 61 | Notes | layers | atlas-vfx | built | synthetic | Artist nodes | |
+| 62 | Tiny VAE | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
+| 63 | Alpha Prep | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
+| 64 | Alpha Return | layers | atlas-vfx | built | synthetic; plate V141 | Artist nodes | |
+| 65 | Latent Pre-render | layers | atlas-vfx | built | synthetic | Render queue | |
+| 66 | Guide From Latent | layers | atlas-vfx | built | synthetic; plate V141 | Render queue | |
+| 67 | Solve Mask | camera_side | Atlas Camera | built | synthetic | Tracker | |
+| 68 | Track 2D | camera_side | Atlas Camera | built | synthetic | Tracker | tools/track_picks.py |
+| 69 | Solve View | camera_side | Atlas Camera | built | synthetic | Tracker | |
+| 70 | Shot Setup | layers | atlas-vfx | built | synthetic | Shot mode | |
 
-40 rows are built or deprecated, and those are the 40 nodes that load. Categories: `Atlas VFX/Camera`
+58 rows are built or deprecated, and those are the 58 nodes that load. Categories: `Atlas VFX/Camera`
 (camera_side), `Atlas VFX/Layers` (layers), `Atlas VFX/Layers/Plate Lock` (platelock), `Atlas VFX/Layers/Chunks`
-(layers), `Atlas VFX/Deliver`
+(layers), `Atlas VFX/Artist` (layers: plain helpers for artists, 55-66), `Atlas VFX/Deliver`
 (deliver), `Atlas VFX/Sensor` (sensor).
 
 ## Planned and elsewhere
 
 - 3 Shot Splitter: shot boundaries from the proxy; the script exists, no node.
-- 4 Solve Plate: pycolmap solves of DSCF3000 in vfx_probe, `camera_side/rs_solve.py` + `tools/rs_clip_solve.py`
-  for the RS-aware refit. Phase 1 imports Nuke's camera instead; the RS refit is node 47.
 - 11 Clean Plate, 12 Matte, 19 Look Transfer, 22 Edge QC: Phase 2, nothing written.
 - 13 Layer Stack: was "T6-T8 (minimal)"; T8 was accepted without it because the Nuke Builder stacks the layer
   folders itself. Phase 2, only if a ComfyUI-side stack is wanted.
@@ -137,18 +153,22 @@ Payloads (all plain JSON-safe dicts unless said):
 <!-- types:begin (generated) -->
 | Type | Made by | Read by |
 |---|---|---|
-| `ATLAS_PLATE_SEQ` | 1 Plate Read | 2 Tracking Proxy, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview |
-| `ATLAS_TRACKED_CAMERA` | 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky |
+| `ATLAS_PLATE_SEQ` | 1 Plate Read, 70 Shot Setup | 2 Tracking Proxy, 4 Solve Plate, 5 Camera Import, 8 Lock Check, 9 Plate Depth, 14 Card Project, 24 Nuke Builder, 29 Sensor Lens Maps, 44 LTX Prep, 46 Comp Preview, 67 Solve Mask, 68 Track 2D |
+| `ATLAS_TRACKED_CAMERA` | 4 Solve Plate, 5 Camera Import, 7 Measure & Scale, 47 RS Solve | 6 Solve Compare, 7 Measure & Scale, 8 Lock Check, 9 Plate Depth, 10 Set Proxy, 14 Card Project, 15 Foreground Element, 16 Character Insert, 25 Camera Export, 28 Sensor Readout Solve, 29 Sensor Lens Maps, 30 Sensor RS Maps, 47 RS Solve, 48 Physical Sky, 53 Relight Transfer, 54 Relight Transfer Files, 69 Solve View |
+| `ATLAS_TRACKS_2D` | 68 Track 2D | 4 Solve Plate |
+| `ATLAS_VFX_ALPHA_PREP` | 63 Alpha Prep | 64 Alpha Return |
 | `ATLAS_VFX_CARD` | 15 Foreground Element, 16 Character Insert | 14 Card Project |
 | `ATLAS_VFX_CHUNK_PLAN` | 50 Chunk Plan | 52 Chunk Stitch |
-| `ATLAS_VFX_LIGHT_RIG` | 33 Light From Plate, 48 Physical Sky | 18 Light Probe & Relight |
+| `ATLAS_VFX_LIGHT_RIG` | 33 Light From Plate, 48 Physical Sky | 18 Light Probe & Relight, 56 Sun Direction |
 | `ATLAS_VFX_LTX_PREP` | 44 LTX Prep | 31 Sensor Apply, 45 LTX Return |
 | `ATLAS_VFX_PLATELOCK_PEOPLE` | 38 Plate Lock Person | 38 Plate Lock Person, 39 Plate Lock QC, 40 Plate Lock |
 | `ATLAS_VFX_PLATELOCK_RESULT` | 40 Plate Lock | 41 Plate Lock Layer, 42 Plate Lock Write |
 | `ATLAS_VFX_PLATELOCK_TRACK` | 37 Plate Lock Camera | 40 Plate Lock |
 | `ATLAS_VFX_SENSOR_LENS` | 29 Sensor Lens Maps | 30 Sensor RS Maps |
-| `MOGE_GEOMETRY` | - | 32 Normals, 34 Depth Holdout (element) |
-| `MOGE_MODEL` | - | 9 Plate Depth |
+| `ATLAS_VFX_SHOT` | 70 Shot Setup | - |
+| `ATLAS_VFX_SUN` | 56 Sun Direction | 57 Light Ball |
+| `MOGE_GEOMETRY` | - | 32 Normals, 34 Depth Holdout (element), 53 Relight Transfer |
+| `MOGE_MODEL` | - | 9 Plate Depth, 54 Relight Transfer Files |
 <!-- types:end -->
 
 ## Contracts
@@ -173,6 +193,31 @@ Payloads (all plain JSON-safe dicts unless said):
 - licences: `ffmpeg`
 - needs: ffmpeg (run)
 - writes: log-luma + CLAHE PNG proxies under out_dir
+
+### 4 Solve Plate
+`AtlasVFXSolvePlate` · camera_side · Atlas VFX/Camera
+- in: plate_ref ATLAS_PLATE_SEQ, sensor_preset auto|fujifilm_xh2_dci4k_24p_dis_off|custom, sensor_width_mm FLOAT, sensor_height_mm FLOAT, focal_guess_mm FLOAT, solve_focal BOOLEAN, solve_distortion BOOLEAN, lens_model k1 k2 (RADIAL)|k1 (SIMPLE_RADIAL)|k1 k2 p1 p2 (OPENCV), proxy_width INT, max_features INT, overlap INT, reject_px FLOAT, name STRING, out_dir STRING
+- in, optional: masks MASK, mask_dilate_px INT, tracks ATLAS_TRACKS_2D, seed INT, camera_move auto|free|nodal
+- out: shot_camera ATLAS_TRACKED_CAMERA, path STRING, report STRING, preview IMAGE
+- test: tests/test_plate_solve.py, tests/test_camera_io.py, tests/test_camera_checks.py
+- proof: synthetic (dolly: focal 0.1 % and k1/k2 from an 8 % wrong guess, all frames; moving board: its points
+  dropped or masked out; nodal pan: rotation-only fallback with the focal solved)
+- licences: `pycolmap`, `opencv-python`, `scipy`, `numpy`
+- needs: pycolmap, opencv, scipy
+- writes: tracking proxies, the COLMAP database + model (sparse/0), solve_report.json, the shot camera + sidecar
+  under out_dir (default atlas-vfx-work/<plate>/solve/<name>)
+- notes: the 3D camera tracker (`camera_side/plate_solve.py`, the DSCF3000 S1-S3 recipe from tools/rs_clip_solve.py
+  with the lens solved instead of locked). SIFT on log-luma proxies, sequential matching, incremental SfM with focal
+  and k1/k2 (RADIAL; SIMPLE_RADIAL or OPENCV on the widget) refined in the bundle adjust on the raw features, so the
+  lens is solved with the poses rather than undistorted first. Frames the first pass drops are mapped onto the
+  model again; points whose worst reprojection is over reject_px are dropped and the solve re-adjusted (things that
+  moved). A shot whose matched pairs are mostly rotation-only, or where SfM can't start, is solved nodal
+  (`camera_side/nodal_solve.py`: rotations + focal + distortion, points on a sphere 100 units out; no depth, so
+  Measure & Scale can't scale it). The camera is unscaled and keeps the longest run of registered frames; its lens
+  block is `brown` [k1 k2 p1 p2 k3] and `project()` applies it, so Lock Check and Card Project draw on the plate as
+  shot; Sensor Lens Maps (29) turns it into undistort / redistort STMaps for Nuke. Masks: Solve Mask (67) or any
+  MASK batch, one per plate frame, 1 = no features. Tracks: Track 2D (68), added as matches between consecutive
+  frames. Chain RS Solve (47) for a rolling-shutter plate (it undistorts the observations first).
 
 ### 5 Camera Import
 `AtlasVFXCameraImport` · camera_side · Atlas VFX/Camera
@@ -239,7 +284,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 14 Card Project
 `AtlasVFXCardProject` · layers · Atlas VFX/Layers
 - in: plate_ref ATLAS_PLATE_SEQ, shot_camera ATLAS_TRACKED_CAMERA, card ATLAS_VFX_CARD, scale FLOAT, frame_step INT, preview_every INT, preview_width INT, out_dir STRING
-- in, optional: holdout_depth STRING, holdout_margin_m FLOAT, holdout_soft_m FLOAT
+- in, optional: holdout_depth STRING, holdout_margin_m FLOAT, holdout_soft_m FLOAT, sensor_lens_folder STRING
 - out: exr_folder STRING, preview IMAGE
 - test: tests/test_card_project.py
 - proof: plate V141 (S2-S3)
@@ -250,8 +295,9 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 15 Foreground Element
 `AtlasVFXForegroundElement` · layers · Atlas VFX/Layers
 - in: image IMAGE, mask MASK, shot_camera ATLAS_TRACKED_CAMERA, batch_index INT, frame INT, distance_m FLOAT, lateral_m FLOAT, height_m FLOAT, ground_y STRING, yaw_deg FLOAT, erode_px INT, mask_is_background BOOLEAN, ocio_config STRING, name STRING, out_dir STRING
+- in, optional: source_colour inverse display view (ACES 2.0 SDR, as LTX)|sRGB texture
 - out: card ATLAS_VFX_CARD, preview IMAGE, report STRING
-- test: tests/test_card_project.py
+- test: tests/test_card_project.py, tests/test_element_colour.py
 - proof: plate V141 (Z-Image grass + BiRefNet matte)
 - licences: `openimageio`, `z-image-turbo` (upstream, in the T6 graph), `birefnet` (upstream)
 - needs: OpenImageIO (run)
@@ -260,9 +306,9 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 16 Character Insert
 `AtlasVFXCharacterInsert` · layers · Atlas VFX/Layers
 - in: images IMAGE, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT, last_frame INT, pick_frame INT, pick_u FLOAT, pick_v FLOAT, deck_y FLOAT, height_m FLOAT, key_lo FLOAT, key_hi FLOAT, erode_px INT, mode billboard|fixed, clip_start INT, end_mode hold|pingpong|loop, source_model STRING, ocio_config STRING, name STRING, out_dir STRING
-- in, optional: mask MASK, exposure_stops FLOAT
+- in, optional: mask MASK, exposure_stops FLOAT, source_colour inverse display view (ACES 2.0 SDR, as LTX)|sRGB texture
 - out: card ATLAS_VFX_CARD, preview IMAGE, report STRING
-- test: tests/test_character_insert.py, tests/test_character_time.py
+- test: tests/test_character_insert.py, tests/test_character_time.py, tests/test_element_colour.py
 - proof: synthetic. The 2026-10-19 plate run used a MiniMax H3 clip and is withdrawn with H3 (2026-10-24); it needs
   a licensed source to re-prove on the plate.
 - licences: `openimageio`; the clip is upstream: source_model names it and the node logs a warning for any model in
@@ -297,7 +343,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 24 Nuke Builder
 `AtlasVFXNukeBuilder` · deliver · Atlas VFX/Deliver
 - in: plate_ref ATLAS_PLATE_SEQ, nuke_camera_json STRING, layer_folders STRING, shot STRING, plate_kind dpx|prores|original, set_proxy_obj STRING, prefix STRING, set_root BOOLEAN, out_dir STRING
-- in, optional: x_offset INT
+- in, optional: x_offset INT, lens_delivery plate|clean + STMaps, sensor_lens_folder STRING
 - out: script_path STRING, script STRING
 - test: tests/test_nuke_builder.py, tests/test_nuke_text.py
 - proof: Nuke accepted (T8, Nuke Indie 17.1 on S2-S3, accepted by Mike)
@@ -330,13 +376,19 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 29 Sensor Lens Maps
 `AtlasVFXSensorLensMaps` · sensor · Atlas VFX/Sensor
 - in: lens_source camera|camera + typed|typed, k1 FLOAT, k2 FLOAT, k3 FLOAT, p1 FLOAT, p2 FLOAT, ca_r FLOAT, ca_b FLOAT, vig_1 FLOAT, vig_2 FLOAT, vig_3 FLOAT, map_scale FLOAT, out_dir STRING
-- in, optional: shot_camera ATLAS_TRACKED_CAMERA, plate_ref ATLAS_PLATE_SEQ
+- in, optional: shot_camera ATLAS_TRACKED_CAMERA, plate_ref ATLAS_PLATE_SEQ, overscan none|auto|5 %|10 %
 - out: sensor_lens ATLAS_VFX_SENSOR_LENS, lens_folder STRING, preview IMAGE, report STRING
-- test: tests/test_sensor_lens.py
-- proof: plate V141 (DEMO sensor pass, S2-S3; k1 k2 are 0 until the chart shoot measures them)
+- test: tests/test_sensor_lens.py, tests/test_overscan.py
+- proof: plate V141 (DEMO sensor pass, S2-S3; k1 k2 are 0 until the chart shoot measures them); synthetic overscan
 - licences: `scipy`, `openimageio`
 - needs: scipy (load); OpenImageIO (run)
 - writes: STMaps (Brown-Conrady + lateral CA) and a vignette map + `.nk` under out_dir
+- notes: overscan (none | auto | 5 % | 10 %) makes the clean frame bigger than the plate so barrel corners survive
+  undistort: undistort maps live on the clean grid and point into the plate, redistort maps on the plate grid point
+  into the clean frame; sensor_lens.json records `clean_size` and `overscan_px`. Everything in clean space follows
+  that size: Card Project renders through `camera_side/clean_space.clean_camera` (no lens, wider sensor, same focal
+  in pixels, principal point shifted), LTX Prep / Return work on the clean frame, the Nuke Builder's clean +
+  STMaps branch widens the camera aperture to it. Sensor Apply with LTX crop windows refuses an overscanned folder.
 
 ### 30 Sensor RS Maps
 `AtlasVFXSensorRSMaps` · sensor · Atlas VFX/Sensor
@@ -425,6 +477,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 37 Plate Lock Camera
 `AtlasVFXPlateLockCamera` · platelock · Atlas VFX/Layers/Plate Lock
 - in: frames IMAGE, mode locked_off|shot_camera|platelock_json, path STRING, focal_mm FLOAT, sensor_width_mm FLOAT, readout_ms FLOAT, fps FLOAT, rs_anchor centre|top
+- in, optional: frames_are_clean BOOLEAN
 - out: camera ATLAS_VFX_PLATELOCK_TRACK, info STRING
 - test: tests/test_platelock_nodes.py, tests/test_rs_time.py
 - proof: synthetic
@@ -508,7 +561,7 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 44 LTX Prep
 `AtlasVFXLTXPrep` · layers · Atlas VFX/Layers
 - in: plate_ref ATLAS_PLATE_SEQ, layer_folder STRING, first_frame INT, length INT, width INT, height INT, mask_thresh FLOAT, shadow_px INT, dilate_px INT, keyframe_every INT, mode full|crop, crop_margin INT, extra_layers STRING, reference plate|comp, mask_mode layer|none
-- in, optional: sensor_rs_folder STRING, sensor_lens_folder STRING
+- in, optional: sensor_rs_folder STRING, sensor_lens_folder STRING, mirror BOOLEAN, allow_raw_lens BOOLEAN
 - out: reference IMAGE, mask MASK, reference_half IMAGE, mask_half MASK, start_image IMAGE, ltx_prep ATLAS_VFX_LTX_PREP, keyframes_half IMAGE
 - test: tests/test_ltx_integration.py, tests/test_ltx_sensor_loop.py
 - proof: plate V141 (LTX clean loop, S2-S3)
@@ -517,7 +570,11 @@ Payloads (all plain JSON-safe dicts unless said):
 - needs: scipy (load); OpenImageIO (run)
 - writes: nothing (images + record out)
 - notes: plate -> ACEScg -> named SDR view, element alpha as mask, start image + keyframes; crop mode; Sensor Pass
-  maps. Reads the plate from ATLAS_PLATE_SEQ itself, so a de-RS'd clean plate can't be fed in yet.
+  maps. Reads the plate from ATLAS_PLATE_SEQ itself, so a de-RS'd clean plate can't be fed in yet. mirror
+  (2026-10-30) flips every image output left-right; Return flips the take back, Sensor Apply refuses mirrored frames.
+  Why: on DSCF3000 the LTX-2.3 Relight LoRA kept the sun on frame right whatever the light ball or prompt said
+  (left, front-left, back-left, right, strength 1.5); mirrored with the ball on the right, the take comes back lit
+  from the left.
 
 ### 45 LTX Return
 `AtlasVFXLTXReturn` · layers · Atlas VFX/Layers
@@ -528,6 +585,7 @@ Payloads (all plain JSON-safe dicts unless said):
 - licences: `scipy`, `openimageio`; the render is upstream (see 44)
 - needs: scipy (load); OpenImageIO (run)
 - writes: an EXR layer folder + sidecar (inverse view, paste-back with a faded edge)
+- notes: flips the take back when Prep's mirror was on (recorded in the sidecar).
 
 ### 46 Comp Preview
 `AtlasVFXCompPreview` · deliver · Atlas VFX/Deliver
@@ -644,3 +702,240 @@ Payloads (all plain JSON-safe dicts unless said):
   frame chain their handovers). Blends the files' own values: scene-linear for EXR, display-encoded for PNG / JPEG.
   Crossfading hides a seam only when the two takes agree; if they ghost, the next step is conditioning each chunk
   on the previous one's tail.
+
+### 53 Relight Transfer
+`AtlasVFXRelightTransfer` · layers · Atlas VFX/Layers
+- in: element IMAGE, matte MASK, relit IMAGE, encoding linear|srgb|inverse display view (ACES 2.0 SDR, as LTX), mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT
+- in, optional: normals IMAGE, moge_geometry MOGE_GEOMETRY, shot_camera ATLAS_TRACKED_CAMERA, first_frame INT, relit_mirrored BOOLEAN, holdout MASK, lift_limit FLOAT, holdout_grow INT
+- out: images IMAGE, gain IMAGE, info STRING
+- test: tests/test_relight_transfer.py, tests/test_element_colour.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: moves the light of a low-res relit take (LTX relight IC-LoRAs: `ltx-2.3-ic-lora-relight` at 1280x704,
+  `ltx-2.5-ic-lora-day-to-night`, `ltx-2.5-ic-lora-golden-hour`, run upstream; the graph that runs them owns that
+  check) onto the full-res element and keeps the element's pixels. log2(relit / element) is measured at
+  analysis_width from pixels fully inside the matte, blurred inside the matte, filled outward, and brought to full
+  res by a matte-weighted guided filter on the element's log luminance (plus MoGe depth / normals), so a bright
+  background does not bend the edge. mode sh fits 2nd-order spherical harmonics from normal to gain per frame (in
+  world space with a shot camera) and re-shades at the normals' sharpness, plus the guided residual for cast
+  shadows; a frame under min_r2 falls back to guided. Synthetic: guided halves the error of a plain upscale (0.22 vs
+  0.47 stops), sh is 4x better than guided on fine normal detail (0.13 vs 0.55). Cast shadows stay at the analysis
+  size. For full-res normals run MoGe-3 on the element at its own size, not a 1024 proxy. subsample is the fast guided
+  filter (He & Sun 2015: coefficients solved at 1/N res, applied with the full-res guide, matte-weighted shrink so
+  the halo fix holds): on a 4K LTX frame with a 5-channel guide, 2 is 2.6x faster than exact and within 0.008 stops
+  rms (p99 0.03); 4 is 4.4x, 0.044 rms (p99 0.17, at edges). relit_mirrored flips a raw take rendered on a
+  mirrored reference back (the sun-on-the-left trick, see 44); LTX Return output is already flipped back.
+  lift_limit (default 3 stops): where the take lifts the element more than that, the plate has too little signal
+  (DSCF3000 1160: a post in shade at luma 0.012 lifted 4.9 stops came out a soft grainy smudge, the plate's noise
+  x30), so it fades over one stop to the take's own pixels. On the real take it swaps 0.1-4 % of the matte. holdout
+  is a roto for what the take invented rather than lit: its gain is ignored and filled from around it (sh fills
+  from the normals and matches a clean take; guided fills smoothly from the edge). A gain-outlier test could not
+  tell invented content from real light edges (it flagged sunlit step lips and real cast shadows first), so it is
+  by hand.
+
+### 54 Relight Transfer Files
+`AtlasVFXRelightTransferFiles` · layers · Atlas VFX/Layers
+- in: element_path STRING, relit_path STRING, matte_path STRING, first_frame INT, length INT, relit_numbering frame|sequential, relit_encoding linear|srgb|inverse display view (ACES 2.0 SDR, as LTX), mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT, lift_limit FLOAT, name STRING, out_dir STRING
+- in, optional: moge_model MOGE_MODEL, resolution_level INT, refine_steps INT, normals_temporal INT, normals_sigma FLOAT, depth_guide BOOLEAN, shot_camera ATLAS_TRACKED_CAMERA, relit_mirrored BOOLEAN, holdout_path STRING, holdout_grow INT, ocio_config STRING
+- out: images STRING, gain STRING, info STRING
+- test: tests/test_relight_transfer.py, tests/test_element_colour.py
+- proof: synthetic; plate V141
+- licences: none beyond the base (MoGe-3 is in the register)
+- needs: nothing beyond the base
+- writes: <name>.<frame>.exr (ACEScg, alpha = matte), <name>_gain/<name>_gain.<frame>.exr (log2, Raw), a sidecar
+- notes: 53 for long or 4K shots. Same maths (light_transfer.transfer on frame sources and an EXR sink), but the
+  element, matte (blank = the element's alpha), relit take and holdout are paths read one frame at a time, and MoGe
+  runs per frame inside the node, its smoothed normals and depth cached on disk as .npy (no pickle) and deleted at
+  the end, so one MoGe run serves the SH fit and the full-res pass. The IMAGE graph holds ~10 GB per 4K link per
+  100 frames and ran out of 64 GB on 97 frames of DSCF3000; this node holds a few full-res frames whatever the
+  length. Synthetic: matches 53 on the same half-float frames within 0.0011 stops, one MoGe run per frame, peak RAM
+  47 MB for 4 frames and 52 MB for 20.
+
+### 55 Shot Range
+`AtlasVFXShotRange` · layers · Atlas VFX/Artist
+- in: first INT, last INT, ltx_length as is|8k+1 shorter|8k+1 longer, frame_offset INT, width INT, height INT
+- out: first_frame INT, length INT, last_frame INT, plate_first INT, plate_last INT, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: the frame range set once, in Nuke frames. length snaps to LTX's 8k+1 (shorter or longer), plate_first / plate_last are the 0-based plate index Plate Read takes (1130 is index 129 at offset 1001), and info says in words what one IMAGE link of that range holds in RAM (97 frames at 4K: 9.6 GB), pointing at Relight Transfer Files or Chunk Plan when it is a lot.
+
+### 56 Sun Direction
+`AtlasVFXSunDirection` · layers · Atlas VFX/Artist
+- in: direction COMBO, height low|mid|high, look STRING, mirror_trick auto|off
+- in, optional: light_rig ATLAS_VFX_LIGHT_RIG, rig_frame middle|first|last
+- out: mirror BOOLEAN, prompt STRING, sun ATLAS_VFX_SUN
+- test: tests/test_artist_nodes.py, tests/test_sun_rig.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: the sun for the LTX-2.3 Relight IC-LoRA, in words: one of the 8 directions the LoRA knows (as seen in the finished shot), low / mid / high, and the look. Gives the prompt, the ball to paste (sun, for Light Ball) and LTX Prep's mirror. mirror_trick auto renders a sun with "left" in it mirrored and asks for the right, because on DSCF3000 the LoRA only ever lit from frame right; for the left sun it gives exactly the prompt of the 2026-10-30 take that worked.
+
+### 57 Light Ball
+`AtlasVFXLightBall` · layers · Atlas VFX/Artist
+- in: image IMAGE, sun ATLAS_VFX_SUN
+- out: image IMAGE
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: assets/relight_balls (MIT, register id relight-light-balls)
+- needs: nothing beyond the base
+- writes: nothing
+- notes: pastes the light-direction ball on every frame of LTX Prep's reference, at 143/1280 of the width, 22/1280 in from the top-right corner (the training layout), so it is right at any work size. The 24 balls ship in assets/relight_balls (MIT, register id relight-light-balls); direction and height come from Sun Direction's lists, never a path.
+
+### 58 Layer Picker
+`AtlasVFXLayerPicker` · layers · Atlas VFX/Artist
+- in: layer COMBO
+- out: folder STRING, pattern STRING, first INT, last INT, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: a list of the folders under the work root holding an EXR sequence and a sidecar (what Card Project, LTX Return, EXR Write and Relight Transfer Files write), shown relative to the work root so a saved graph carries no user folder. Gives the folder, the #### pattern, the frame range and the size / channels / colourspace of the first frame. A value that resolves outside the work root is refused. The list is read when ComfyUI loads node definitions.
+
+### 59 Grade
+`AtlasVFXGrade` · layers · Atlas VFX/Artist
+- in: image IMAGE, blackpoint FLOAT, whitepoint FLOAT, lift FLOAT, gain FLOAT, multiply FLOAT, offset FLOAT, gamma FLOAT, exposure FLOAT, tint_r FLOAT, tint_g FLOAT, tint_b FLOAT, reverse BOOLEAN, clamp_black BOOLEAN, clamp_white BOOLEAN, mix FLOAT
+- in, optional: mask MASK
+- out: image IMAGE
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: Nuke's Grade on linear RGB, same maths (A = multiply * (gain - lift) / (whitepoint - blackpoint), B = offset + lift - A * blackpoint, gamma above 0, black clamp on by default), plus exposure in stops on the input and an r/g/b tint on gain. reverse undoes the grade; mask and mix blend as Nuke's do; alpha passes through.
+
+### 60 Viewer
+`AtlasVFXViewer` · layers · Atlas VFX/Artist
+- in: a_path STRING, b_path STRING, frame INT, mode COMBO, wipe FLOAT, exposure FLOAT, gamma FLOAT, view COMBO, zoom_to_alpha BOOLEAN, width INT
+- in, optional: a_image IMAGE, b_image IMAGE, image_index INT, ocio_config STRING
+- out: image IMAGE, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: a preview PNG in ComfyUI's temp folder (as Preview Image does)
+- notes: one frame as Nuke's viewer shows it: A and B from EXR sequences (pattern, folder or file) or IMAGE inputs; wipe, side by side, difference; exposure (f-stops) and gamma for the view only; any display / view of the shipped OCIO config; zoom to A's alpha; gain false colour for Relight Transfer's log2 gain EXRs (blue darker, white 0, orange brighter, saturated at +-3 stops, with a legend). Reads one frame per input. info gives the luminance and gain stats inside A's alpha.
+
+### 61 Notes
+`AtlasVFXNotes` · layers · Atlas VFX/Artist
+- in: info STRING
+- out: text STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: any node's info / report JSON as readable lines: warnings first (gain clamped on more than 25% of the matte, sh fallback frames, soft take pixels over 10%, IMAGE links over 8 GB), then the known keys by name, then the rest with long lists cut.
+
+### 62 Tiny VAE
+`AtlasVFXTinyVAE` · layers · Atlas VFX/Artist
+- in: tae_name (put taeltx2_3.safetensors in models/vae_approx)
+- out: vae VAE
+- test: tests/test_artist_nodes.py
+- proof: synthetic; plate V141
+- licences: taeltx2_3 (MIT, register id taeltx2-3)
+- needs: nothing beyond the base
+- writes: nothing
+- notes: loads the LTX-2.3 / 2.5 tiny autoencoder taeltx2_3 (madebyollin/taehv, MIT; the safetensors file, never the pickled .pth) from models/vae_approx as a VAE, for a quick-look VAE Decode next to the real one (seconds, blurry, right in framing, motion and light); core's VAE Loader only lists taeltx_2. Checked: a (1, 128, 3, 22, 40) LTX latent decodes to 17 frames at 1280x704; live on V141 the Alpha-Gen sampler sent 8 tiny-VAE previews (TAESD method). Loading the pack also installs ltx_live_preview: with ComfyUI's live preview method on TAESD, LTX samplers preview the first latent frame through it; any surprise falls back to ComfyUI's own preview, and ATLAS_VFX_LTX_LIVE_PREVIEW=0 turns the hook off.
+
+### 63 Alpha Prep
+`AtlasVFXAlphaPrep` · layers · Atlas VFX/Artist
+- in: images IMAGE, still_frames INT, max_width INT, max_height INT
+- out: image IMAGE, length INT, width INT, height INT, alpha_prep ATLAS_VFX_ALPHA_PREP, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic; plate V141
+- licences: ltx-2.5-ic-lora-alpha-gen (LTX-2.x Community License, run upstream in the graph)
+- needs: nothing beyond the base
+- writes: nothing
+- notes: gets any image or clip ready for the LTX-2.5 Alpha-Gen IC-LoRA, a single still included: fitted inside 1920x1088, padded with grey to /32 (never stretched), held to 8n+1 frames (a still for still_frames, default 9), at most 145 frames (longer leaks RGB into the matte). Gives the guide image, the latent length / width / height, and the record for Alpha Return. Settings follow the model card (empty prompt, LoRA 1.0, reference strength 1.0, single stage).
+
+### 64 Alpha Return
+`AtlasVFXAlphaReturn` · layers · Atlas VFX/Artist
+- in: images IMAGE, alpha_prep ATLAS_VFX_ALPHA_PREP, channel red|green|blue|mean, still_average BOOLEAN
+- out: mask MASK, matte_image IMAGE, info STRING
+- test: tests/test_artist_nodes.py
+- proof: synthetic; plate V141
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: the decoded Alpha-Gen output back to a MASK at the source size: padding cropped, the matte channel (green, as the tested graph), held frames trimmed; for a still the held frames are averaged before the clamp (synthetic: a third of the single-frame error). Live, one still of DSCF3000 1130 with the showcase element comped in: IoU 0.962 against the element's own alpha, mean error 0.0015, 30 s end to end on the 5090. Feeds EXR Write's mask, Relight Transfer's matte / holdout, Grade's mask.
+
+### 65 Latent Pre-render
+`AtlasVFXLatentPrerender` · layers · Atlas VFX/Artist
+- in: images IMAGE, vae VAE, name STRING, out_dir STRING
+- out: latent LATENT, path STRING, info STRING
+- test: tests/test_latent_guide.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: <out>/<name>.latent (safetensors, one float32 tensor `latent_tensor`) and <name>.json (frames sha256, count, size, the VAE's downscale layout, the file's sha256); default out is <work>/latent_cache
+- notes: encodes a reference clip once with the VAE (through LTXVVAEForceFloat32 for a float32 encode) and keeps the latent; the same frames again (16-bit hash) load the file instead of encoding. Frames are trimmed to LTX's 8k+1 as its guide node does. What Guide From Latent (66) adds as the IC-LoRA guide, and what a farm or cloud job sends (a few MB instead of the frames). Read back with safetensors only, never pickle.
+
+### 66 Guide From Latent
+`AtlasVFXGuideFromLatent` · layers · Atlas VFX/Artist
+- in: positive CONDITIONING, negative CONDITIONING, vae VAE, latent LATENT, guide LATENT, strength FLOAT, latent_downscale_factor FLOAT
+- out: positive CONDITIONING, negative CONDITIONING, latent LATENT
+- test: tests/test_latent_guide.py
+- proof: synthetic; plate V141
+- licences: none beyond the base (calls ComfyUI-LTXVideo's own guide code at run time; LTX-2 Community License, already required by every LTX graph)
+- needs: ComfyUI-LTXVideo loaded (found at run time, so atlas-vfx loads without it)
+- writes: nothing
+- notes: LTX's "Add Video IC-LoRA Guide" for a reference already encoded by Latent Pre-render (65): it skips the encode and runs LTX's own resolve_frame_idx, LTXVAddGuide.append_keyframe and append_guide_attention_entry from the loaded pack, so the conditioning is the same by construction. Synthetic test against LTX's node on the same frames: identical keyframe tensors, attention entries, latent and noise mask. Live on V141 (DSCF3000 relight preview, 17 frames, seed 42): LTX Return's EXRs bit-identical to the image-guided run. Whole clip from frame 0 and latent_downscale_factor 1 only (the Relight and Alpha-Gen LoRAs declare 1); a guide whose latent size differs from the job's is refused. The guide goes in at the VAE's output dtype, as the image path would.
+
+### 67 Solve Mask
+`AtlasVFXSolveMask` · camera_side · Atlas VFX/Camera
+- in: plate_ref ATLAS_PLATE_SEQ, classes STRING, window INT, box_threshold FLOAT, text_threshold FLOAT, dilate_px INT, proxy_width INT
+- out: masks MASK, preview IMAGE, report STRING
+- test: tests/test_solve_mask.py
+- proof: synthetic (SAM 2.1 on a moving block; the detector run on a real frame when the weights are there)
+- licences: `transformers`, `grounding-dino-base`, `sam2.1-hiera-large`, `torch`
+- needs: transformers 5.x, the two model folders (tools/fetch_solve_models.py)
+- writes: nothing (masks out)
+- notes: masks of things that move, for Solve Plate. Grounding DINO boxes the classes you name on the middle frame
+  of each window, SAM 2.1 tracks them forwards and backwards through the window, windows unioned, dilated. Both
+  transformers-native classes from local safetensors folders, never remote code. Masks at proxy_width; the plate is
+  seen through the shipped OCIO display view.
+
+### 68 Track 2D
+`AtlasVFXTrack2D` · camera_side · Atlas VFX/Camera
+- in: plate_ref ATLAS_PLATE_SEQ, seeds STRING, scale FLOAT, span INT, fb_px FLOAT, window INT, levels INT
+- out: tracks ATLAS_TRACKS_2D, preview IMAGE, summary STRING
+- test: tests/test_tracks2d.py
+- proof: synthetic
+- licences: `opencv-python`
+- needs: opencv
+- writes: nothing
+- notes: pyramidal Lucas-Kanade from seeds (label, plate frame index, plate px), forwards and backwards, kept while
+  the forward-backward error is under fb_px (`camera_side/tracks2d.py`, ported from tools/track_picks.py). Seeds are
+  untrusted JSON: labels are word characters, at most 500. Solve View writes seeds when you click a plate frame.
+
+### 69 Solve View
+`AtlasVFXSolveView` · camera_side · Atlas VFX/Camera
+- in: shot_camera ATLAS_TRACKED_CAMERA, max_points INT, plate_frames INT, seeds STRING
+- out: seeds STRING
+- test: tests/test_solve_view.py
+- proof: synthetic
+- licences: `three-js`
+- needs: web/atlas_vfx_solve_view.js (display only)
+- writes: a few proxy JPEGs into ComfyUI's temp folder for the panel
+- notes: a three.js panel: points coloured by worst reprojection (green < 0.5 px, yellow < 2, red beyond, plate px,
+  through the camera's lens), camera path, frustum at the scrubbed frame, median error per frame, and plate frames
+  with the points drawn on them. Clicking a plate frame appends a Track 2D seed to the seeds widget, which the node
+  passes out. Proxies are read only from a folder outputs may be written to (the camera is graph data).
+
+### 70 Shot Setup
+`AtlasVFXShotSetup` · layers · Atlas VFX/Layers
+- in: mode plate|foreground|generate, path STRING, first INT, last INT, screen green|blue, width INT, height INT, fps STRING, frames INT, ocio_config STRING, input_space STRING, frame_offset INT, preview_width INT, preview_every INT
+- out: plate_ref ATLAS_PLATE_SEQ, shot ATLAS_VFX_SHOT, preview IMAGE, info STRING
+- test: tests/test_shot_mode.py
+- proof: synthetic
+- licences: none beyond the base
+- needs: nothing beyond the base
+- writes: nothing
+- notes: the choice before anything else (layers/shot_mode.py, owner call 2026-11-01): plate (a real background plate, read as Plate Read does), foreground (an actor on a green or blue screen; key it, track the screen plate, generate the background behind them through that camera) or generate (create both: no plate, a virtual plate_ref from width, height, fps and frames). Every mode hands on a plate_ref, so the nodes after it work the same; nodes that read plate pixels refuse a virtual plate (plate.is_virtual) and the comp shows black under the layers. Atlas Comp's new-shot form writes the same mode into shot.json.

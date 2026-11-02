@@ -7,7 +7,7 @@
    "type": "AtlasVFXPlateRead",
    "pos": [
     40,
-    70
+    100
    ],
    "size": [
     300,
@@ -44,7 +44,7 @@
     "~\\Videos\\atlas-vfx_footage\\DSCF3000.MOV",
     129,
     296,
-    "",
+    "~\\atlas-vfx\\config\\atlas_aces2.0_studio_flog2.ocio",
     "auto",
     "auto",
     1001,
@@ -61,7 +61,7 @@
    ],
    "size": [
     300,
-    466
+    526
    ],
    "flags": {},
    "order": 1,
@@ -106,6 +106,8 @@
     0.0,
     false,
     "DSCF3000_pycolmap_f16_full",
+    "",
+    "off",
     ""
    ]
   },
@@ -114,7 +116,7 @@
    "type": "AtlasVFXMeasureScale",
    "pos": [
     880,
-    103
+    133
    ],
    "size": [
     300,
@@ -171,7 +173,7 @@
    "type": "AtlasVFXCameraExport",
    "pos": [
     1300,
-    160
+    190
    ],
    "size": [
     300,
@@ -224,7 +226,7 @@
    ],
    "size": [
     300,
-    352
+    412
    ],
    "flags": {},
    "order": 4,
@@ -238,9 +240,6 @@
     {
      "name": "nuke_camera_json",
      "type": "STRING",
-     "widget": {
-      "name": "nuke_camera_json"
-     },
      "link": 5
     }
    ],
@@ -260,13 +259,15 @@
     "Node name for S&R": "AtlasVFXNukeBuilder"
    },
    "widgets_values": [
-    "",
     "~\\atlas-vfx-work\\DSCF3000\\layers\\DSCF3000_f16_GUESS_stairs_grass_far\n~\\atlas-vfx-work\\DSCF3000\\layers\\DSCF3000_f16_GUESS_stairs_grass_near",
     "DSCF3000_S2S3",
     "dpx",
     "~\\atlas-vfx-work\\DSCF3000\\set_proxy\\DSCF3000_f16_GUESS_stairs_set.obj",
     "AVFX_",
     true,
+    "",
+    0,
+    "plate",
     ""
    ]
   }
@@ -320,7 +321,7 @@
     -5,
     -51,
     2070,
-    602
+    662
    ],
    "color": "#335159",
    "font_size": 24

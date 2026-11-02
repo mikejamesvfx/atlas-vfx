@@ -4,7 +4,6 @@ layer. Writes a comp preview and a sidecar with the colour round-trip report."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import numpy as np
 
@@ -23,7 +22,8 @@ class AtlasVFXLTXReturn:
     RETURN_NAMES = ("layer_folder", "preview")
     DESCRIPTION = ("Takes the LTX output (display-referred, work size), inverts the named view back to ACEScg, upscales "
                    "it to plate size and keeps it only inside the inpaint mask: <name>.<frame>.exr, RGBA half, "
-                   "premultiplied ACEScg. Outside the mask alpha is 0, so the plate (and its lock) is untouched.")
+                   "premultiplied ACEScg. Outside the mask alpha is 0, so the plate (and its lock) is untouched. "
+                   "If Prep mirrored the frames, the take is flipped back first.")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -54,9 +54,10 @@ class AtlasVFXLTXReturn:
         ww, wh = ltx_prep["work_size"]
         if ltx.shape[1:3] != (wh, ww):
             ltx = np.stack([li.resize(f, (ww, wh)) for f in ltx])
-        _, inv = li.view_processors(ref["ocio_config"])
-        fwd, _ = li.view_processors(ref["ocio_config"])
-        stem = Path(ref["path"]).stem
+        if ltx_prep.get("mirror"):
+            ltx = li.mirror(ltx)                            # Prep mirrored the frames LTX saw: flip the take back
+        fwd, inv = li.prep_processors(ltx_prep)          # the exact view Prep applied, from its record
+        stem = pl.plate_stem(ref)
         name = pl.safe_name(name)
         out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / stem / "layers" / name)
         off = ref["frame_offset"]
@@ -69,13 +70,16 @@ class AtlasVFXLTXReturn:
             else:
                 rgba = li.return_frame(ltx[i], masks[i], (W, H), inv, feather_px)
             if sensor is not None:
-                rgba = li.apply_camera(rgba, sensor, n)     # LTX worked in clean space: put the plate camera back
+                # LTX worked in clean space: keep that frame (clean/) and put the plate camera back for the main one
+                exr_io.write_rgba(out / "clean" / f"{name}.{n:04d}.exr", rgba,
+                                  attrs={"layer": name, "frame": n, "space": "clean"})
+                rgba = li.apply_camera(rgba, sensor, n)
             exr_io.write_rgba(out / f"{name}.{n:04d}.exr", rgba,
                               attrs={"layer": name, "frame": n, "source": "LTX integration pass",
                                      "replaces": ltx_prep["layer"]})
             cover.append(float((rgba[..., 3] > 0.5).mean()))
             if i % preview_every == 0:
-                _, img = next(pl.decode_rgb(ref, n - off, n - off, width=1024))
+                _, img = next(pl.decode_rgb_or_black(ref, n - off, n - off, width=1024))
                 lin = pl.to_working(img, ref)
                 small = cv2.resize(rgba, (lin.shape[1], lin.shape[0]), interpolation=cv2.INTER_AREA)
                 previews.append(li.to_view(cp.over(small, lin), fwd))
@@ -83,9 +87,17 @@ class AtlasVFXLTXReturn:
                   "replaces_layer": ltx_prep["layer"], "work_size": [ww, wh], "plate_size": [W, H],
                   "roundtrip": ltx_prep["roundtrip"], "mask": ltx_prep["mask"], "feather_px": feather_px,
                   "coverage_max": max(cover), "source_model": source_model, "mode": ltx_prep.get("mode", "full"),
+                  "mirror": bool(ltx_prep.get("mirror")),
                   "window_scale": ([round(w[3] / wh, 3) for w in ltx_prep["windows"]] if ltx_prep.get("windows") else None),
                   "sensor": ({**sens, "applied": "vignette -> CA + distortion -> RS"} if sensor is not None else None),
-                  "note": "inside the mask: LTX output upscaled from work size; outside: alpha 0 (plate untouched)"}
+                  "note": "inside the mask: LTX output upscaled from work size; outside: alpha 0 (plate untouched)",
+                  # plate = on the plate as shot (this folder). clean = the pinhole frame LTX made, when Prep worked
+                  # in clean space. With no lens on the camera (Prep had no lens folder and layers had none) they match
+                  "space": "plate",
+                  "sizes": {"clean": [W, H], "plate": ltx_prep.get("true_plate_size") or [W, H]},
+                  "versions": ({"plate": f"{name}.%04d.exr", "clean": f"clean/{name}.%04d.exr"} if sensor is not None
+                               else {"plate": f"{name}.%04d.exr", "clean": f"{name}.%04d.exr"}
+                               if not ltx_prep.get("lens_on_layers") else {"plate": f"{name}.%04d.exr"})}
         (out / f"{name}.render.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
         pl.write_sidecar(out / f"{name}.sidecar.json", "AtlasVFXLTXReturn",
                          inputs={k: v for k, v in ltx_prep.items() if k != "masks_work"}, outputs=report)

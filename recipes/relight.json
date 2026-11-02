@@ -1,0 +1,699 @@
+{
+ "name": "relight",
+ "label": "Relight (LTX-2.3 + 4K transfer)",
+ "modes": [
+  "plate",
+  "foreground",
+  "generate"
+ ],
+ "description": "Relights the element layer with the LTX-2.3 Relight IC-LoRA from the sun you pick, then carries the light onto the full-res element. A sun on the left is done mirrored.",
+ "graph": {
+  "70": {
+   "class_type": "AtlasVFXShotRange",
+   "inputs": {
+    "first": 1130,
+    "last": 1226,
+    "ltx_length": "8k+1 shorter",
+    "frame_offset": 1001,
+    "width": 4096,
+    "height": 2160
+   }
+  },
+  "72": {
+   "class_type": "AtlasVFXSunDirection",
+   "inputs": {
+    "direction": "the left",
+    "height": "low",
+    "look": "hard warm golden sunset sunlight",
+    "mirror_trick": "auto"
+   }
+  },
+  "1": {
+   "class_type": "AtlasVFXPlateRead",
+   "inputs": {
+    "path": "~/Videos/atlas-vfx_footage/DSCF3000.MOV",
+    "first": [
+     "70",
+     3
+    ],
+    "last": [
+     "70",
+     4
+    ],
+    "ocio_config": "",
+    "input_space": "auto",
+    "range": "auto",
+    "frame_offset": 1001,
+    "preview_width": 512,
+    "preview_every": 56
+   }
+  },
+  "2": {
+   "class_type": "AtlasVFXLTXPrep",
+   "inputs": {
+    "plate_ref": [
+     "1",
+     0
+    ],
+    "layer_folder": [
+     "71",
+     0
+    ],
+    "first_frame": [
+     "70",
+     0
+    ],
+    "length": [
+     "70",
+     1
+    ],
+    "width": 1280,
+    "height": 704,
+    "mask_thresh": 0.05,
+    "shadow_px": 24,
+    "dilate_px": 12,
+    "keyframe_every": 24,
+    "mode": "full",
+    "crop_margin": 96,
+    "extra_layers": "",
+    "reference": "comp",
+    "mask_mode": "layer",
+    "sensor_rs_folder": "",
+    "sensor_lens_folder": "",
+    "mirror": [
+     "72",
+     0
+    ]
+   }
+  },
+  "5": {
+   "class_type": "AtlasVFXLightBall",
+   "inputs": {
+    "image": [
+     "2",
+     0
+    ],
+    "sun": [
+     "72",
+     2
+    ]
+   }
+  },
+  "12": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "13": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors",
+    "type": "ltxv",
+    "device": "default"
+   }
+  },
+  "14": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "ltx-2.5-video-vae-bf16.safetensors"
+   }
+  },
+  "15": {
+   "class_type": "LTXVVAEForceFloat32",
+   "inputs": {
+    "vae": [
+     "14",
+     0
+    ]
+   }
+  },
+  "16": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "ltx-2.5-audio-vae-bf16.safetensors"
+   }
+  },
+  "17": {
+   "class_type": "LTXICLoRALoaderModelOnly",
+   "inputs": {
+    "model": [
+     "12",
+     0
+    ],
+    "lora_name": "ltx23\\ltx-2.3-22b-ic-lora-relight-1.0.safetensors",
+    "strength_model": 1.0
+   }
+  },
+  "39": {
+   "class_type": "CLIPTextEncode",
+   "inputs": {
+    "text": [
+     "72",
+     1
+    ],
+    "clip": [
+     "13",
+     0
+    ]
+   }
+  },
+  "40": {
+   "class_type": "CLIPTextEncode",
+   "inputs": {
+    "text": "pc game, console game, video game, cartoon, childish, ugly, blurry, deformed",
+    "clip": [
+     "13",
+     0
+    ]
+   }
+  },
+  "41": {
+   "class_type": "LTXVConditioning",
+   "inputs": {
+    "positive": [
+     "39",
+     0
+    ],
+    "negative": [
+     "40",
+     0
+    ],
+    "frame_rate": 24.0
+   }
+  },
+  "42": {
+   "class_type": "EmptyLTXVLatentVideo",
+   "inputs": {
+    "width": 1280,
+    "height": 704,
+    "length": [
+     "70",
+     1
+    ],
+    "batch_size": 1
+   }
+  },
+  "43": {
+   "class_type": "AtlasVFXGuideFromLatent",
+   "inputs": {
+    "positive": [
+     "41",
+     0
+    ],
+    "negative": [
+     "41",
+     1
+    ],
+    "vae": [
+     "15",
+     0
+    ],
+    "latent": [
+     "42",
+     0
+    ],
+    "guide": [
+     "90",
+     0
+    ],
+    "strength": 1.0,
+    "latent_downscale_factor": [
+     "17",
+     1
+    ]
+   }
+  },
+  "44": {
+   "class_type": "LTXVEmptyLatentAudio",
+   "inputs": {
+    "frames_number": [
+     "70",
+     1
+    ],
+    "frame_rate": 24,
+    "batch_size": 1,
+    "audio_vae": [
+     "16",
+     0
+    ]
+   }
+  },
+  "45": {
+   "class_type": "LTXVConcatAVLatent",
+   "inputs": {
+    "video_latent": [
+     "43",
+     2
+    ],
+    "audio_latent": [
+     "44",
+     0
+    ]
+   }
+  },
+  "46": {
+   "class_type": "CFGGuider",
+   "inputs": {
+    "model": [
+     "17",
+     0
+    ],
+    "positive": [
+     "43",
+     0
+    ],
+    "negative": [
+     "43",
+     1
+    ],
+    "cfg": 1.0
+   }
+  },
+  "47": {
+   "class_type": "ManualSigmas",
+   "inputs": {
+    "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+   }
+  },
+  "48": {
+   "class_type": "KSamplerSelect",
+   "inputs": {
+    "sampler_name": "euler_ancestral_cfg_pp"
+   }
+  },
+  "49": {
+   "class_type": "RandomNoise",
+   "inputs": {
+    "noise_seed": 42
+   }
+  },
+  "50": {
+   "class_type": "SamplerCustomAdvanced",
+   "inputs": {
+    "noise": [
+     "49",
+     0
+    ],
+    "guider": [
+     "46",
+     0
+    ],
+    "sampler": [
+     "48",
+     0
+    ],
+    "sigmas": [
+     "47",
+     0
+    ],
+    "latent_image": [
+     "45",
+     0
+    ]
+   }
+  },
+  "51": {
+   "class_type": "LTXVSeparateAVLatent",
+   "inputs": {
+    "av_latent": [
+     "50",
+     0
+    ]
+   }
+  },
+  "52": {
+   "class_type": "LTXVCropGuides",
+   "inputs": {
+    "positive": [
+     "43",
+     0
+    ],
+    "negative": [
+     "43",
+     1
+    ],
+    "latent": [
+     "51",
+     0
+    ]
+   }
+  },
+  "53": {
+   "class_type": "VAEDecodeTiled",
+   "inputs": {
+    "samples": [
+     "52",
+     2
+    ],
+    "vae": [
+     "15",
+     0
+    ],
+    "tile_size": 768,
+    "overlap": 192,
+    "temporal_size": 64,
+    "temporal_overlap": 16
+   }
+  },
+  "54": {
+   "class_type": "AtlasVFXLTXReturn",
+   "inputs": {
+    "images": [
+     "53",
+     0
+    ],
+    "ltx_prep": [
+     "2",
+     5
+    ],
+    "feather_px": 3.0,
+    "name": "element_relit",
+    "source_model": "ltx-2.5-22b-distilled int8 + ltx-2.3-22b-ic-lora-relight-1.0",
+    "preview_every": 24,
+    "out_dir": ""
+   }
+  },
+  "55": {
+   "class_type": "PreviewImage",
+   "inputs": {
+    "images": [
+     "5",
+     0
+    ]
+   }
+  },
+  "56": {
+   "class_type": "LoadMoGeModel",
+   "inputs": {
+    "model_name": "moge_3_vitl_fp16.safetensors"
+   }
+  },
+  "57": {
+   "class_type": "AtlasVFXRelightTransferFiles",
+   "inputs": {
+    "element_path": [
+     "71",
+     1
+    ],
+    "relit_path": [
+     "54",
+     0
+    ],
+    "matte_path": "",
+    "first_frame": [
+     "70",
+     0
+    ],
+    "length": [
+     "70",
+     1
+    ],
+    "relit_numbering": "frame",
+    "relit_encoding": "linear",
+    "mode": "sh",
+    "analysis_width": 1280,
+    "blur_px": 2.0,
+    "max_stops": 3.0,
+    "temporal": 1,
+    "eps": 0.01,
+    "subsample": 2,
+    "geo_weight": 0.5,
+    "min_r2": 0.3,
+    "lift_limit": 3.0,
+    "name": "element_relit_4k",
+    "out_dir": "",
+    "moge_model": [
+     "56",
+     0
+    ],
+    "resolution_level": 9,
+    "refine_steps": 3,
+    "normals_temporal": 1,
+    "normals_sigma": 1.5,
+    "depth_guide": true,
+    "relit_mirrored": false,
+    "holdout_path": "",
+    "holdout_grow": 2,
+    "ocio_config": ""
+   }
+  },
+  "58": {
+   "class_type": "AtlasVFXNotes",
+   "inputs": {
+    "info": [
+     "57",
+     2
+    ]
+   }
+  },
+  "59": {
+   "class_type": "AtlasVFXViewer",
+   "inputs": {
+    "a_path": [
+     "57",
+     0
+    ],
+    "b_path": [
+     "71",
+     1
+    ],
+    "frame": [
+     "70",
+     0
+    ],
+    "mode": "wipe",
+    "wipe": 0.5,
+    "exposure": 0.0,
+    "gamma": 1.0,
+    "view": "sRGB - Display / ACES 2.0 - SDR 100 nits (Rec.709)",
+    "zoom_to_alpha": true,
+    "width": 1280
+   }
+  },
+  "90": {
+   "class_type": "AtlasVFXLatentPrerender",
+   "inputs": {
+    "images": [
+     "5",
+     0
+    ],
+    "vae": [
+     "15",
+     0
+    ],
+    "name": "reference",
+    "out_dir": ""
+   }
+  }
+ },
+ "fields": [
+  {
+   "key": "element",
+   "label": "Element layer",
+   "type": "layer",
+   "default": "",
+   "targets": [
+    [
+     "2",
+     "layer_folder",
+     "folder"
+    ],
+    [
+     "57",
+     "element_path",
+     "pattern"
+    ],
+    [
+     "59",
+     "b_path",
+     "pattern"
+    ]
+   ]
+  },
+  {
+   "key": "direction",
+   "label": "Sun from",
+   "type": "choice",
+   "default": "the left",
+   "choices": [
+    "the front",
+    "the front-right",
+    "the right",
+    "the back-right",
+    "behind",
+    "the back-left",
+    "the left",
+    "the front-left"
+   ],
+   "targets": [
+    [
+     "72",
+     "direction"
+    ]
+   ]
+  },
+  {
+   "key": "height",
+   "label": "Sun height",
+   "type": "choice",
+   "default": "low",
+   "choices": [
+    "low",
+    "mid",
+    "high"
+   ],
+   "targets": [
+    [
+     "72",
+     "height"
+    ]
+   ]
+  },
+  {
+   "key": "look",
+   "label": "Look",
+   "type": "text",
+   "default": "hard warm golden sunset sunlight",
+   "targets": [
+    [
+     "72",
+     "look"
+    ]
+   ]
+  },
+  {
+   "key": "mode",
+   "label": "Transfer",
+   "type": "choice",
+   "default": "sh",
+   "choices": [
+    "sh",
+    "guided"
+   ],
+   "targets": [
+    [
+     "57",
+     "mode"
+    ]
+   ]
+  },
+  {
+   "key": "seed",
+   "label": "Seed",
+   "type": "int",
+   "default": 42,
+   "min": 0,
+   "max": 2147483647,
+   "targets": [
+    [
+     "49",
+     "noise_seed"
+    ]
+   ]
+  }
+ ],
+ "context": {
+  "plate": [
+   [
+    "1",
+    "path"
+   ]
+  ],
+  "first": [
+   [
+    "70",
+    "first"
+   ]
+  ],
+  "last": [
+   [
+    "70",
+    "last"
+   ]
+  ],
+  "frame_offset": [
+   [
+    "70",
+    "frame_offset"
+   ],
+   [
+    "1",
+    "frame_offset"
+   ]
+  ],
+  "cache_dir": [
+   [
+    "90",
+    "out_dir"
+   ]
+  ]
+ },
+ "outputs": [
+  [
+   "54",
+   "out_dir",
+   "ltx"
+  ],
+  [
+   "57",
+   "out_dir",
+   "beauty"
+  ]
+ ],
+ "stages": {
+  "pre": "90",
+  "gen_out": [
+   "52",
+   2
+  ]
+ },
+ "names": [
+  [
+   "54",
+   "name"
+  ],
+  [
+   "57",
+   "name"
+  ]
+ ],
+ "preview": {
+  "frames": 17,
+  "nodes": {
+   "61": {
+    "class_type": "AtlasVFXTinyVAE",
+    "inputs": {
+     "tae_name": "taeltx2_3.safetensors"
+    }
+   },
+   "53": {
+    "class_type": "VAEDecode",
+    "inputs": {
+     "samples": [
+      "52",
+      2
+     ],
+     "vae": [
+      "61",
+      0
+     ]
+    }
+   }
+  },
+  "drop": [
+   "56",
+   "57",
+   "58",
+   "59"
+  ],
+  "outputs": [
+   [
+    "54",
+    "out_dir",
+    ""
+   ]
+  ]
+ }
+}

@@ -211,9 +211,16 @@ def test_platelock_nk_keep_their_nodes():
     labels = knob(text, "label")
     assert labels and all(nk_unquote(lab) for lab in labels)
 
-    cv = cvj._nuke(TMP / 'cv"\n}', ["id_a", "id-b"], [1001, 1002], NK_HOSTILE)
+    # colour is explicit on every Read (the shipped config reads untagged EXRs as ACES2065-1), STMaps raw
+    spaces = [nk_unquote(v) for v in knob(text, "colorspace")]
+    assert len(spaces) == 6 and spaces.count("Raw") == 2 and spaces.count("ACEScg") == 4, spaces
+    assert len(knob(text, "raw")) == 2, knob(text, "raw")
+
+    cv = cvj._nuke(TMP / 'cv"\n}', ["id_a", "id-b"], [1001, 1002], NK_HOSTILE, ai_space='ACEScg"\n}x')
     assert nk_nodes(cv) == ["Root", "Read", "Read", "Read", "Read", "Read", "Read"], nk_nodes(cv)
     assert not knob(cv, "onCreate") and "Read_id_b_stmap" in knob(cv, "name"), knob(cv, "name")
+    cvs = [nk_unquote(v) for v in knob(cv, "colorspace")]
+    assert len(cvs) == 6 and cvs.count("Raw") == 2 and cvs.count('ACEScg"\n}x') == 4, cvs
     print("ok plate lock .nk: lock and cross-view scripts keep their node list with a hostile ai_path, out_dir "
           "and performer name")
 

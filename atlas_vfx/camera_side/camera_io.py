@@ -289,6 +289,11 @@ def from_colmap(folder, *, plate: dict, sensor: dict, frame_offset: int = 1001, 
             raise CameraImportError(f"COLMAP camera {cid}: fx {fx} != fy {fy} (non-square pixels not supported)")
         if model == "SIMPLE_RADIAL":
             dist = ("simple_radial", extra) if any(abs(k) > 0 for k in extra) else ("none", [])
+        elif model in ("RADIAL", "OPENCV") and any(abs(k) > 0 for k in extra):
+            # COLMAP RADIAL is k1 k2, OPENCV is k1 k2 p1 p2, both OpenCV's normalised convention (y down), which
+            # is the contract's brown order [k1, k2, p1, p2, k3]; normalised by focal, so proxy size doesn't matter
+            k = list(extra) + [0.0] * (4 - len(extra))
+            dist = ("brown", [k[0], k[1], k[2], k[3], 0.0])
         elif any(abs(k) > 0 for k in extra):
             raise CameraImportError(f"COLMAP {model} distortion {extra} not mapped to the contract yet")
         else:

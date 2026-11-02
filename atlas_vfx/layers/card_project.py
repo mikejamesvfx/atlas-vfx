@@ -58,8 +58,9 @@ def render(cam: sc.ShotCamera, frame: int, corners, texture: np.ndarray, scale: 
     M = cam.cam_to_world(frame)
     R, Cw = M[:3, :3], M[:3, 3]
 
-    # bounding box of the card on screen when it is fully in front; else the whole frame
-    uv, depth = cam.project(frame, np.asarray(corners, float))
+    # bounding box of the card on screen when it is fully in front; else the whole frame. The card is rendered in
+    # clean (pinhole) space, so the box is too: a lensed camera's distortion belongs to the plate, not to this layer
+    uv, depth = cam.project(frame, np.asarray(corners, float), ignore_distortion=True)
     if np.all(depth > NEAR):
         x0, y0 = np.floor(uv.min(0) * scale).astype(int) - 2
         x1, y1 = np.ceil(uv.max(0) * scale).astype(int) + 2

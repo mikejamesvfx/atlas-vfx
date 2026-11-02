@@ -137,7 +137,8 @@ def flat_depth(n: int, h: int, w: int, distance: float = 10.0) -> np.ndarray:
 _CV_FROM_NUKE = np.diag([1.0, -1.0, -1.0])
 
 
-def track_from_shot_camera(cam, readout: float = 0.0, rs_anchor: str = "centre") -> CameraTrack:
+def track_from_shot_camera(cam, readout: float = 0.0, rs_anchor: str = "centre",
+                           frames_are_clean: bool = False) -> CameraTrack:
     """atlas-vfx shot-camera@0.1 (Nuke axes: Y up, looking down -Z, pixel origin at the corner)
     -> platelock CameraTrack (OpenCV axes, pixel centres on integers).
 
@@ -147,6 +148,13 @@ def track_from_shot_camera(cam, readout: float = 0.0, rs_anchor: str = "centre")
     if isinstance(cam, str):
         from ..contracts import shot_camera as sc
         cam = sc.load(cam)
+    from ..camera_side import camera_checks as cc
+
+    if cc.has_lens(cam) and not frames_are_clean:
+        # the lock is pinhole: on distorted frames every reprojection would be off by the lens
+        raise ValueError(f"Plate Lock: {cam.name} has a {cam.data['lens']['distortion_model']} lens and the lock is "
+                         "pinhole. Feed it clean (undistorted) plate and AI frames (Sensor Apply 'remove camera', or "
+                         "LTX Return's clean/ version) and set frames_are_clean, or use a lens-free camera")
     frames = list(cam.frames)
     K = np.asarray(cam.intrinsics(frames[0]).K, float)
     focals = [float(cam._frame(f)["focal_mm"]) for f in frames]

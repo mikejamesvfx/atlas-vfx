@@ -2,6 +2,73 @@
 
 Running log for whoever works here. Newest at the top. Keep it short: what was decided, what was learned, what broke.
 
+## 2026-11-01 (3D camera tracker, flow review; branch feat/tracker)
+
+- Built: Solve Plate (4), Solve Mask (67), Track 2D (68), Solve View (69) in camera_side. pycolmap SfM with focal +
+  k1 k2 solved on the raw features, a rotation-only (nodal) solver for real pans, Grounding DINO + SAM 2.1 masks.
+- DSCF3000 0-296, free lens: 297/297, 0.43 px at 1024, focal 16.55-16.67 mm (run to run: the multithreaded mapper
+  isn't bit-identical), k1 k2 ~0 (in-camera correction). Against Mike's NukeX Camera1: view angle median 0.28 /
+  0.47 / 0.65 deg (S1 / S2 / S3), centre residual 0.12 % of path. The old pycolmap f16 solve is 6-10x further from
+  NukeX (median 3.5 / 2.5 / 3.1 deg, rotation up to 12.8 deg): the Measure / depth work built on f16 is worth redoing.
+- DSCF2977 (walk + pan), NukeX retrack by Mike (1.04 px, focal 15.52 mm, distortion1 -0.021). The first rule (go
+  nodal when most matched pairs look rotation-only) sent it nodal: focal 18.05 mm, k1 +0.056, wrong. Pairs are
+  frames up to `overlap` apart and look rotation-only on a walk too. Rule now: nodal only if SfM can't solve the
+  shot or its lens is impossible (|k| > 0.25, focal 2x off; synthetic pure pan: focal +98 %, k1 +0.61). Free SfM:
+  focal 15.80 mm, k1 -0.025. Against the pixels themselves (essential matrix on 164 pairs 6-12 frames apart):
+  free SfM 0.16 deg median, NukeX 1.00 (1.09 over the walk): NukeX drifts in the walk, ours doesn't.
+- Speed: nodal solve of 336 frames took 70 min, free SfM of the same clip 38 min (rotation-heavy shots make the
+  mapper retry); DSCF3000 297 frames 8-9 min. On the speed-pass list.
+- Lens policy (Mike: both, a switch): layers are written clean and plate (redistorted); Nuke Builder lens_delivery
+  plate | clean + STMaps; overscan (Sensor Lens Maps) keeps barrel corners. The contract's project() applies the lens.
+- Nuke Indie: Python may create or touch only 10 nodes per session. The builder also writes build_<shot>.nk to paste
+  (Atlas Camera's verified stack order: the last push is input 0). The atlas OCIO config (OCIO 2.5) did not load in
+  Mike's Indie (F-Log missing from the colorspace list); parked, Mike: "let's worry about comfy".
+- Colour: generated elements now come in through the inverse of LTX Prep's ACES view (the old sRGB texture path came
+  back 0.12 darker in the mids after LTX). Relight Transfer has the same option for raw LTX takes.
+- Golden graph (tracker -> metres -> lens -> cards -> LTX clean loop -> Return -> Nuke) ran on V141 in 76.5 min after
+  two live bugs (Card Project preview variable clash; a point behind the camera crashing the motion test).
+- Tracked relight (relight a comp: Physical Sky sun at the capture time, seen from the tracked camera, picks the
+  Relight LoRA's direction; Latent Pre-render encodes the reference once): built, queued. Heading of DSCF3000 frame
+  1001 unknown (180 placeholder).
+
+## 2026-10-30 (Relight Transfer, catalogue 53; branch feat/relight-transfer)
+
+- Why: LTX relight IC-LoRAs run at their own size (2.3 Relight 1280x704, single-stage: LTX's stage 2 drops the
+  IC-LoRA and the reference; the pixel upscaler invents texture). So the full-res result keeps the element's pixels
+  and takes only the change of light. Decided with Mike: sources 2.3 Relight + 2.5 Day-to-Night / Golden-Hour,
+  elements only, guided first then SH on MoGe-3 normals. Prior art: Hi-Light (arXiv 2601.23167) does the same in LAB
+  from 480p; ours is linear, per channel.
+- Two bugs found by the synthetic test, both the old light_transfer.py halo: (1) edge pixels of the shrunk image are
+  part background, so the gain is now measured only from analysis pixels fully inside the matte and filled outward;
+  (2) the guided filter's luma guide saw a bright background across the edge, so the filter is matte-weighted (every
+  window statistic a weighted mean). Bright background now moves the edge gain 0.016 stops (was 1.2).
+- MoGe-3 in core does predict normals (moge_3_vitl_fp16 has a normal_head; the core comment "v2 only" is stale).
+- No LTX-2.3 base on ws: the 2.3 Relight LoRA would run on the 2.5 base, as the 2.3 in/outpainting LoRA does.
+  Golden-Hour's file has no metadata, so its licence is unverified (register says personal tests only).
+- Live plumbing on a side ComfyUI (8191, GPU), 12 DSCF3000 frames 1230-1241 at 4096x2160, matte = Plate Depth
+  door208 < 3.2 m (60% of frame), relit = a stand-in: the frames at 1280 under a known gain field. Starter graph
+  (MoGe-3 at element size -> Normals -> Transfer sh -> EXR) ran in 240 s. Against the known gain: 0.0006 stops rms
+  (plain upscale 0.14), fine detail kept (high-pass correlation 0.99999 vs 0.86). Guided alone is ~3 s per 4K
+  frame. This proves the graph and the maths, not the look: next is a real LTX relight take.
+- Fast guided filter (subsample widget, default 2): the 5-channel guided filter at 4K was ~19 s per frame of a 97-frame
+  run. He & Sun 2015: solve a, b at 1/N res, upsample, apply with the full-res guide. The first version brought the
+  halo back (0.93 stops): shrinking mixed the bright background into edge pixels of the guide. Fixed by a
+  matte-weighted shrink (shrink(I*w)/shrink(w)). Real 4K LTX frame: exact 15.1 s, N=2 5.8 s (0.008 stops rms, p99
+  0.03), N=4 3.4 s (0.044 rms, p99 0.17 at edges). Default 2.
+- First real LTX relight: LTX-2.3 Relight IC-LoRA on the LTX-2.5 distilled int8 base (graph of
+  ltx23_relight/relight_official_ltx25_AB.json, single stage), DSCF3000 1130-1226 (97 frames) centre-cropped to
+  1280:704 through the ACES 2.0 SDR view, ball "the left, low", look "warm golden low side sun". 250 s on V141. The
+  take holds the plate's framing and timing (0 frame lag, < 1 px shift at 640 wide) but invents content (door opened
+  with an interior, a lit support under the steps, a dark border round the doormat). Element = the nearest 45% by
+  Plate Depth (railing + steps), ball patch cleared from the matte. Gain in the matte -1 to +4.3 stops (max_stops 5).
+  Transfer sh at 3928x2160, 4 batches, ~7.5 min per 25 frames (exact filter; the fast one landed after).
+  Against the take shrunk back to 1280 (light) and the element (detail, fine-scale correlation): plain upscale light
+  0.016 stops / detail 0.07; guided 0.19 / 0.96; sh 0.33 / 0.985. So the transfer keeps the plate's own texture where
+  the upscale keeps almost none, at the price of a looser match to LTX's light. Where LTX changed content its gain
+  lands on the real pixels as a soft smudge (the support, the mat border): the next fix is a structure-agreement
+  confidence that drops the gain where the take and the element disagree. Lifting a dusk plate 2-4 stops also lifts
+  its grain.
+
 ## 2026-10-29 (Physical Sky: Hosek-Wilkie fallback; branch feat/sky-hosek-fallback)
 
 - Why: the repo is public but Atlas Scene is private, so Physical Sky failed for everyone else. Rule now: Atlas Scene
@@ -884,3 +951,133 @@ Running log for whoever works here. Newest at the top. Keep it short: what was d
   door at an ASSUMED 2.08 m. Mike still to measure the door, a step riser and the deck rail.
 - Lock check (card on the wall plane) held across S1-S3 by eye.
 - Phase 1 slice: "character on the deck", S2-S3, Nuke frames 1130-1297. The test character is 2.13 m.
+
+### 2026-10-30 Relight Transfer smudges: lift_limit and holdout
+
+- The soft smudges in the first real take were not all invented content. On 1160 the "white support" LTX shows is
+  a post the plate holds in deep shade (luma 0.012, std 0.006, black in the view). LTX lifts it 4.9 stops, so the
+  transfer lifts the plate's noise 30x: a soft grainy blob. Nothing in the plate to keep there.
+- Tried first: a gain-vs-local-median outlier test (weight exp(-(d/tau)^2)). At a 33 px window (LTX size) it missed
+  the 20 px post (the post was the median); at 97 px it caught it but also the sunlit step lips and, on the
+  left-sun take, the real post shadows on the fascia (8-13 % of the matte). Gain alone cannot tell "LTX painted it"
+  from "the sun lit it". Dropped.
+- lift_limit (default 3 stops): above it, fade over one stop to the take's own pixels (upscaled). 1160: the post
+  comes back clean, 2.6 % of the matte swapped, detail 0.959 -> 0.907 (only where swapped); 1210: 0.1 %. At 2.0
+  a third of the element goes, too much.
+- holdout (MASK, optional): a roto over what LTX truly invented; its gain gets no weight and is filled from around
+  it. Synthetic invented patch: sh fills from the normals (0.126 vs clean 0.117 stops), guided halves the error.
+
+## 2026-10-31 LTX relight starter, and the Triton decode crash
+
+`workflows/ltx_relight_mirror.json` ran end to end on V141 (97 frames, 15 min 23 s, Return wrote
+`~/atlas-vfx-work/DSCF3000/layers/element_relit_starter`). Sun lands on frame left as with the hand-run take.
+The element covers about 3% of the frame, so in `mode full` LTX sees it at a few hundred pixels and the face comes
+back soft and drawn over; `mode crop` gives it more pixels, and Relight Transfer puts the element's own detail back.
+
+V141 started with `--enable-triton-backend` breaks the LTX-2.5 VAE decode: comfy_kitchen's Triton `rms_rope_` in
+`na_diffusion_decoder.py` fails with `Triton Error [CUDA]: invalid argument`, on any length and on a graph that
+had worked. Without the flag the Triton backend is disabled and the decode runs. Start V141 without it for LTX work.
+
+## 2026-10-31 Relight Transfer Files (54): streaming, and why
+
+The IMAGE graph for Relight Transfer holds every link as a float32 clip: 9.6 GB per 4K RGB link per 97 frames, and
+the graph has about ten (four reads, MoGe points and normals, Normals, both transfer outputs). 97 frames of DSCF3000
+ran out of 64 GB three times; four 25-frame chunks worked but popped at the joins (frames 1154/1155, 1204/1205
+differ from the streamed render by a median 0.07-0.09 stops, p99 up to 1 stop: the temporal smoothing and the SH
+fit stop at each chunk edge). Relight Transfer Files reads frames on demand (light_transfer.transfer now takes
+frame sources and a sink; the array path is unchanged, its tests give the same numbers), runs MoGe per frame and
+caches the smoothed normals and depth as float16 .npy so the SH fit and the full-res pass share one MoGe run.
+Live: 97 frames in one prompt, 700 s, V141 peak private memory 13.4 GB (MoGe and ComfyUI included), mid-chunk
+frames identical to the chunked render. Synthetic: within 0.0011 stops of the in-memory transfer on the same
+half-float frames, peak 47 MB at 4 frames vs 52 MB at 20.
+
+On this take 48 of 97 frames fell back from sh to guided (R^2 under 0.3) and the clamp hit up to half the matte:
+the element is a dark comp lifted hard by the take. Worth a look in Nuke before trusting the sh path on it.
+
+## 2026-10-31 Artist nodes, blueprints, Tiny VAE, Alpha-Gen
+
+- Artist starter (Shot Range, Layer Picker, Sun Direction "the left" + auto, Light Ball, Notes, Viewer) ran end to
+  end on V141: 97 frames, 28 min, sun on frame left as the hand-built take; Notes flagged what we saw by hand
+  (clamp on 49% of the matte, 50 sh fallbacks, 39% soft take pixels).
+- Tiny VAE: taeltx2_3 safetensors decodes LTX-2.5 latents (17 frames at 1280x704 from 3 latent frames). ComfyUI core
+  (here and on master) lists taeltx_2 but never hooks a tiny VAE to LTX live previews; layers/ltx_live_preview.py
+  wraps get_previewer (safe fallback, ATLAS_VFX_LTX_LIVE_PREVIEW=0 off). Live: 8 previews during an Alpha-Gen run.
+- Alpha-Gen on a single still (held 9 frames, mattes averaged): IoU 0.962 against the true alpha of the showcase
+  element over DSCF3000 1130, 30 s. On a frame with no clear foreground (an empty deck) the model returns a grey copy
+  of the scene: it needs a subject.
+
+## 2026-10-31 Atlas Comp Phase 1 live check (V141)
+
+- The empty state, then New shot DSCF3000_S2S3 1130-1226 from the dialog. The plate proxy built in the background
+  (97 frames, ~70 s; seeking the HEVC plate per frame had cost 8-17 s, the proxy then reads in 0.02 s).
+- Layers: the showcase element and the relit 4K take as EXR layers over the plate. A/B wipe (element | relit) at
+  +1 stop on 1178. The timeline shows each layer's frames.
+- A Matte recipe layer: Preview wrote 9 frames to layers/matte/preview and the layer switched to it. With
+  preview_method taesd sent per prompt, live tiny-VAE previews showed the matte forming at step 2/8. An identical
+  second Preview does nothing (ComfyUI's cache): change the seed or a field to run again.
+- A Sky layer: Render landed as v001. The sky is a lat-long map, so as a layer it covers the frame (plate-framed sky
+  needs the camera; Phase 2).
+- Bugs found live and fixed with tests: a reused frame URL never reloaded and left the request lock set; `[hidden]`
+  lost to the label display rule; a frame request could start a second proxy build.
+
+## 2026-10-31 Guide From Latent: live, bit-identical
+
+The relight recipe's preview (DSCF3000 1130, 17 frames, sun from the right, low, seed 42) was run twice on V141.
+- **Image guide:** LTX's Add Video IC-LoRA Guide, as shipped.
+- **Latent guide:** Latent Pre-render then Guide From Latent in its place.
+
+LTX Return's 17 EXRs match exactly: max abs difference 0.0 on every frame. The cache file holds 17 frames at
+1280x704, latent (1, 128, 3, 22, 40).
+
+Timing: the runs took 275 s and 85 s, but the first also loaded the models, so this is no speed measure. The encode
+itself is a small part of a run; the cache's value is that every machine starts from the same numbers, and the file
+that travels is a few MB.
+
+## 2026-10-31 Atlas Comp render queue: preflight live, farm and Cloud runs pending
+
+- **ws:** `/atlas/api/targets` lists ws, render and hub with no addresses.
+- **hub, live from the app:** a relight Preview sent to hub was refused at preflight, with nothing sent and
+  nothing run on ws: "hub is missing nodes: AtlasVFXGuideFromLatent; hub is missing models:
+  ltx-2.5-audio-vae-bf16.safetensors, ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors". render
+  lacks the same. A farm run needs atlas-vfx installed there plus those two files.
+- **Matte on the farm:** the first split left Alpha Prep and Sequence Read in generate (the empty latent took its
+  size from Alpha Prep), and they read EXRs by ws paths. Pre now reports those numbers through core PreviewAny and
+  generate gets them as literals.
+- **Comfy Cloud:** built against the documented API (docs.comfy.org/development/cloud/api-reference, read
+  2026-10-31) and tested with a fake. No live run yet: it needs `COMFY_CLOUD_API_KEY` and spends credits, so it
+  waits for Mike. Cloud's guide is 8-bit PNG frames (no atlas nodes there), the farm's is the float32 latent, so a
+  Cloud take is close to, not bit-identical with, a ws take.
+
+## 2026-10-31 Render queue, live end to end on ws (a "loop" target pointing back at 127.0.0.1)
+
+A temporary target named loop made ws act as a farm machine, so every stage ran for real: pre on ws, the guide
+latent uploaded, generate, the sampled latent downloaded, post on ws.
+
+- **First try failed:** ComfyUI refused the pre graph, "Prompt has no outputs" (Latent Pre-render is not an output
+  node). Pre now always reports the Pre-render's path and info through PreviewAny, and the guide is checked
+  against the reported sha256 before upload.
+- **Matte preview, 9 frames:** done, 9 of 9 back, 1.97 MB guide. Against the same preview run straight on ws:
+  bit-identical, max difference 0.0 over all 9 frames at 4096x2160 RGBA.
+- **Relight preview, 17 frames:** done, 17 of 17 back, 1.35 MB guide. Against the straight run: bit-identical,
+  max difference 0.0 over 17 files.
+- **Cancel during pre of a 97-frame render:** the job showed cancelled at once and the layer kept its version
+  (preview). The target deleted and interrupted that prompt only, but ComfyUI checks interrupts between nodes,
+  so it stopped 4 min 17 s later, when the long 4K read finished. The new v003 folder stayed empty.
+
+## 2026-10-31 Farm installed: render queue runs on render and hub
+
+- **Installed on both Linux boxes:** atlas-vfx (this branch) in `custom_nodes/atlas-vfx`, plus `opencolorio` 2.6.0
+  (the only requirement missing). Both load 54 nodes, none disabled.
+- **Models:** the int8 LTX-2.5 transformer, the LTX-2.5 audio VAE, and the Alpha-Gen and Relight IC-LoRAs were
+  copied into the farm's shared model store, sha256 checked. render reads that store over NFS.
+- **Preflight bug, found live:** the first matte on render passed preflight, then failed with "Model in folder
+  'loras' with filename 'ltx25\...' not found". The LoRA loader lists its choices as `["COMBO", {"options":
+  [...]}]`, which preflight didn't read; and ws writes subfolders with `\` where Linux uses `/`. Fixed: preflight
+  reads both formats, matches across the two separators, and rewrites the graph to the target's spelling. It then
+  correctly refused both LoRAs as missing, until they were copied.
+- **Matte preview, generate on render (3090):** done, 9 of 9 frames, 97 s end to end. Against ws: mean
+  difference 0.00013, mean alpha difference 0.0005; a few edge pixels flip (max 1.0). Expected across GPUs.
+- **Relight preview, generate on hub (A4000 16 GB, the 20 GB int8 model offloaded):** done, 17 of 17 frames,
+  250 s. Against ws: mean 0.04 stop, the largest differences in the hottest highlights.
+- NFS caches folder listings: render saw new files about 30 s after they landed on hub.
+

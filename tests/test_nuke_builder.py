@@ -158,6 +158,12 @@ def test_camera_export(cam: sc.ShotCamera, tmp: Path):
     assert np.allclose(s2["win_translate"], [40 / 2048, -20 / 2048]), s2["win_translate"]
     text = Path(res["usda"]).read_text(encoding="utf-8")
     assert 'upAxis = "Y"' in text and "metersPerUnit = 1" in text and "timeCodesPerSecond = 24" in text
+    # the fps comes from shot.fps (it read a key the contract doesn't have and always wrote 24)
+    d25 = copy.deepcopy(cam.data)
+    d25["shot"]["fps"] = 25.0
+    r25 = ce.export(sc.ShotCamera(d25), tmp / "cam25", "syn25")
+    t25 = Path(r25["usda"]).read_text(encoding="utf-8")
+    assert "timeCodesPerSecond = 25" in t25 and "framesPerSecond = 25" in t25 and r25["settings"]["fps"] == 25.0
     print(f"ok camera export: chan round trip within {worst:.1e} (ZXY, metres), usda {len(usd)} transform samples "
           f"within {uworst:.1e}, apertures 23.5 x {s['vaperture']:.3f} mm, principal point -> win_translate")
     return res
@@ -232,6 +238,157 @@ def test_builder(tmp: Path, cam: sc.ShotCamera, cam_res: dict, layer_pattern: st
     print("ok fallbacks: Camera2 when Camera3 is absent; a missing file stops the build before any node is made")
 
 
+def test_lens_delivery(tmp: Path, cam_res: dict, layer_pattern: str):
+    """clean + STMaps: the clean layers are stacked, redistorted once through the Raw STMap Read and merged over
+    the untouched plate; an undistorted plate branch exists for lining up. Layer versions come from render.json."""
+    import json as _json
+
+    lf = tmp / "lens"
+    lf.mkdir()
+    for k in ("undistort_g", "redistort_g"):
+        (lf / f"{k}.exr").write_bytes(b"\0")
+    base = make_shot(tmp / "lensshot", cam_res, layer_pattern)
+    data = nb.build_data(shot="SYN_S1", plate=base["plate"], plate_colorspace="F-Log2 F-Gamut",
+                         plate_frames=(1130, 1159), fmt=(4096, 2160, 1.0), ocio_config=OCIO,
+                         camera_chan=cam_res["chan"], camera_settings=cam_res["settings"], layers=base["layers"],
+                         write_pattern=str(tmp / "comp.%04d.exr"),
+                         lens_maps={"undistort": lf / "undistort_g.exr", "redistort": lf / "redistort_g.exr"})
+    text = nb.script_text(data)
+    assert not (nb.node_classes_used(text) & set(nb.NUKEX_ONLY)), "STMap is Indie; LensDistortion must not appear"
+    fake = fake_nuke(("Read", "Merge2", "Write", "Camera3", "ReadGeo2", "STMap"))
+    run_in_fake(text, fake)
+    by = {n.name(): n for n in fake.all}
+    rd, ud = by["AVFX_Redistort_layers"], by["AVFX_Undistort_plate"]
+    stack, over, wr = by["AVFX_Stack_grass"], by["AVFX_Over_layers"], by["AVFX_Write_comp"]
+    assert stack.inputs[0] is by["AVFX_Layer_element"] and stack.inputs[1] is by["AVFX_Layer_grass"]
+    assert rd.inputs[0] is stack and rd.inputs[1] is by["AVFX_Read_redistort"] and rd["uv"].value == "rgb"
+    assert over.inputs[0] is by["AVFX_Plate"] and over.inputs[1] is rd and wr.inputs[0] is over
+    assert ud.inputs[0] is by["AVFX_Plate"] and by["AVFX_Read_undistort"]["raw"].value is True
+    assert by["AVFX_Read_redistort"]["raw"].value is True
+    print("ok lens delivery: clean layers stacked -> one STMap redistort (Raw map) -> over the untouched plate -> "
+          "Write; undistorted plate branch; no NukeX-only nodes")
+
+    # layer versions
+    d = tmp / "layer_v"
+    d.mkdir()
+    (d / "el.render.json").write_text(_json.dumps({"card": "el", "pattern": "el.%04d.exr", "frames": [1, 2],
+                                                   "versions": {"clean": "el.%04d.exr"}}), encoding="utf-8")
+    assert nb.find_layer(d, "clean")["pattern"].endswith("/el.%04d.exr")
+    try:
+        nb.find_layer(d, "plate")
+        raise AssertionError("missing plate version not refused")
+    except ValueError as e:
+        assert "lens" in str(e)
+    (d / "el.render.json").write_text(_json.dumps({"card": "el", "pattern": "el.%04d.exr", "frames": [1, 2]}),
+                                      encoding="utf-8")
+    assert nb.find_layer(d, "plate")["pattern"] == nb.find_layer(d, "clean")["pattern"]
+    print("ok layer versions: clean / plate from render.json; a lensed layer with no plate version is refused; "
+          "an old folder is both")
+
+
+def nk_graph(text: str) -> dict:
+    """Wire a .nk paste the way Nuke does (Atlas Camera's verified convention: the LAST push is input 0):
+    {node name: (class, [input names])}."""
+    import re as _re
+
+    stack, sets, nodes = [], {}, {}
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        if ln.startswith("#") or not ln.strip():
+            i += 1
+            continue
+        m = _re.match(r"push \$(\w+)", ln)
+        if m:
+            stack.append(sets[m.group(1)])
+            i += 1
+            continue
+        m = _re.match(r"set (\w+) \[stack 0\]", ln)
+        if m:
+            sets[m.group(1)] = stack[-1]
+            i += 1
+            continue
+        m = _re.match(r"(\w+) \{$", ln)
+        assert m, ln
+        cls, body = m.group(1), []
+        i += 1
+        while lines[i] != "}":
+            body.append(lines[i])
+            i += 1
+        i += 1
+        k = int(next(b for b in body if b.startswith(" inputs ")).split()[1])
+        name = next(b for b in body if b.startswith(" name ")).split(None, 1)[1]
+        ins = [stack.pop() for _ in range(k)]                  # input 0 = the last push
+        nodes[name] = (cls, ins)
+        stack.append(name)
+    return nodes
+
+
+def test_nk_paste(tmp: Path, cam_res: dict, layer_pattern: str):
+    """The Indie paste (.nk text): same wiring as the Python build, both lens modes, no NukeX-only nodes."""
+    lf = tmp / "lens"
+    base = make_shot(tmp / "nkshot", cam_res, layer_pattern)
+    plate_data = nb.build_data(shot="SYN_S1", plate=base["plate"], plate_colorspace="F-Log2 F-Gamut",
+                               plate_frames=(1130, 1159), fmt=(4096, 2160, 1.0), ocio_config=OCIO,
+                               camera_chan=cam_res["chan"], camera_settings=cam_res["settings"], layers=base["layers"],
+                               write_pattern=str(tmp / "comp.%04d.exr"))
+    g = nk_graph(nb.nk_text(plate_data))
+    o1, o2 = g["AVFX_Over_element"], g["AVFX_Over_grass"]
+    assert o1 == ("Merge2", ["AVFX_Plate", "AVFX_Layer_element"]) and o2 == ("Merge2", ["AVFX_Over_element",
+                                                                                        "AVFX_Layer_grass"]), (o1, o2)
+    assert g["AVFX_Write_comp"][1] == ["AVFX_Over_grass"] and "AVFX_Camera" in g
+    lens_data = dict(plate_data, lens={"undistort": (lf / "undistort_g.exr").as_posix(),
+                                       "redistort": (lf / "redistort_g.exr").as_posix()})
+    text = nb.nk_text(lens_data)
+    g = nk_graph(text)
+    assert g["AVFX_Stack_grass"] == ("Merge2", ["AVFX_Layer_element", "AVFX_Layer_grass"]), g["AVFX_Stack_grass"]
+    assert g["AVFX_Redistort_layers"] == ("STMap", ["AVFX_Stack_grass", "AVFX_Read_redistort"])
+    assert g["AVFX_Undistort_plate"] == ("STMap", ["AVFX_Plate", "AVFX_Read_undistort"])
+    assert g["AVFX_Over_layers"] == ("Merge2", ["AVFX_Plate", "AVFX_Redistort_layers"])
+    assert g["AVFX_Write_comp"][1] == ["AVFX_Over_layers"]
+    assert not (set(c for c, _ in g.values()) & set(nb.NUKEX_ONLY))
+    assert text.count("raw true") == 2 and "curve x" in text and "rot_order ZXY" in text
+    print(f"ok nk paste (Indie): {len(g)} nodes, both lens modes wired as the Python build (B/A, src/stmap), "
+          f"STMap Reads raw, camera as curves")
+
+
+def test_virtual_plate(tmp: Path, cam_res: dict, layer_pattern: str):
+    """A shot with no plate (Shot Setup generate): the build starts from a black Constant, Python and .nk alike."""
+    base = make_shot(tmp / "virtual", cam_res, layer_pattern)
+    data = nb.build_data(shot="SYN_GEN", plate=nb.plate_source("", "virtual"), plate_colorspace="ACEScg",
+                         plate_frames=(1001, 1003), fmt=(4096, 2160, 1.0), ocio_config=OCIO,
+                         camera_chan=cam_res["chan"], camera_settings=cam_res["settings"], layers=base["layers"],
+                         write_pattern=str(tmp / "gen.%04d.exr"))
+    assert None not in data["reads"] and all(data["reads"])
+    fake = fake_nuke(("Constant", "Read", "Merge2", "Write", "Camera3"))
+    run_in_fake(nb.script_text(data), fake)
+    by = {n.name(): n for n in fake.all}
+    assert by["AVFX_Plate"].cls == "Constant" and by["AVFX_Over_element"].inputs[0] is by["AVFX_Plate"]
+    g = nk_graph(nb.nk_text(data))
+    assert g["AVFX_Plate"] == ("Constant", []) and g["AVFX_Over_element"][1][0] == "AVFX_Plate", g["AVFX_Plate"]
+    print("ok virtual plate: Python build and .nk paste start from a black Constant under the layers")
+
+
+def test_nk_header_injection(tmp: Path, cam_res: dict, layer_pattern: str):
+    """Values in the .nk header comments come from widgets and camera files: a newline in them must not end the
+    comment and smuggle a live node or TCL line into the paste."""
+    base = make_shot(tmp / "inject", cam_res, layer_pattern)
+    evil = 'x\nNoOp {\n name pwn\n label "[python -exec {print(1)}]"\n}\r\n#'
+    data = nb.build_data(shot="SYN_INJ", plate=nb.plate_source("", "virtual"), plate_colorspace="ACEScg",
+                         plate_frames=(1001, 1003), fmt=(4096, 2160, 1.0), ocio_config=OCIO + evil,
+                         camera_chan=cam_res["chan"], camera_settings=cam_res["settings"], layers=base["layers"],
+                         write_pattern=str(tmp / "inj.%04d.exr"))
+    data["camera"]["units"] = "metres" + evil
+    text = nb.nk_text(data)
+    g = nk_graph(text)
+    assert "pwn" not in g and "NoOp" not in {c for c, _ in g.values()}, sorted(g)
+    head = [ln for ln in text.splitlines() if ln.startswith("#")]
+    assert len(head) == 3 and all("\r" not in ln for ln in head), head
+    assert not any(ln.lstrip().startswith(("NoOp", "label", "name pwn")) for ln in text.splitlines()[:6])
+    print("ok nk header: newlines in ocio_config and camera units stay inside their comment lines")
+
+
 def main() -> int:
     cam = camera()
     with tempfile.TemporaryDirectory() as t:
@@ -239,6 +396,10 @@ def main() -> int:
         layer_pattern = test_exr_write(tmp)
         cam_res = test_camera_export(cam, tmp)
         test_builder(tmp, cam, cam_res, layer_pattern)
+        test_lens_delivery(tmp, cam_res, layer_pattern)
+        test_nk_paste(tmp, cam_res, layer_pattern)
+        test_virtual_plate(tmp, cam_res, layer_pattern)
+        test_nk_header_injection(tmp, cam_res, layer_pattern)
     return 0
 
 

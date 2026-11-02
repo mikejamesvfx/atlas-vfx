@@ -50,6 +50,21 @@ def test_parse_and_discover():
             check(False, "missing folder is a clear error")
         except FileNotFoundError:
             check(True, "missing folder is a clear error")
+        # versions: the preview is over the plate as shot, so a layer shows its plate (redistorted) frames
+        v = d / "DSCF_solve_card"
+        (v / "plate").mkdir(parents=True)
+        exr_io.write_rgba(v / "card.1130.exr", rgba)                  # clean
+        exr_io.write_rgba(v / "plate" / "card.1130.exr", rgba)        # plate
+        (v / "card.render.json").write_text(json.dumps({"card": "card", "versions": {
+            "clean": "card.%04d.exr", "plate": "plate/card.%04d.exr"}}))
+        _, fr = cpv.layer_frames(v)
+        check(fr[1130].parent.name == "plate", "layer with versions: the plate frames are previewed", str(fr[1130]))
+        (v / "card.render.json").write_text(json.dumps({"card": "card", "versions": {"clean": "card.%04d.exr"}}))
+        try:
+            cpv.layer_frames(v)
+            check(False, "a lensed layer with only clean frames is refused")
+        except ValueError:
+            check(True, "a lensed layer with only clean frames is refused")
 
 
 def test_over_order():

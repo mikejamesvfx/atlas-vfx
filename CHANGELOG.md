@@ -10,6 +10,59 @@ when it does, the entry says so and names the tool that rewrites them.
   last frame, nothing padded); Sequence Read Chunk reads one chunk of an EXR/DPX/PNG sequence; Chunk Stitch joins
   the rendered chunks into one sequence numbered from the first frame, crossfading the overlaps.
   `tools/queue_chunks.py` queues one prompt per chunk from an API workflow. New socket type `ATLAS_VFX_CHUNK_PLAN`.
+- **Relight Transfer** (catalogue 53, `Atlas VFX/Layers`): an LTX relight IC-LoRA runs at its own size (2.3 Relight
+  at 1280x704, 2.5 Day-to-Night / Golden-Hour), and this node moves only the change of light onto the full-res
+  element, keeping every element pixel. mode guided measures the gain at the LoRA's size and brings it up with a
+  matte-weighted guided filter (element luminance, plus MoGe depth / normals); mode sh fits the light as spherical
+  harmonics on MoGe-3 normals and re-shades at their sharpness. Starter: `workflows/relight_transfer_element.json`
+  (`tools/relight_transfer_workflow.py`). The three LoRAs are in the licence register. `subsample` runs the fast
+  guided filter (default 2: 2.6x faster at 4K, within 0.01 stop of exact).
+- **Relight Transfer smudges**: `lift_limit` (default 3 stops) hands the near-black parts of the plate that the take
+  lifts further than that to the take's own pixels (soft but clean, instead of the plate's noise lifted 30x), and an
+  optional `holdout` mask drops the light of anything the relight invented and fills it from around it.
+- **Mirror for LTX relights**: LTX Prep `mirror` flips what LTX sees left-right and LTX Return flips the take back;
+  Relight Transfer `relit_mirrored` does the same for a raw take. On DSCF3000 the LTX-2.3 Relight LoRA kept the sun
+  on frame right whatever the light ball said; mirrored, with the ball on the right, the sun lands on the left.
+  Starter: `workflows/ltx_relight_mirror.json` (`tools/ltx_relight_workflow.py`): Plate Read, LTX Prep (comp
+  reference, mirror on, 1280x704, 97 frames), the light ball pasted top-right, the LTX-2.3 Relight IC-LoRA on the
+  LTX-2.5 distilled base, LTX Return. Its layer is the `relit` input of the Relight Transfer starter. Put the ball
+  PNG (`the right__low.png`) in ComfyUI's input folder.
+
+- **Relight Transfer Files** (catalogue 54, `Atlas VFX/Layers`): Relight Transfer for 4K and long shots. It takes
+  the element, matte (blank = the element's alpha), relit take and holdout as sequence paths, reads them one frame
+  at a time, runs MoGe-3 per frame inside the node (normals cached on disk, removed at the end) and writes the EXRs
+  and gain EXRs as it goes. Same maths as 53. 97 frames of DSCF3000 at 4K in one prompt peaked at 13.4 GB of RAM;
+  the IMAGE graph ran out of 64 GB and had to be cut into chunks, which popped up to a stop at the joins. Starter:
+  `workflows/relight_transfer_files.json`.
+
+- **Artist nodes** (catalogue 55-61, `Atlas VFX/Artist`), for a Nuke / AE / Photoshop user: Shot Range (frames
+  once, in Nuke numbers; LTX 8k+1, Plate Read's index, RAM), Sun Direction and Light Ball (the sun in words; prompt,
+  ball and the mirror trick done for you; the balls ship in `assets/relight_balls`, MIT), Layer Picker (rendered
+  layers from a list), Grade (Nuke's Grade maths), Viewer (A/B wipe, f-stops, OCIO view, zoom to alpha, gain false
+  colour) and Notes (reports as readable lines, warnings first). No new dependencies.
+- **Blueprints**: `subgraphs/relight_element_4k.json` and `subgraphs/ltx_clean_loop.json` show up in ComfyUI's node
+  library as one box each, with only the settings an artist changes (`tools/blueprints.py`). The LTX relight
+  starters now use the artist nodes.
+
+- **LTX Alpha-Gen mattes** (catalogue 63-64): Alpha Prep / Alpha Return wrap the LTX-2.5 Alpha-Gen IC-LoRA (a matte
+  from any picture or clip, no green screen, soft edges kept). A single still works: it is held for 9 frames and the
+  mattes are averaged before the clamp. Starter `workflows/alpha_matte.json`, blueprint "Atlas VFX Alpha Matte".
+- **Tiny VAE** (catalogue 62): taeltx2_3 (madebyollin/taehv, MIT, safetensors) for a quick-look decode of any LTX
+  latent in a second. Loading the pack also gives LTX samplers live previews through it when ComfyUI's live preview
+  method is TAESD (`ATLAS_VFX_LTX_LIVE_PREVIEW=0` turns that off; anything unexpected falls back to ComfyUI's preview).
+
+- **Atlas Comp** (early, at `/atlas` on the running ComfyUI): a compositor's screen over these nodes. Shots on disk,
+  a layer stack (EXR sequences and recipes), a viewer through the OCIO view with A/B wipe and f-stops, recipes
+  (Matte, Relight, Sky) run as Preview with tiny-VAE live previews or Render into versions. New package
+  `atlas_vfx/comp` (allowed to import every package; only the root imports it), `app/`, `recipes/`.
+- **Latent Pre-render** (catalogue 65) and **Guide From Latent** (catalogue 66): encode a reference clip once with
+  the VAE at float32, keep it on disk (safetensors + sidecar, reused while the frames hash the same), and add it as
+  the LTX IC-LoRA guide exactly as `LTXAddVideoICLoRAGuide` would. On V141 a relight from the cached latent is
+  bit-identical to the image-guided one. Atlas Comp's Matte and Relight recipes use it.
+- **Atlas Comp render queue**: Render on ws, a home-farm ComfyUI or Comfy Cloud. pre (ws) / generate (target) /
+  post (ws); preflight refuses a target missing a node or model before anything is sent; the frame count is
+  checked after. Targets in the untracked `atlas_comp_targets.local.json`. Cloud jobs wait for Confirm with a rough
+  credit range; the API key comes from `COMFY_CLOUD_API_KEY`.
 
 ## 0.1.0 (2026-10-30), first public beta
 

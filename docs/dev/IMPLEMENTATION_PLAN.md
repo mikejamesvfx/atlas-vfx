@@ -206,7 +206,9 @@ Rules for the whole phase:
 
 ## S6. RS back on in the LTX clean loop
 
-- Only after S5 passes. `tools/ltx_clean_loop_workflow.py` `USE_RS = True` with the S3 camera and the S1 readout;
+- Only after S5 passes. In `workflows/golden_dscf3000_s2s3.json` (tools/golden_shot_workflow.py; the old
+  `tools/ltx_clean_loop_workflow.py` was deleted 2026-10-24) give LTX Prep `sensor_rs_folder` from RS Maps on the RS
+  Solve camera at the S1 readout;
   the demo's RS Maps on the preset rule instead of "measured if connected".
 - Visible proof needs a rigid element generated in clean space (a box or a sign), where straight verticals make the
   lean measurable to 0.001 px/row; the test character's silhouette was 14x too noisy (2026-10-21).
@@ -218,3 +220,33 @@ Rules for the whole phase:
 
 S1, S2, S3 and S5 pass; S6 passes or Mike parks it; catalogue and NOTES updated. Then draft the Sensor Pass part of
 ADR-022 Amendment 3. Don't start lens fitting beyond k1 k2, depth bokeh or LoRA work without Mike.
+
+## Tracker. Solve Plate (4), Solve Mask (67), Track 2D (68), Solve View (69) (built 2026-11-01, synthetic)
+
+- Plate to camera inside ComfyUI, in camera_side so it moves to Atlas Camera at the split (ADR-022 decision 2,
+  Amendment 2). Owner calls (2026-11-01): pycolmap first, lens always solved, a built-in auto mask
+  (Grounding DINO + SAM 2.1), manual 2D tracks and a three.js viewer.
+- Engine `camera_side/plate_solve.py`: the DSCF3000 S1-S3 recipe with focal + k1/k2 refined on the raw features,
+  bridging, motion rejection, degeneracy report; panoramic shots and failed starts go to `nodal_solve.py`.
+- The contract's `project()` applies the lens block (brown / simple_radial) so the QC nodes draw on the plate as
+  shot; RS Solve undistorts its observations first.
+- **Tests:** `tests/test_plate_solve.py` (rendered courtyard, known camera + lens: dolly with manual tracks, a moving
+  board masked and unmasked, a nodal pan), `tests/test_solve_mask.py`, `tests/test_tracks2d.py`,
+  `tests/test_solve_view.py`, `tests/test_shot_camera.py` (lens projection).
+- **Next (live):** DSCF3000 S1-S3 through the GUI workflow, compared with `solve_s1s3_f16` and Mike's Nuke camera
+  (Solve Compare), the free-focal delta reported; Solve Mask on a shot with people; Lock Check + Camera Export to Nuke.
+
+## Flow review (2026-11-01): one lens policy, guards, overscan, the golden graph
+
+- Phases A-C of the flow review (commits d8ee2c1, aec9cbe, 8a43015): correctness fixes, camera guards
+  (`camera_side/camera_checks.py`), layers delivered clean + plate with a Nuke Builder switch, overscan (Sensor Lens
+  Maps `overscan`, `camera_side/clean_space.py`).
+- **Golden graph** `workflows/golden_dscf3000_s2s3.json` (`tools/golden_shot_workflow.py`, built from the DEMO and
+  clean-loop workflows with `tools/ui_workflow.to_api`): Solve Mask -> Solve Plate (0-296) -> Measure & Scale (S2-S3
+  picks) -> Sensor Lens Maps (auto overscan) -> cards (clean + plate) -> LTX clean loop -> LTX Return -> Comp Preview
+  and Nuke Builder (clean + STMaps). The element card has no depth holdout (refused with a lens folder until Plate
+  Depth works in clean space). Pick the element clip in LoadVideo before queueing.
+- **Open:** colour pairs (Character Insert / Foreground Element / Relight Transfer decode generated clips with plain
+  sRGB, LTX Prep re-encodes with the ACES 2.0 view); depth holdout in clean space; the HDR spike (LTX-2.5 SDR->HDR
+  IC-LoRA) with numbers to Mike before a node; a live golden run and Nuke Indie check of both lens modes.
+

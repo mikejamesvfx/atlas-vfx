@@ -95,7 +95,7 @@ class AtlasVFXCameraImport:
                                 frame_offset=plate_ref["frame_offset"], fps=fps, camera=abc_camera.strip() or None,
                                 first_frame_to=first_to)
         shift = cam.data.get("extensions", {}).get("atlas_vfx_import", {}).get("frame_shift")
-        out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / Path(plate_ref["path"]).stem / "camera")
+        out = pl.resolve_out_dir(out_dir, pl.WORK_ROOT / pl.plate_stem(plate_ref) / "camera")
         path = cio.sc.save(cam, out / f"{name}.shot_camera.json")
         pl.write_sidecar(out / f"{name}.shot_camera.sidecar.json", "AtlasVFXCameraImport",
                          inputs={"source_path": str(src), "kind": kind, "source_sha256": _source_hash(src),

@@ -5,6 +5,8 @@
 - identity: if LTX hands back exactly what it was given (the plate in the view, at work size), the returned layer over
   the plate reproduces the plate: outside the mask exactly (alpha 0), inside within the round trip + resize error
 - the returned layer is premultiplied ACEScg with alpha = the feathered mask
+- mirror (2026-10-30): flips W only, is its own inverse, and a mirrored round trip (Prep flips, "LTX" lights the
+  flipped frame from its right, Return flips back) puts the light on the plate's left
 
 Run: <V141 python> tests\test_ltx_integration.py
 """
@@ -113,12 +115,54 @@ def test_windows(fwd, inv):
           f"native 1:1, max scale step {jump:.4f}/frame; crop -> paste back identity within {rel * 100:.3f} %")
 
 
+def test_mirror(fwd, inv):
+    W, H, ww, wh = 512, 270, 256, 128
+    lin = plate(W, H)
+    stack = np.stack([lin, lin * 0.5])
+    m = li.mirror(stack)
+    assert m.shape == stack.shape and np.array_equal(m[0, :, 0], stack[0, :, -1]) and np.array_equal(m[1, 0], stack[1, 0, ::-1])
+    assert np.array_equal(li.mirror(m), stack) and m.flags["C_CONTIGUOUS"]
+    masks = np.zeros((2, 4, 6), np.float32)
+    masks[:, :, 0] = 1
+    assert np.array_equal(li.mirror(masks)[:, :, -1], masks[:, :, 0])           # (N, H, W) masks too
+    try:
+        li.mirror(lin[..., 0])
+        raise AssertionError("a single 2-D image must be refused (it would flip rows)")
+    except ValueError:
+        pass
+    ref = li.mirror(li.resize(li.to_view(lin, fwd), (ww, wh))[None])[0]           # what LTX sees
+    ramp = np.linspace(1.6, 0.6, ww, dtype=np.float32)[None, :, None]           # "LTX" sun on ITS frame right
+    lit = np.clip(ref * ramp[:, ::-1], 0, 1)
+    back = li.mirror(lit[None])[0]                                               # LTX Return's flip
+    rgba = li.return_frame(back, np.ones((wh, ww), np.float32), (W, H), inv, feather_px=0)
+    gain = rgba[..., :3].mean(-1) / lin.mean(-1)
+    left, right = gain[:, : W // 4].mean(), gain[:, -W // 4:].mean()
+    assert left > 1.3 * right, (left, right)
+    print(f"ok mirror: flips W only, its own inverse; mirrored relight lands on the plate's left (gain left "
+          f"{left:.2f} vs right {right:.2f})")
+
+
+def test_prep_view():
+    """Return inverts the view Prep recorded, not today's default."""
+    ref = {"ocio_config": OCIO, "working_space": "ACEScg"}
+    lin = plate()[:16, :16]
+    fwd_d, _ = li.prep_processors({"plate_ref": ref})
+    fwd_u, inv_u = li.prep_processors({"plate_ref": ref, "view": ["sRGB - Display", "Un-tone-mapped"]})
+    a, b = li.to_view(lin, fwd_d), li.to_view(lin, fwd_u)
+    assert float(np.abs(a - b).max()) > 1e-3, "the two views should differ"
+    back = li.from_view(b, inv_u)
+    assert float(np.abs(back - lin).max()) < 1e-3, float(np.abs(back - lin).max())
+    print("ok prep view: Return's processors come from the recorded view (Un-tone-mapped round trips, differs from the default)")
+
+
 def main() -> int:
     fwd, inv = li.view_processors(OCIO)
+    test_prep_view()
     test_roundtrip(fwd, inv)
     test_mask()
     test_identity(fwd, inv)
     test_windows(fwd, inv)
+    test_mirror(fwd, inv)
     return 0
 
 

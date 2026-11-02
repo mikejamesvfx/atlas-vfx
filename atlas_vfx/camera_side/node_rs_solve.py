@@ -110,7 +110,7 @@ class AtlasVFXRSSolve:
         start_ms, start_from = start_readout(cam.data, readout_ms, held)
         warnings = []
         dist = (cam.data.get("lens") or {}).get("distortion_model", "none")
-        if dist not in ("none", None):
+        if dist not in ("none", None, "simple_radial", "brown"):
             warnings.append(f"camera lens distortion '{dist}' is ignored: the RS solve is pinhole")
         if "atlas_vfx_rs_solve" in (cam.data.get("extensions") or {}):
             warnings.append("input camera is already an RS solve; solving again from its poses")

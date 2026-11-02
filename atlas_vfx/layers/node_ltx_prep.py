@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
+from atlas_vfx.camera_side import camera_checks as cc
 from atlas_vfx.camera_side import exr_io
 from atlas_vfx.camera_side import plate as pl
 
@@ -61,12 +62,22 @@ class AtlasVFXLTXPrep:
                                                 "de-rolling-shuttered before LTX (clean space). LTX Return puts it back"}),
                 "sensor_lens_folder": ("STRING", {"default": "", "tooltip": "Sensor Lens Maps folder: the plate is "
                                                   "undistorted / devignetted before LTX. LTX Return puts it back"}),
+                "mirror": ("BOOLEAN", {"default": False,
+                                       "tooltip": "flip every output left-right before LTX; LTX Return flips the take "
+                                                  "back. On DSCF3000 the LTX-2.3 Relight LoRA kept the sun on frame "
+                                                  "right whatever the ball said: mirror and ask for the right to get "
+                                                  "the sun on the left. Add the light ball after Prep, on the mirrored "
+                                                  "frame"}),
+                "allow_raw_lens": ("BOOLEAN", {"default": False,
+                                               "tooltip": "a layer whose camera has a lens normally needs "
+                                                          "sensor_lens_folder (the plate undistorted to match the "
+                                                          "pinhole layer); on = comp it on the distorted plate anyway"}),
             },
         }
 
     def run(self, plate_ref, layer_folder, first_frame, length, width, height, mask_thresh, shadow_px, dilate_px,
             keyframe_every=24, mode="full", crop_margin=96, extra_layers="", reference="plate", mask_mode="layer",
-            sensor_rs_folder="", sensor_lens_folder=""):
+            sensor_rs_folder="", sensor_lens_folder="", mirror=False, allow_raw_lens=False):
         import torch
 
         if (length - 1) % 8:
@@ -75,16 +86,28 @@ class AtlasVFXLTXPrep:
         def load(folder):
             folder = Path(pl.clean_path(folder))
             rj = json.loads(next(folder.glob("*.render.json")).read_text(encoding="utf-8"))
-            return {"name": rj["card"], "pattern": str(folder / rj["pattern"]), "range": rj["frames"]}
+            # clean-space Prep (lens folder) comps the clean (pinhole) version, raw-plate Prep the plate version
+            want = "clean" if sensor is not None and sensor.lens_folder is not None else "plate"
+            versions = rj.get("versions") or {want: rj["pattern"]}
+            pat = versions.get(want)
+            if pat is None:
+                raise ValueError(f"LTX Prep: layer {rj['card']} has no {want} version ({sorted(versions)})")
+            return {"name": rj["card"], "pattern": str(folder / pat), "range": rj["frames"],
+                    "lens": rj.get("lens")}
 
         main = load(layer_folder)
         layers = [main] + [load(f) for f in extra_layers.splitlines() if f.strip()]
+        for L in layers:            # pinhole layers of a lensed camera need the plate in clean space
+            cc.lens_needs_clean({"lens": L["lens"], "shot": {"name": L["name"]}}, sensor is not None and
+                                sensor.lens_folder is not None, "LTX Prep", allow_raw=allow_raw_lens)
         rj = {"card": main["name"]}
         pattern = main["pattern"]
         frames = list(range(first_frame, first_frame + length))
         if mode == "crop" and (frames[0] < main["range"][0] or frames[-1] > main["range"][1]):
             raise ValueError(f"crop mode: layer covers {main['range']}, asked {frames[0]}-{frames[-1]}")
-        H0, W0 = plate_ref["height"], plate_ref["width"]
+        # the frame LTX works on: the plate, or with an overscanned lens the bigger clean frame
+        W0, H0 = (sensor.clean_size if sensor is not None and sensor.lens_folder is not None
+                  else (plate_ref["width"], plate_ref["height"]))
 
         def read(L, n):
             """A layer frame, or nothing (zeros) outside its range."""
@@ -94,7 +117,7 @@ class AtlasVFXLTXPrep:
         fwd, inv = li.view_processors(plate_ref["ocio_config"])
         off = plate_ref["frame_offset"]
         size, half = (width, height), (width // 2, height // 2)
-        plate_size = (plate_ref["width"], plate_ref["height"])
+        plate_size = (W0, H0)
         windows = None
         if mode == "crop":
             boxes = [li.bbox(exr_io.read_rgba(pattern % n)[0][..., 3], mask_thresh) for n in frames]
@@ -104,7 +127,7 @@ class AtlasVFXLTXPrep:
         start, rt = None, None
         key_idx = sorted(set(list(range(0, length, keyframe_every)) + [length - 1]))
         keys = []
-        for (i, img), n in zip(pl.decode_rgb(plate_ref, frames[0] - off, frames[-1] - off), frames):
+        for (i, img), n in zip(pl.decode_rgb_or_black(plate_ref, frames[0] - off, frames[-1] - off), frames):
             lin = pl.to_working(img, plate_ref)
             if sensor is not None:
                 lin = li.remove_camera(lin, sensor, n)      # clean space: matches the pinhole card layers
@@ -134,15 +157,21 @@ class AtlasVFXLTXPrep:
             m_half.append((li.resize(m, half) > 0.5).astype(np.float32))
         prep = {"plate_ref": plate_ref, "layer": rj["card"], "layer_pattern": pattern, "frames": [frames[0], frames[-1]],
                 "work_size": list(size), "plate_size": list(plate_size), "mode": mode, "windows": windows,
+                "true_plate_size": [plate_ref["width"], plate_ref["height"]],
                 "mask": {"thresh": mask_thresh, "shadow_px": shadow_px, "dilate_px": dilate_px},
                 "masks_work": None, "view": [pl.DEFAULT_DISPLAY, pl.DEFAULT_VIEW], "roundtrip": rt,
                 "mask_coverage": float(np.mean(m_full)), "keyframes": key_idx,
                 "layers": [L["name"] for L in layers], "reference": reference, "mask_mode": mask_mode,
-                "sensor": li.sensor_record(sensor)}
+                "sensor": li.sensor_record(sensor), "mirror": bool(mirror),
+                "warnings": li.roundtrip_warnings(rt, mask_mode),
+                "lens_on_layers": any(cc.has_lens({"lens": L["lens"]}) for L in layers if L["lens"])}
+        for w in prep["warnings"]:
+            li.log.warning("atlas-vfx LTX Prep: %s", w)
         masks = np.stack(m_full).astype(np.float32)
-        prep["masks_work"] = masks                       # kept in memory for Return (not JSON)
-        t = lambda a: torch.from_numpy(np.ascontiguousarray(a, dtype=np.float32))
-        return (t(np.stack(ref_full)), t(masks), t(np.stack(ref_half)), t(np.stack(m_half)), t(start[None]), prep, t(np.stack(keys)))
+        prep["masks_work"] = masks                       # kept in memory for Return (not JSON), never mirrored
+        t = lambda a: torch.from_numpy(np.ascontiguousarray(li.mirror(a) if mirror else a, dtype=np.float32))
+        return (t(np.stack(ref_full)), t(masks), t(np.stack(ref_half)), t(np.stack(m_half)), t(start[None]), prep,
+                t(np.stack(keys)))
 
 
 NODE_CLASS_MAPPINGS = {"AtlasVFXLTXPrep": AtlasVFXLTXPrep}

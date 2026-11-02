@@ -21,7 +21,7 @@ def progress_bar():
 
 def work_dir(cam_data: dict | None, sub: str, out_dir: str = "") -> Path:
     """The node's output folder: out_dir if given, else under the work root; either way checked by resolve_out_dir."""
-    stem = Path(cam_data["plate"]["path"]).stem if cam_data else "shot"
+    stem = (Path(cam_data["plate"].get("path") or "").stem if cam_data else "") or "shot"
     return pl.resolve_out_dir(out_dir, pl.WORK_ROOT / stem / "sensor" / sub)
 
 

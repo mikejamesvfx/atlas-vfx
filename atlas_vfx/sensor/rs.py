@@ -65,6 +65,30 @@ def pose_at(cam, t: float) -> tuple[np.ndarray, np.ndarray]:
     return rs_time.interp_pose(A[:3, :3], B[:3, :3], A[:3, 3], B[:3, 3], a)
 
 
+def poses_at(cam, t) -> tuple[np.ndarray, np.ndarray]:
+    """pose_at for many times at once: (R c2w (n,3,3), C (n,3)). The same pairs, slerp and lerp as pose_at."""
+    from scipy.spatial.transform import Rotation
+
+    t = np.asarray(t, np.float64).ravel()
+    frames = cam.frames
+    if len(frames) < 2:
+        M = cam.cam_to_world(frames[0])
+        return np.broadcast_to(M[:3, :3], (len(t), 3, 3)).copy(), np.broadcast_to(M[:3, 3], (len(t), 3)).copy()
+    f0 = np.clip(np.floor(t).astype(np.int64), frames[0], frames[-2])
+    a = t - f0
+    R, C = np.empty((len(t), 3, 3)), np.empty((len(t), 3))
+    for f in np.unique(f0):
+        f = int(f)
+        if f not in cam._by_frame or f + 1 not in cam._by_frame:
+            raise KeyError(f"pose_at({t[f0 == f][0]}): frames {f}/{f + 1} not both in {cam.name}")
+        A, B = cam.cam_to_world(f), cam.cam_to_world(f + 1)
+        sel = f0 == f
+        rel = Rotation.from_matrix(A[:3, :3].T @ B[:3, :3]).as_rotvec()
+        R[sel] = A[:3, :3] @ Rotation.from_rotvec(a[sel, None] * rel).as_matrix()
+        C[sel] = A[:3, 3] * (1 - a[sel, None]) + B[:3, 3] * a[sel, None]
+    return R, C
+
+
 class RowPoses:
     """Pose of every sensor row relative to the frame-time camera, as a fine table in y (linear in between).
 
@@ -78,16 +102,13 @@ class RowPoses:
         R0, C0 = M0[:3, :3], M0[:3, 3]
         self.ys = np.arange(0.0, h + step, step)
         n = len(self.ys)
-        self.M = np.empty((n, 3, 3))
-        self.b = np.empty((n, 3))
         moving = readout_fr != 0 or time_offset != 0
-        for i, y in enumerate(self.ys):
-            if moving:
-                R, C = pose_at(cam, frame + time_offset + float(row_tau(y, h, readout_fr)))
-            else:
-                R, C = R0, C0
-            self.M[i] = R0.T @ R
-            self.b[i] = R0.T @ (C - C0)
+        if moving:
+            R, C = poses_at(cam, frame + time_offset + row_tau(self.ys, h, readout_fr))
+        else:
+            R, C = np.broadcast_to(R0, (n, 3, 3)), np.broadcast_to(C0, (n, 3))
+        self.M = np.einsum("ji,njk->nik", R0, R)                          # R0^T R, every row at once
+        self.b = (C - C0) @ R0                                              # R0^T (C - C0)
         self.flatM = self.M.reshape(n, 9)
 
     def at(self, y):
@@ -212,6 +233,9 @@ def rs_maps(cam, frame: int, depth: np.ndarray, readout_s: float, fps: float | N
     h = int(height or cam.data["plate"]["height"])
     S = _Setup(cam, frame, w, h, readout_s, fps, lens, time_offset)
     depth = prepare_depth(depth, valid, far_m)
+    from . import rs_gpu
+    if rs_gpu.available():
+        return rs_gpu.rs_maps(S, depth, object_flow, iters, want_ders)
     rs = np.empty((h, w, 2), np.float32)
     de = np.empty((h, w, 2), np.float32) if want_ders else None
     xs = np.arange(w, dtype=np.float64) + 0.5

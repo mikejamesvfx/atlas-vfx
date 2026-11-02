@@ -2,6 +2,7 @@
 
 - a camera vs itself scaled 7x, rotated and moved: scale 7, residual 0, view angle 0 (and 1/7 the other way)
 - noise on the copy shows up as residual and angle of the right size
+- a straight walk: the orientation-aligned view angle stays small where the centre fit loses the roll
 - acceptance on real data, if present: Nuke Camera1 vs solve_s1s3_f16 reproduces the prototype (align_nuke.py,
   2026-10-18): median centre residual 0.97 % of path, median view angle 2.94 deg, scale 0.10488 Nuke per solve unit
 
@@ -96,9 +97,32 @@ def test_real():
           f"{got['view_angle_median']:.4f} deg, {got['scale_nuke_per_mine']:.6f}")
 
 
+def test_straight_walk():
+    """A walk down a straight line (DSCF2977, 2026-11-01): the centre fit can't see the roll about the path, so it
+    reports a large view angle between two cameras that agree; the orientation-aligned angle stays small and the
+    summary line uses it."""
+    mats = []
+    for i in range(60):
+        M = np.eye(4)
+        M[:3, :3] = rot(np.array([0.0, 1.0, 0.0]), 0.3 * math.sin(i / 7))
+        M[:3, 3] = [0.0, 1.6, -0.05 * i]                       # straight down -Z, 3 m
+        mats.append(M)
+    a = sc.build(name="walk", frame_start=1001, fps=24.0, plate=PLATE, sensor=SENSOR, cam_to_world=mats,
+                 focal_mm=16.0, source={"kind": "synthetic"})
+    b = transformed(a, 3.0, rot(np.array([0.2, 0.9, 0.1]) / np.linalg.norm([0.2, 0.9, 0.1]), 40.0),
+                    np.array([1.0, 2.0, 3.0]), noise_pos=0.004, noise_deg=0.05, seed=3)
+    r = cmp.compare(a, b)
+    o = r["view_angle_orientation_deg"]["median"]
+    assert o < 0.2 and r["alignment_disagreement_deg"] > cmp.DISAGREE_DEG, (o, r["alignment_disagreement_deg"])
+    assert "orientation-aligned" in cmp.summary_line(r)
+    print(f"ok straight walk: centre fit {r['view_angle_deg']['median']:.2f} deg off (roll about the path is loose), "
+          f"orientation-aligned {o:.3f} deg; the summary line reports the latter")
+
+
 def main() -> int:
     test_exact()
     test_noise()
+    test_straight_walk()
     test_real()
     return 0
 

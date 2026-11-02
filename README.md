@@ -20,12 +20,12 @@ Start with AGENTS.md (rules, layout, import graph) and SECURITY.md (threat model
 
 ![The main wiring by family: Plate Read and Camera Import feed Card Project and Foreground Element, Chart Calibrate feeds Sensor RS Maps and Sensor Apply, Physical Sky feeds Relight, and the layer folders go to Nuke Builder](docs/images/node_map.png)
 
-Ten of the 40 nodes and the sockets that tie them. Plate Lock's nine nodes run their own chain. The full list, with
+Ten of the 54 nodes and the sockets that tie them. Plate Lock's nine nodes run their own chain. The full list, with
 every input and output, is `docs/NODE_CATALOGUE.md`.
 
 ## Status (0.1.0, beta)
 
-40 nodes ship and load; the catalogue's other 12 entries are planned or live elsewhere. How far each node is
+54 nodes ship and load; the catalogue's other 12 entries are planned or live elsewhere. How far each node is
 proven:
 
 - **Accepted in Nuke** (3): EXR Write, Nuke Builder, Camera Export.
@@ -33,9 +33,9 @@ proven:
   Plate Depth, Card Project, Foreground Element, Sensor Lens Maps, Sensor RS Maps, Sensor Apply, LTX Prep, LTX
   Return, Comp Preview, Physical Sky, and on an LTX plate: Light Probe & Relight, Normals, Light From Plate, Depth
   Holdout. Measure & Scale and Set Proxy ran on the plate with guessed picks and a guessed scale (2 more).
-- **Synthetic only**, tests with a known answer, not yet a real plate (15): the nine Plate Lock nodes, Chart
-  Calibrate (the chart isn't shot yet), Character Insert (its plate run was withdrawn), RS Solve, and the three
-  frame chunk nodes (Chunk Plan, Sequence Read Chunk, Chunk Stitch).
+- **Synthetic only**, tests with a known answer, not yet a real plate (16): the nine Plate Lock nodes, Chart
+  Calibrate (the chart isn't shot yet), Character Insert (its plate run was withdrawn), RS Solve, the three
+  frame chunk nodes (Chunk Plan, Sequence Read Chunk, Chunk Stitch) and Relight Transfer.
 - **Deprecated** (1): Sensor Readout Solve, biased low on the plate; RS Solve replaces it.
 
 What that means for you: the camera to cards to Nuke path, Sensor Pass and Physical Sky are the solid parts. Plate
@@ -69,6 +69,74 @@ source; this list follows it.
 
 `tools/clean_install_check.py` does step 2 in a ComfyUI that has never seen your machine (a fresh clone, empty home
 folder); CI runs it on Linux on every push.
+
+## Atlas Comp (early)
+
+Open **http://127.0.0.1:8188/atlas** in a browser while ComfyUI runs: a compositor's screen on top of these nodes.
+Make a shot (a plate movie and a frame range in Nuke numbers), stack layers (EXR sequences you have, or recipes:
+Matte, Relight, Sky), look at them through the OCIO view with an A/B wipe and an f-stop slider, and run a recipe as
+**Preview** (a few frames, tiny-VAE live previews) or **Render** (the full job, a new version). Everything lives on
+disk under `~/atlas-vfx-work/comp/<shot>/`:
+
+```
+shot.json                          the shot and its layers
+plate_proxy_1280/plate.####.exr    the plate, decoded once for the viewer
+layers/<layer>/v001/ ...           one folder per render (a relight's 4K result is in beauty/)
+layers/<layer>/preview/            the last Preview
+```
+
+The routes live in `atlas_vfx/comp/server.py`, the recipes in `recipes/` (written by `tools/comp_recipes.py`), the
+page in `app/`. Design and plan: `docs/superpowers/specs/2026-10-31-atlas-comp-design.md`.
+
+### Rendering on another machine
+
+Beside **Render** sits a **Render on** picker. `ws` (this machine) runs as before. Any other target goes through
+Atlas Comp's queue (the **Queue** button in the top bar) in three stages:
+
+- **pre** on this machine: reads the plate, preps the reference, and encodes it once to a float32 latent
+  (Latent Pre-render, cached under the layer);
+- **generate** on the target: Guide From Latent loads that latent as the IC-LoRA guide, samples, and sends the
+  sampled latent back (a few MB each way, not the frames);
+- **post** on this machine: decode, LTX Return, a new version.
+
+Before anything is sent, the target is checked for every node and model file the job names; one miss and the job
+is refused with the miss named. After the run the frame count must come back or the job fails. One job per target
+at a time; a dead machine fails its own jobs only.
+
+Targets live outside the repo in `~/atlas-vfx-work/atlas_comp_targets.local.json` (they name machines on your LAN):
+
+```json
+{"targets": [
+  {"name": "render", "kind": "comfyui", "url": "http://<address>:8188", "note": "3090 24 GB"},
+  {"name": "cloud", "kind": "comfy_cloud",
+   "models": {"ltx23\\ltx-2.3-22b-ic-lora-relight-1.0.safetensors": "<the name your import got>"}}
+]}
+```
+
+A farm machine needs atlas-vfx installed (for Guide From Latent) and the same model files.
+
+**Comfy Cloud** is opt-in. Set `COMFY_CLOUD_API_KEY` (your Comfy account's API key, needs a paid plan) before
+starting ComfyUI; the key is read from the environment and never written down. Cloud has no atlas-vfx nodes, so
+there the reference frames are uploaded (one PNG each) and LTX's own image guide is used. A Cloud job stops at
+**Confirm** in the Queue panel with a rough credit range (Cloud has no estimate endpoint, so it is GPU seconds at
+the published rate) and says what will leave the machine; nothing is uploaded until you confirm. The Relight LoRA is
+not in Cloud's catalogue: import it into your account (Models, Import) and map its name with `models` as above.
+
+## If you come from Nuke
+
+The `Atlas VFX/Artist` nodes are the familiar tools:
+
+| You know | Here | What it does |
+|---|---|---|
+| Project frame range | Shot Range | in/out once, in Nuke frames; gives LTX's 8k+1 length and the plate index |
+| Viewer (wipe, f-stop, view) | Viewer | A/B wipe, side by side, difference, exposure, OCIO display/view, zoom to alpha |
+| Grade | Grade | the same maths: blackpoint, whitepoint, lift, gain, multiply, offset, gamma, mask, mix |
+| Read node's file browser | Layer Picker | rendered layers and EXR sequences from a list, no typed paths |
+| A light rig | Sun Direction + Light Ball | where the sun is, in words; the relight prompt and ball are made for you |
+| Script notes | Notes | any node's report as readable lines, warnings first |
+
+Whole jobs come as one box: search the node library for **Atlas VFX Relight Element 4K** or **Atlas VFX LTX Clean
+Loop** (blueprints in `subgraphs/`). Double-click a box to see the graph inside.
 
 ## Physical Sky
 

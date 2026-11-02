@@ -98,6 +98,69 @@ def convert(graph, title=""):
     return wf
 
 
+def _dynamic(prefix, spec, chosen, vals, k, inputs):
+    """A dynamic combo's chosen option brings its own widgets (saved right after it): name them prefix.sub and
+    recurse into nested dynamic combos (SaveVideo: format -> format.codec -> format.codec.encoding)."""
+    opts = spec[1] if len(spec) > 1 and isinstance(spec[1], dict) else {}
+    option = next((o for o in opts.get("options", []) if o.get("key") == chosen), None)
+    if option is None:
+        return k
+    subs = list(option["inputs"].get("required", {}).items()) + list(option["inputs"].get("optional", {}).items())
+    for sub, sspec in subs:
+        if not _is_widget(sspec) or k >= len(vals):
+            continue
+        key = f"{prefix}.{sub}"
+        inputs[key] = vals[k]
+        k += 1
+        if sspec[0] == "COMFY_DYNAMICCOMBO_V3":
+            k = _dynamic(key, sspec, inputs[key], vals, k, inputs)
+    return k
+
+
+def to_api(wf: dict) -> dict:
+    """A GUI (litegraph) workflow back to an API graph, the inverse of convert: widgets_values are read in the
+    node definition's input order (skipping the control_after_generate and upload slots convert adds), sockets and
+    converted widgets take their link. Reroutes / primitives / subgraphs are not handled (refused). Raises when a
+    node's widget count doesn't match its definition (a stale saved graph)."""
+    links = {l[0]: l for l in wf["links"]}
+    graph = {}
+    for n in wf["nodes"]:
+        if n["type"] in ("MarkdownNote", "Note"):
+            continue                              # frontend-only notes: nothing to run
+        if n["type"] in ("Reroute", "PrimitiveNode") or n.get("mode", 0) == 4:
+            raise ValueError(f"to_api: node {n['id']} {n['type']} is not handled")
+        info = _info(n["type"])
+        specs = list(info["input"].get("required", {}).items()) + list(info["input"].get("optional", {}).items())
+        linked = {i["name"]: links[i["link"]] for i in n.get("inputs", []) if i.get("link") is not None}
+        vals = list(n.get("widgets_values") or [])
+        k, inputs = 0, {}
+        for name, spec in specs:
+            if _is_widget(spec):
+                if k >= len(vals):
+                    if name not in info["input"].get("optional", {}):
+                        raise ValueError(f"to_api: {n['type']} #{n['id']} has {len(vals)} widget values, its "
+                                         f"definition wants more (stale graph?)")
+                    if name in linked:
+                        inputs[name] = [str(linked[name][1]), linked[name][2]]
+                    continue                     # an optional input the saved graph doesn't know: the server default
+                v = vals[k]
+                k += 1
+                if _has_control(name, spec):
+                    k += 1
+                opts = spec[1] if len(spec) > 1 and isinstance(spec[1], dict) else {}
+                if opts.get("image_upload") or opts.get("video_upload"):
+                    k += 1
+                inputs[name] = [str(linked[name][1]), linked[name][2]] if name in linked else v
+                if spec[0] == "COMFY_DYNAMICCOMBO_V3":
+                    k = _dynamic(name, spec, v, vals, k, inputs)
+            elif name in linked:
+                inputs[name] = [str(linked[name][1]), linked[name][2]]
+        if k < len(vals):                # (k may run 1 past the end: an upload / control slot not saved)
+            raise ValueError(f"to_api: {n['type']} #{n['id']}: {len(vals) - k} widget values left over (stale graph?)")
+        graph[str(n["id"])] = {"class_type": n["type"], "inputs": inputs}
+    return graph
+
+
 def portable(text: str) -> str:
     """The repo copy of a workflow: the home folder written as ~ (both slash styles, as JSON escapes them) and the
     shipped OCIO config blank (the nodes take blank as the shipped config). Path widgets expand ~ when they run.
