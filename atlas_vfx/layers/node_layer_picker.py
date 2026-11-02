@@ -76,6 +76,8 @@ class AtlasVFXLayerPicker:
                    "range. The list is read when ComfyUI loads the nodes: press R (refresh) or reload after "
                    "rendering something new.")
 
+    DISK_COMBOS = ("layer",)    # its options are what this machine has rendered, not part of the node's contract
+
     @classmethod
     def INPUT_TYPES(cls):
         layers = find_layers(pl.WORK_ROOT) or [NONE]

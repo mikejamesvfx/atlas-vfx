@@ -52,7 +52,8 @@ def contracts() -> tuple[dict, dict]:
         for group in ("required", "optional"):
             for name, spec in (it.get(group) or {}).items():
                 entry = {"name": name, "type": _spec_type(spec), "group": group}
-                if entry["type"] == "COMBO" and len(spec[0]) <= COMBO_SHOW:
+                if (entry["type"] == "COMBO" and len(spec[0]) <= COMBO_SHOW
+                        and name not in getattr(cls, "DISK_COMBOS", ())):    # listed from disk: differs per machine
                     entry["options"] = [str(o) for o in spec[0]]
                 inputs.append(entry)
         rt = list(cls.RETURN_TYPES)
