@@ -3086,6 +3086,11 @@
     "name": "ocio_config",
     "type": "STRING",
     "group": "optional"
+   },
+   {
+    "name": "geometry_cache",
+    "type": "BOOLEAN",
+    "group": "optional"
    }
   ],
   "outputs": [

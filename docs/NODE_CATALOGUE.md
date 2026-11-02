@@ -738,13 +738,13 @@ Payloads (all plain JSON-safe dicts unless said):
 ### 54 Relight Transfer Files
 `AtlasVFXRelightTransferFiles` · layers · Atlas VFX/Layers
 - in: element_path STRING, relit_path STRING, matte_path STRING, first_frame INT, length INT, relit_numbering frame|sequential, relit_encoding linear|srgb|inverse display view (ACES 2.0 SDR, as LTX), mode guided|sh, analysis_width INT, blur_px FLOAT, max_stops FLOAT, temporal INT, eps FLOAT, subsample INT, geo_weight FLOAT, min_r2 FLOAT, lift_limit FLOAT, name STRING, out_dir STRING
-- in, optional: moge_model MOGE_MODEL, resolution_level INT, refine_steps INT, normals_temporal INT, normals_sigma FLOAT, depth_guide BOOLEAN, shot_camera ATLAS_TRACKED_CAMERA, relit_mirrored BOOLEAN, holdout_path STRING, holdout_grow INT, ocio_config STRING
+- in, optional: moge_model MOGE_MODEL, resolution_level INT, refine_steps INT, normals_temporal INT, normals_sigma FLOAT, depth_guide BOOLEAN, shot_camera ATLAS_TRACKED_CAMERA, relit_mirrored BOOLEAN, holdout_path STRING, holdout_grow INT, ocio_config STRING, geometry_cache BOOLEAN
 - out: images STRING, gain STRING, info STRING
 - test: tests/test_relight_transfer.py, tests/test_element_colour.py
 - proof: synthetic; plate V141
 - licences: none beyond the base (MoGe-3 is in the register)
 - needs: nothing beyond the base
-- writes: <name>.<frame>.exr (ACEScg, alpha = matte), <name>_gain/<name>_gain.<frame>.exr (log2, Raw), a sidecar
+- writes: <name>.<frame>.exr (ACEScg, alpha = matte), <name>_gain/<name>_gain.<frame>.exr (log2, Raw), a sidecar; with geometry_cache (default on) MoGe's normals (float16) and depth (float32) per frame in <work>/geometry_cache/<key>, keyed on the element and matte files and the MoGe settings, kept between runs (about 85 MB per 4K frame; delete the folder to reclaim it)
 - notes: 53 for long or 4K shots. Same maths (light_transfer.transfer on frame sources and an EXR sink), but the
   element, matte (blank = the element's alpha), relit take and holdout are paths read one frame at a time, and MoGe
   runs per frame inside the node, its smoothed normals and depth cached on disk as .npy (no pickle) and deleted at

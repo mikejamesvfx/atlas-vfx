@@ -442,7 +442,7 @@ def test_files():
               matte_path="", first_frame=F0, length=T, relit_numbering="frame", relit_encoding="linear", mode="sh",
               analysis_width=0, blur_px=2.0, max_stops=3.0, temporal=1, eps=0.01, subsample=2, geo_weight=0.5,
               min_r2=0.3, lift_limit=3.0, name="rt", out_dir=str(tmp / "out"))
-    res = node.run(**kw, moge_model=moge, normals_temporal=1, normals_sigma=1.5)
+    res = node.run(**kw, moge_model=moge, normals_temporal=1, normals_sigma=1.5, geometry_cache=False)
     pattern, gpattern, info = res["result"]
     rep = json.loads(info)
     check(moge.calls == T and rep["moge"]["runs"] == T, "files: MoGe runs once per frame (normals cached on disk)",
@@ -468,7 +468,7 @@ def test_files():
     check(rep["streamed"] and rep["frames_range"] == [F0, F0 + T - 1], "files: report")
 
     mir = node.run(**{**kw, "relit_path": str(tmp / "rlm" / "rlm.####.exr"), "out_dir": str(tmp / "outm")},
-                   moge_model=FakeMoGe(n, depth), relit_mirrored=True)["result"][0]
+                   moge_model=FakeMoGe(n, depth), relit_mirrored=True, geometry_cache=False)["result"][0]
     check(np.array_equal(read(mir % F0), got[0]), "files: relit_mirrored flips a mirrored take back")
     raises(lambda: node.run(**kw), "files: sh without a MoGe model", "moge_model")
 
@@ -487,8 +487,71 @@ def test_files():
           f"{p20 / 2**20:.0f} MB for 20 (one full frame {element.nbytes / 2**20:.1f} MB)")
 
 
+def test_geometry_cache():
+    """With geometry_cache on, MoGe's normals and depth stay in <work>/geometry_cache/<key>: a second run on the same
+    element skips MoGe and writes bit-identical EXRs; a changed element frame or MoGe setting is a new key."""
+    import os
+    import tempfile
+
+    from atlas_vfx.camera_side import exr_io
+    from atlas_vfx.camera_side import plate as pl
+    from atlas_vfx.layers import light_transfer_files as ltf
+    from atlas_vfx.layers.node_relight_transfer_files import AtlasVFXRelightTransferFiles
+
+    n, matte, bump, element, truth, relit_low = setup()
+    tmp = Path(tempfile.mkdtemp(prefix="rtg_"))
+    os.environ["ATLAS_VFX_OUT_ROOTS"] = str(tmp)
+    real_root, pl.WORK_ROOT = pl.WORK_ROOT, tmp / "work"            # the cache must not land in the owner's work root
+    try:
+        T, F0 = 4, 1001
+        for t in range(T):
+            exr_io.write_rgba(tmp / "el" / f"el.{F0 + t}.exr", np.dstack([element, matte]))
+            exr_io.write_rgba(tmp / "rl" / f"rl.{F0 + t}.exr",
+                              np.dstack([relit_low * (1 + 0.05 * t), np.ones(relit_low.shape[:2], np.float32)]))
+        depth = (2.0 + np.mgrid[0:H, 0:W][0] / H).astype(np.float32)
+        node = AtlasVFXRelightTransferFiles()
+        kw = dict(element_path=str(tmp / "el" / "el.####.exr"), relit_path=str(tmp / "rl" / "rl.####.exr"),
+                  matte_path="", first_frame=F0, length=T, relit_numbering="frame", relit_encoding="linear",
+                  mode="sh", analysis_width=0, blur_px=2.0, max_stops=3.0, temporal=1, eps=0.01, subsample=2,
+                  geo_weight=0.5, min_r2=0.3, lift_limit=3.0, name="rt")
+        read = (lambda p: exr_io.read_rgba(p)[0])
+
+        def go(out, moge, **extra):
+            res = node.run(**kw, out_dir=str(tmp / out), moge_model=moge, **extra)
+            pattern, _, info = res["result"]
+            return np.stack([read(pattern % (F0 + t)) for t in range(T)]), json.loads(info)["moge"]
+
+        m1 = FakeMoGe(n, depth)
+        a, rep1 = go("a", m1)
+        m2 = FakeMoGe(n, depth)
+        b, rep2 = go("b", m2)
+        check(m1.calls == T and not rep1["cache"]["hit"], "geometry cache: the first run fills it", m1.calls)
+        check(m2.calls == 0 and rep2["cache"]["hit"] and rep2["cache"]["dir"] == rep1["cache"]["dir"],
+              "geometry cache: a second run on the same element skips MoGe", m2.calls)
+        check(np.array_equal(a, b), "geometry cache: the run from the cache writes bit-identical EXRs")
+        c, _ = go("c", FakeMoGe(n, depth), geometry_cache=False)
+        check(np.array_equal(a, c), "geometry cache: same EXRs as a run without the cache")
+        check(Path(rep1["cache"]["dir"]).parent == tmp / "work" / ltf.GEOMETRY_CACHE,
+              "geometry cache: kept under <work>/geometry_cache")
+        m3 = FakeMoGe(n, depth)
+        _, rep3 = go("d", m3, refine_steps=2)
+        check(m3.calls == T and rep3["cache"]["dir"] != rep1["cache"]["dir"], "geometry cache: a changed MoGe "
+              "setting is a new key")
+        f = tmp / "el" / f"el.{F0 + 2}.exr"
+        exr_io.write_rgba(f, np.dstack([element * 1.01, matte]))
+        os.utime(f, ns=(f.stat().st_atime_ns, f.stat().st_mtime_ns + 10**9))
+        m4 = FakeMoGe(n, depth)
+        _, rep4 = go("e", m4)
+        check(m4.calls == T and rep4["cache"]["dir"] not in (rep1["cache"]["dir"], rep3["cache"]["dir"]),
+              "geometry cache: a changed element frame is a new key")
+        check(not list(Path(rep1["cache"]["dir"]).glob("*.partial.npy")), "geometry cache: no partial files left")
+    finally:
+        pl.WORK_ROOT = real_root
+
+
 def main():
     test_files()
+    test_geometry_cache()
     test_guided_filter_identity()
     test_fast_guided()
     test_guided_gpu()
