@@ -62,6 +62,8 @@ def test_virtual():
     check(ref["colorspace"] == ref["working_space"] == "ACEScg" and ref["path"] == "", "virtual plate is in ACEScg, no file")
     check(pl.virtual_plate_ref(1920, 1080, [25, 1], 10, 2, 5)["nuke_first"] == 1003, "frame range and offset")
     raises(lambda: pl.virtual_plate_ref(1921, 1080), "odd size refused", "even")
+    raises(lambda: pl.virtual_plate_ref(64, 64, ocio_config_path="x\nNoOp {}"),
+           "OCIO config that isn't a file refused", "not a file")
     raises(lambda: pl.virtual_plate_ref(1920, 1080, 24, 5, 2, 9), "range outside the frames refused", "outside")
     raises(lambda: next(pl.decode_rgb(ref, 1001, 1001)), "decode refuses a virtual plate", "virtual")
     frames = list(pl.decode_rgb_or_black(ref, 0, 16, width=512, step=8))

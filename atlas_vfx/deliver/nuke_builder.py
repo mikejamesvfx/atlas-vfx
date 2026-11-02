@@ -346,6 +346,12 @@ def _curve(values, first: int) -> str:
     return "{curve x%d %s}" % (first, " ".join(f"{v:.9g}" for v in values))
 
 
+def _comment_text(value) -> str:
+    """A value for a `#` comment line: one line, no control characters. A newline would end the comment and the rest
+    would be read as live script on paste (the values come from widgets and camera files, both untrusted)."""
+    return " ".join("".join(ch if ch.isprintable() else " " for ch in str(value)).split())
+
+
 def nk_text(data: dict) -> str:
     """The build as Nuke script text, for pasting into Indie's Node Graph (same nodes as the Python build, except
     the Root settings, which a paste can't set: they are listed in the header comment)."""
@@ -355,11 +361,12 @@ def nk_text(data: dict) -> str:
     q = nt.nk_str
     first, last = data["frames"]
     w, h, pa = data["format"]
+    c1 = _comment_text
     out = ["# atlas-vfx Nuke build for Indie: copy ALL of this, click in the Node Graph, Ctrl+V.",
            f"# Set by hand (a paste can't): Project Settings > frame range {first}-{last}, fps {data['fps']:g}, "
-           f"format {w}x{h}, colour management OCIO, config {data['ocio_config']}, working space "
-           f"{data['working_space']}.",
-           f"# shot {data['shot']}; camera units {data['camera'].get('units', 'metres')}"]
+           f"format {w}x{h}, colour management OCIO, config {c1(data['ocio_config'])}, working space "
+           f"{c1(data['working_space'])}.",
+           f"# shot {c1(data['shot'])}; camera units {c1(data['camera'].get('units', 'metres'))}"]
     sets = []
 
     def put(text, var):

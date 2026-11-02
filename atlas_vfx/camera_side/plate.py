@@ -323,6 +323,8 @@ def virtual_plate_ref(width: int, height: int, fps=24, frame_count: int = 1, fir
     if not (0 <= first <= last < frame_count):
         raise PlateError(f"frames {first}-{last} outside the virtual plate's 0-{frame_count - 1}")
     cfg_path = ocio_path(ocio_config_path)
+    if not Path(cfg_path).is_file():                # the path lands in scripts and headers: only a real file
+        raise PlateError(f"OCIO config {cfg_path!r} is not a file")
     return {
         "kind": "atlas_vfx.plate_ref", "version": 1, "virtual": True, "name": safe_name(name, "plate name"),
         "path": "", "quick_sha256": None, "size_bytes": 0, "codec": None, "profile": None, "pix_fmt": None,

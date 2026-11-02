@@ -370,6 +370,25 @@ def test_virtual_plate(tmp: Path, cam_res: dict, layer_pattern: str):
     print("ok virtual plate: Python build and .nk paste start from a black Constant under the layers")
 
 
+def test_nk_header_injection(tmp: Path, cam_res: dict, layer_pattern: str):
+    """Values in the .nk header comments come from widgets and camera files: a newline in them must not end the
+    comment and smuggle a live node or TCL line into the paste."""
+    base = make_shot(tmp / "inject", cam_res, layer_pattern)
+    evil = 'x\nNoOp {\n name pwn\n label "[python -exec {print(1)}]"\n}\r\n#'
+    data = nb.build_data(shot="SYN_INJ", plate=nb.plate_source("", "virtual"), plate_colorspace="ACEScg",
+                         plate_frames=(1001, 1003), fmt=(4096, 2160, 1.0), ocio_config=OCIO + evil,
+                         camera_chan=cam_res["chan"], camera_settings=cam_res["settings"], layers=base["layers"],
+                         write_pattern=str(tmp / "inj.%04d.exr"))
+    data["camera"]["units"] = "metres" + evil
+    text = nb.nk_text(data)
+    g = nk_graph(text)
+    assert "pwn" not in g and "NoOp" not in {c for c, _ in g.values()}, sorted(g)
+    head = [ln for ln in text.splitlines() if ln.startswith("#")]
+    assert len(head) == 3 and all("\r" not in ln for ln in head), head
+    assert not any(ln.lstrip().startswith(("NoOp", "label", "name pwn")) for ln in text.splitlines()[:6])
+    print("ok nk header: newlines in ocio_config and camera units stay inside their comment lines")
+
+
 def main() -> int:
     cam = camera()
     with tempfile.TemporaryDirectory() as t:
@@ -380,6 +399,7 @@ def main() -> int:
         test_lens_delivery(tmp, cam_res, layer_pattern)
         test_nk_paste(tmp, cam_res, layer_pattern)
         test_virtual_plate(tmp, cam_res, layer_pattern)
+        test_nk_header_injection(tmp, cam_res, layer_pattern)
     return 0
 
 
